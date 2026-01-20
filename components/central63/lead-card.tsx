@@ -143,13 +143,13 @@ export function LeadCard({ lead, formatCurrency, onClick, isSelected, onSelect, 
         </div>
 
         {/* Description */}
-        {/* <div className="text-sm text-muted-foreground leading-snug">
+        <div className="text-sm text-muted-foreground leading-snug">
           <span className="font-bold text-foreground mr-1">{lead.broker.name.split(" ")[0]}:</span> 
           Atendimento na fase de <span className="font-medium text-primary">{lead.phase.label}</span>.
-        </div> */}
+        </div>
 
         {/* Funnel Progress Bar */}
-        {/* <div className="space-y-1 pt-1">
+        <div className="space-y-1 pt-1">
           <div className="flex justify-between text-[10px] text-muted-foreground uppercase font-bold">
             <span>Progresso</span>
             <span>{lead.phase.percent}%</span>
@@ -164,7 +164,7 @@ export function LeadCard({ lead, formatCurrency, onClick, isSelected, onSelect, 
               style={{ width: `${lead.phase.percent}%` }}
             />
           </div>
-        </div> */}
+        </div>
         
         {/* Broker Mini Footer */}
         <div className="pt-3 border-t border-border flex items-center justify-between">
