@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast"
 import Loading from "./loading"
 import { supabase } from "@/lib/supabase"
 
-// --- DADOS CONSTANTES ---
+// --- CONSTANTES ---
 const TEAMS = ["Vendas A", "Vendas B", "Locacao Alpha", "Locacao Beta"]
 const CITIES = ["Palmas", "Araguaina", "Gurupi"]
 const PURPOSES = ["Venda", "Locacao"]
@@ -30,7 +30,6 @@ const PHASES = [
   { id: 6, label: "Fechamento", percent: 100 },
 ]
 
-// Mock brokers (enquanto não houver tabela de corretores)
 const MOCK_BROKERS = [
   { id: 1, name: "Mauricio Silva", avatar: "https://i.pravatar.cc/150?u=1" },
   { id: 2, name: "Mariana Costa", avatar: "https://i.pravatar.cc/150?u=2" },
@@ -65,64 +64,190 @@ export default function Central63App() {
     dateEnd: ""
   })
 
-  // --- FUNÇÃO DE BUSCA (SUPABASE + VERIFICAÇÃO DE VENDAS) ---
+  // --- HELPER: SANITIZAR VALORES MONETÁRIOS ---
+  // Remove R$, pontos e converte vírgula decimal
+  const normalizeCurrency = (value: any): number => {
+    if (!value) return 0;
+    if (typeof value === 'number') return value;
+    
+    try {
+      // Converte para string e remove caracteres não numéricos exceto , . -
+      let str = value.toString().replace(/[^\d,.-]/g, '');
+      
+      // Lógica para formato brasileiro (1.000,00)
+      if (str.includes(',')) {
+        str = str.replace(/\./g, ''); // Remove milhar
+        str = str.replace(',', '.');  // Troca virgula por ponto
+      }
+      
+      const parsed = parseFloat(str);
+      return isNaN(parsed) ? 0 : parsed;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // --- HELPER: COMPARAR IDs COM SUFIXO (ex: 2002_1 > 2002_0) ---
+  const compareIds = (id1: string, id2: string) => {
+    if (id1 === id2) return 0;
+    
+    const parts1 = id1.toString().split('_');
+    const parts2 = id2.toString().split('_');
+    
+    if (parts1.length === 2 && parts2.length === 2) {
+        const num1 = parseInt(parts1[1]);
+        const num2 = parseInt(parts2[1]);
+        if (!isNaN(num1) && !isNaN(num2)) {
+            return num1 - num2;
+        }
+    }
+    // Fallback string comparison
+    return id1 > id2 ? 1 : -1;
+  }
+
+  // --- FUNÇÃO DE BUSCA COMPLEXA ---
   const fetchLeads = useCallback(async () => {
     setIsLoading(true)
     try {
-      // 1. Define contexto baseado na cidade
+      // 1. Configuração do Contexto (Cidade/Tabelas)
       const isPmw = !filters.city || filters.city === "Palmas"
       const currentPrefix = isPmw ? "pmw" : "aux"
-      const tableName = isPmw ? "atendimento_pmw" : "atendimento_aux"
-      const leadRelation = isPmw ? "lead_pmw" : "lead_aux"
       
-      // 2. Query Principal na tabela de atendimentos
+      const tableAtendimento = isPmw ? "atendimento_pmw" : "atendimento_aux"
+      const tableLead = isPmw ? "lead_pmw" : "lead_aux"
+      const tableCarrinho = isPmw ? "imovel_carrinho_pmw" : "imovel_carrinho_aux"
+      const tableImovel = isPmw ? "imovel_pmw" : "imovel_aux"
+      
+      // ---------------------------------------------------------
+      // ETAPA 1: Busca Atendimentos
+      // ---------------------------------------------------------
       let query = supabase
-        .from(tableName)
-        .select(`
-          *,
-          ${leadRelation} (*) 
-        `) 
+        .from(tableAtendimento)
+        .select(`*, ${tableLead} (*)`) 
 
       if (filters.status) query = query.eq('situacao', filters.status)
       if (filters.purpose !== "Todos") query = query.eq('finalidade', filters.purpose)
       
-      const { data, error } = await query
-      if (error) throw error
+      const { data: atendimentos, error: errAtend } = await query
+      if (errAtend) throw errAtend
+      if (!atendimentos) return 
 
-      // 3. VERIFICAÇÃO REVERSA: Checa quais cards já estão no Dashboard de Vendas
-      let leadsInDashboard = new Set();
-      
-      // Busca apenas IDs na tabela vendas que começam com o prefixo atual (ex: 'pmw_%')
-      const { data: vendasIds, error: vendasError } = await supabase
-        .from('vendas')
-        .select('id')
-        .ilike('id', `${currentPrefix}_%`) 
-      
-      if (!vendasError && vendasIds) {
-        vendasIds.forEach((item: any) => {
-          // Desmonta o ID: "pmw_32464" -> ["pmw", "32464"] para achar o ID original
-          const parts = item.id.split('_');
-          if (parts.length === 2 && parts[0] === currentPrefix) {
-             const originalId = parseInt(parts[1]);
-             if (!isNaN(originalId)) {
-               leadsInDashboard.add(originalId);
+      const loadedIds = atendimentos.map((a: any) => a.id).filter(Boolean)
+      const loadedCodigos = atendimentos.map((a: any) => a.codigo).filter(Boolean)
+
+      // ---------------------------------------------------------
+      // ETAPA 2: Busca Imóvel no Carrinho (Foto, Valor, Endereço)
+      // ---------------------------------------------------------
+      let imovelDetailsMap: Record<string, { url: string, valor: number, address: string }> = {}
+
+      if (loadedCodigos.length > 0) {
+        const { data: itensCarrinho, error: errCarrinho } = await supabase
+          .from(tableCarrinho)
+          .select('id, atendimento_codigo, imovel_codigo')
+          .in('atendimento_codigo', loadedCodigos)
+
+        if (!errCarrinho && itensCarrinho) {
+          
+          // Agrupar por atendimento e pegar o "Último ID" (mais recente)
+          const bestImovelPorAtendimento: Record<string, string> = {}
+          const itemMaisRecente: Record<string, string> = {} 
+
+          itensCarrinho.forEach((item: any) => {
+             const atCod = item.atendimento_codigo
+             const currentId = item.id 
+             // Se ainda não temos ou se este ID é maior que o guardado
+             if (!itemMaisRecente[atCod] || compareIds(currentId, itemMaisRecente[atCod]) > 0) {
+                itemMaisRecente[atCod] = currentId
+                bestImovelPorAtendimento[atCod] = item.imovel_codigo
+             }
+          })
+
+          const imoveisParaBuscar = Object.values(bestImovelPorAtendimento)
+          
+          if (imoveisParaBuscar.length > 0) {
+             // Busca dados finais na tabela de imóveis
+             const { data: imoveisData, error: errImovel } = await supabase
+               .from(tableImovel)
+               .select('codigo, urlfotoprincipal, valor, endereco, cidade, estado') 
+               .in('codigo', imoveisParaBuscar)
+             
+             if (!errImovel && imoveisData) {
+               const dadosPorImovel: Record<string, { url: string, valor: number, address: string }> = {}
+               
+               imoveisData.forEach((im: any) => {
+                 const valorLimpo = normalizeCurrency(im.valor);
+                 
+                 // Compor Endereço
+                 const partesEndereco = [
+                    im.endereco,
+                    im.cidade ? `${im.cidade}/${im.estado || ''}` : null
+                 ].filter(Boolean);
+                 
+                 const enderecoCompleto = partesEndereco.join(" - ") || "Endereço não informado";
+
+                 dadosPorImovel[im.codigo] = {
+                   url: im.urlfotoprincipal,
+                   valor: valorLimpo,
+                   address: enderecoCompleto 
+                 }
+               })
+
+               // Mapear de volta para o Atendimento
+               Object.keys(bestImovelPorAtendimento).forEach(atCod => {
+                 const imCod = bestImovelPorAtendimento[atCod]
+                 if (dadosPorImovel[imCod]) {
+                   imovelDetailsMap[atCod] = dadosPorImovel[imCod]
+                 }
+               })
              }
           }
-        })
+        }
+      }
+      // ---------------------------------------------------------
+      // ETAPA 3: Verificação de Dashboard (CORRIGIDO)
+      // ---------------------------------------------------------
+      let leadsInDashboard = new Set();
+      
+      if (loadedIds.length > 0) {
+        // 1. Montamos a lista exata de IDs que queremos verificar na tabela vendas
+        // Exemplo: se carregou os IDs 10 e 20, buscamos por ['pmw_10', 'pmw_20']
+        const idsToVerify = loadedIds.map((id: number) => `${currentPrefix}_${id}`)
+
+        // 2. Buscamos APENAS esses IDs específicos
+        const { data: vendasMatches, error: errVendas } = await supabase
+            .from('vendas')
+            .select('id')
+            .in('id', idsToVerify) // .in é mais preciso que .ilike
+        
+        if (!errVendas && vendasMatches) {
+          vendasMatches.forEach((match: any) => {
+            // match.id vem como "pmw_10". Desmontamos para pegar o ID numérico 10.
+            const parts = match.id.split('_');
+            if (parts.length === 2 && parts[0] === currentPrefix) {
+               const originalId = parseInt(parts[1]);
+               if (!isNaN(originalId)) leadsInDashboard.add(originalId);
+            }
+          })
+        }
       }
 
-      // 4. Mapeamento (Banco -> Interface UI)
-      const mappedLeads = data?.map((item: any, index: number) => {
-        const linkedLead = item[leadRelation] || {}
-        // Fallback seguro para ID se vier nulo
+      // ---------------------------------------------------------
+      // Mapeamento Final para UI
+      // ---------------------------------------------------------
+      const mappedLeads = atendimentos.map((item: any, index: number) => {
+        const linkedLead = item[tableLead] || {}
         const safeId = item.id || item.codigo || index;
-        
-        // Verifica se o ID deste card está na lista de vendas
         const isOnDash = leadsInDashboard.has(safeId);
+        
+        // Dados do Imóvel Resolvido
+        const details = imovelDetailsMap[item.codigo] || { url: null, valor: 0, address: "Endereço Pendente" }
+        const resolvedImage = details.url || "https://app.imoview.com.br//Front/img/house1.png"
+        const resolvedValue = details.valor || 0
+        const resolvedAddress = details.address
 
         return {
           id: safeId, 
-          sourceTable: tableName, 
+          sourceTable: tableAtendimento, 
           
           clientName: linkedLead.nome || "Cliente (Sem Nome)",
           clientAvatar: linkedLead.avatar_url || `https://i.pravatar.cc/150?u=${safeId}`,
@@ -136,10 +261,13 @@ export default function Central63App() {
           status: item.situacao || "Novo",
           
           propertyTitle: item.codigo ? `Imóvel #${item.codigo}` : "Imóvel sem código",
-          propertyLocation: "----",
-          propertyAddress: "----",
-          value: 0, 
-          image: "/placeholder.jpg",
+          
+          // Campos Enriquecidos
+          propertyAddress: resolvedAddress,
+          propertyLocation: item.codigo || "----", 
+          value: resolvedValue, 
+          image: resolvedImage, 
+          
           updatedAt: new Date().toLocaleDateString("pt-BR"),
           lastUpdateISO: new Date().toISOString(),
           
@@ -149,25 +277,13 @@ export default function Central63App() {
             origin: item.midia || "Desconhecido",
             createdAt: new Date().toLocaleDateString("pt-BR")
           },
-
-          history: [
-             { 
-               date: new Date().toLocaleDateString("pt-BR"), 
-               action: "Importado", 
-               user: "Sistema", 
-               desc: "Lead carregado do Supabase", 
-               type: "system" 
-             }
-          ],
+          history: [{ date: new Date().toLocaleDateString("pt-BR"), action: "Importado", user: "Sistema", desc: "Lead carregado", type: "system" }],
           
-          // Campos técnicos
           raw_codigo: item.codigo,
           raw_midia: item.midia,
-
-          // Flag que ativa a etiqueta "No Dashboard"
           visibleOnDashboard: isOnDash 
         }
-      }) || []
+      })
 
       setLeadsData(mappedLeads)
 
@@ -186,6 +302,7 @@ export default function Central63App() {
   useEffect(() => {
     fetchLeads()
   }, [fetchLeads])
+
 
   // --- FILTROS CLIENT-SIDE ---
   const filteredLeads = useMemo(() => {
@@ -207,7 +324,6 @@ export default function Central63App() {
     currentPage * itemsPerPage
   )
 
-  // KPIs
   const stats = useMemo(() => {
     return {
       total: filteredLeads.length,
@@ -239,57 +355,53 @@ export default function Central63App() {
   const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
   const formatCompact = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(value)
 
-  // --- AÇÃO: BOTÃO "ADD/ATUALIZAR" NO CARD ---
+  // Botão "Add/Atualizar"
   const handleAddToDashboard = (lead: any) => {
-    // Define o modal para o modo de VENDA e abre
     setSelectedLead(lead)
     setModalMode("sale") 
     setEditModalOpen(true)
   }
 
-  // --- SALVAMENTO (UPSERT NA TABELA VENDAS) ---
+  // --- SALVAMENTO (UPSERT) ---
   const handleSaveData = async (leadId: number, data: EditableLeadData) => {
     
-    // MODO VENDA: Inserir ou Atualizar na tabela 'vendas'
+    // MODO VENDA: Salva no Supabase (Tabela Vendas)
     if (modalMode === "sale") {
       try {
         const lead = leadsData.find(l => l.id === leadId)
         if (!lead) return
 
-        // Cria o ID prefixado (ex: pmw_10)
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
         const newId = `${prefix}_${lead.id}`
 
         const payload = {
-          id: newId, // Chave primária
+          id: newId, 
           id_origem: lead.id,
           tabela_origem: lead.sourceTable,
           
-          // Dados Automáticos
+          // Dados automáticos
           codigo: lead.raw_codigo,
           finalidade: lead.purpose,
           situacao: "Vendido", 
           midia: lead.raw_midia,
-
-          // Dados Manuais do Modal
+          
+          // Dados do Modal
           nome_cliente: data.clientName,
           valor_venda: data.valor_venda,
           data_venda: data.data_venda,
           comissao: data.comissao,
           obs_venda: data.obs_venda,
-          
-          // Visibilidade
           status_dashboard: data.status_dashboard ? "Visível" : "Oculto",
           
           created_at: new Date().toISOString()
         }
 
-        // UPSERT: Atualiza se existir, Insere se não
+        // Upsert = Insert or Update
         const { error } = await supabase.from('vendas').upsert([payload])
 
         if (error) throw error
 
-        // Sucesso: Atualiza UI Local
+        // Atualiza UI Local
         setLeadsData(prev => prev.map(l => 
           l.id === leadId ? { ...l, visibleOnDashboard: true } : l
         ))
@@ -309,8 +421,7 @@ export default function Central63App() {
         })
       }
     } 
-    
-    // MODO EDIÇÃO: Apenas atualiza dados locais
+    // MODO EDIÇÃO
     else {
       console.log("Atualizando lead (modo edit):", data)
       setLeadsData(prev => prev.map(lead => 
@@ -389,16 +500,14 @@ export default function Central63App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
                 {paginatedLeads.map(lead => (
                   <LeadCard 
-                    key={`${lead.sourceTable}-${lead.id}`} // Chave única
+                    key={`${lead.sourceTable}-${lead.id}`} 
                     lead={lead}
                     formatCurrency={formatCurrency}
-                    
-                    // Clique no card abre detalhes (Drawer)
+                    // Ação de clicar no corpo do card (Detalhes)
                     onClick={() => {
                       setSelectedLead(lead)
                     }}
-                    
-                    // Ação do Botão "Add/Atualizar"
+                    // Ação do Botão Add/Atualizar
                     onAddToDashboard={(e) => handleAddToDashboard(lead)}
                   />
                 ))}
@@ -435,12 +544,12 @@ export default function Central63App() {
           onClose={() => setSelectedLead(null)} 
           formatCurrency={formatCurrency}
           onEditClick={() => {
-             setModalMode("edit") // Edição comum
+             setModalMode("edit") 
              setEditModalOpen(true)
           }}
         />
 
-        {/* Modal Unificado (Edição ou Venda) */}
+        {/* Modal de Edição / Venda */}
         <EditLeadModal
           lead={selectedLead}
           isOpen={editModalOpen}
@@ -449,7 +558,7 @@ export default function Central63App() {
              setModalMode("edit") 
           }}
           onSave={handleSaveData}
-          mode={modalMode} // Passa o modo atual (edit/sale)
+          mode={modalMode} 
         />
 
       </div>
