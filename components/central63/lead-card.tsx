@@ -1,11 +1,12 @@
 "use client"
 
 import React from "react"
+import { MapPin, Phone, Mail, Check, LayoutDashboard } from "lucide-react"
 
-import { MapPin, Phone, Mail, Check } from "lucide-react"
 
 interface Lead {
   id: number
+  visibleOnDashboard?: boolean;
   clientName: string
   clientAvatar: string
   broker: { id: number; name: string; avatar: string }
@@ -81,6 +82,13 @@ export function LeadCard({ lead, formatCurrency, onClick, isSelected, onSelect, 
       }`}
       onClick={handleCardClick}
     >
+      {/* --- NOVO: Etiqueta "No Dashboard" --- */}
+      {lead.visibleOnDashboard && (
+        <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg z-10 flex items-center gap-1 shadow-sm">
+          <LayoutDashboard size={10} />
+          No Dashboard
+        </div>
+      )}
       {/* Card Header: Client Info (Instagram Style) */}
       <div className="p-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
