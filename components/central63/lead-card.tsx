@@ -1,12 +1,12 @@
 "use client"
 
 import React from "react"
-import { MapPin, Phone, Mail, Check, LayoutDashboard } from "lucide-react"
-
+import { MapPin, LayoutDashboard, PlusCircle, RefreshCw } from "lucide-react" // Adicionado RefreshCw
+import { Button } from "@/components/ui/button"
 
 interface Lead {
   id: number
-  visibleOnDashboard?: boolean;
+  sourceTable: string 
   clientName: string
   clientAvatar: string
   broker: { id: number; name: string; avatar: string }
@@ -35,15 +35,14 @@ interface Lead {
     status?: string
     type: "action" | "visit" | "system"
   }>
+  visibleOnDashboard?: boolean
 }
 
 interface LeadCardProps {
   lead: Lead
   formatCurrency: (val: number) => string
   onClick: () => void
-  isSelected?: boolean
-  onSelect?: (id: number, selected: boolean) => void
-  selectionMode?: boolean
+  onAddToDashboard: (e: React.MouseEvent) => void
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -61,39 +60,25 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export function LeadCard({ lead, formatCurrency, onClick, isSelected, onSelect, selectionMode }: LeadCardProps) {
-  const handleCheckboxClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onSelect?.(lead.id, !isSelected)
-  }
-
-  const handleCardClick = () => {
-    if (selectionMode && onSelect) {
-      onSelect(lead.id, !isSelected)
-    } else {
-      onClick()
-    }
-  }
-
+export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: LeadCardProps) {
+  
   return (
     <div 
-      className={`bg-card rounded-2xl border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden group relative ${
-        isSelected ? "border-primary ring-2 ring-primary/20" : "border-border"
-      }`}
-      onClick={handleCardClick}
+      className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden group relative"
+      onClick={onClick}
     >
-      {/* --- NOVO: Etiqueta "No Dashboard" --- */}
+      {/* Etiqueta Visual "No Dashboard" (Topo Direito) */}
       {lead.visibleOnDashboard && (
         <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg z-10 flex items-center gap-1 shadow-sm">
           <LayoutDashboard size={10} />
           No Dashboard
         </div>
       )}
-      {/* Card Header: Client Info (Instagram Style) */}
+
+      {/* Cabeçalho do Card */}
       <div className="p-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
-            {/* Story ring indicator */}
             <div className={`absolute -inset-0.5 rounded-full bg-gradient-to-tr ${
               lead.status === "Negócio Realizado" 
                 ? "from-emerald-400 to-emerald-600" 
@@ -112,23 +97,11 @@ export function LeadCard({ lead, formatCurrency, onClick, isSelected, onSelect, 
             </p>
           </div>
         </div>
-        <button
-          onClick={handleCheckboxClick}
-          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-            isSelected 
-              ? "bg-primary border-primary text-primary-foreground" 
-              : "border-muted-foreground/30 hover:border-primary"
-          }`}
-        >
-          {isSelected && <Check size={14} strokeWidth={3} />}
-        </button>
       </div>
 
-      {/* Card Image: Property */}
+      {/* Imagem do Imóvel */}
       <div className="relative aspect-square bg-accent">
         <img src={lead.image || "/placeholder.svg"} alt="Imóvel" className="w-full h-full object-cover" />
-        
-        {/* Badges */}
         <div className="absolute top-3 right-3">
           <span className={`px-2 py-1 rounded-md text-xs font-bold shadow-sm backdrop-blur-md 
             ${lead.purpose === "Venda" ? "bg-card/90 text-primary" : "bg-card/90 text-amber-600"}`}>
@@ -142,58 +115,48 @@ export function LeadCard({ lead, formatCurrency, onClick, isSelected, onSelect, 
         </div>
       </div>
 
-      {/* Card Footer: Details & Actions */}
+      {/* Rodapé do Card */}
       <div className="p-4 space-y-3">
-        {/* Price & Status */}
         <div className="flex items-center justify-between">
           <span className="font-bold text-lg text-foreground">{formatCurrency(lead.value)}</span>
           <StatusBadge status={lead.status} />
         </div>
 
-        {/* Description */}
-        <div className="text-sm text-muted-foreground leading-snug">
-          <span className="font-bold text-foreground mr-1">{lead.broker.name.split(" ")[0]}:</span> 
-          Atendimento na fase de <span className="font-medium text-primary">{lead.phase.label}</span>.
-        </div>
-
-        {/* Funnel Progress Bar */}
-        <div className="space-y-1 pt-1">
-          <div className="flex justify-between text-[10px] text-muted-foreground uppercase font-bold">
-            <span>Progresso</span>
-            <span>{lead.phase.percent}%</span>
-          </div>
-          <div className="w-full bg-accent rounded-full h-1.5 overflow-hidden">
-            <div 
-              className={`h-full rounded-full ${
-                lead.status === "Negócio Realizado" 
-                  ? "bg-emerald-500" 
-                  : "bg-gradient-to-r from-primary to-violet-500"
-              }`} 
-              style={{ width: `${lead.phase.percent}%` }}
-            />
-          </div>
-        </div>
-        
-        {/* Broker Mini Footer */}
-        <div className="pt-3 border-t border-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
+          
+          {/* Info do Corretor */}
+          <div className="flex items-center gap-2 min-w-0">
             <img src={lead.broker.avatar || "/placeholder.svg"} className="w-5 h-5 rounded-full" alt="Corretor" />
-            <span className="text-xs text-muted-foreground truncate max-w-[100px]">{lead.broker.name}</span>
+            <span className="text-xs text-muted-foreground truncate">{lead.broker.name}</span>
           </div>
-          <div className="flex gap-2">
-            <button 
-              className="p-1.5 bg-emerald-50 text-emerald-600 rounded hover:bg-emerald-100 transition"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Phone size={14}/>
-            </button>
-            <button 
-              className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Mail size={14}/>
-            </button>
-          </div>
+
+          {/* BOTÃO INTELIGENTE: ADD OU ATUALIZAR */}
+          <Button 
+            size="sm" 
+            // Se já estiver no dashboard, usa um estilo outline azulado para indicar atualização
+            // Se não, usa o estilo padrão primário
+            variant={lead.visibleOnDashboard ? "outline" : "default"}
+            className={`h-7 text-xs px-3 gap-1.5 transition-all shadow-sm ${
+              lead.visibleOnDashboard 
+                ? "text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700" 
+                : "bg-primary hover:bg-primary/90"
+            }`}
+            onClick={(e) => {
+              e.stopPropagation(); // Impede abrir detalhes
+              onAddToDashboard(e); // Agora SEMPRE dispara a ação
+            }}
+            // REMOVIDO: disabled={lead.visibleOnDashboard} (Agora sempre habilitado)
+          >
+            {lead.visibleOnDashboard ? (
+              <>
+                <RefreshCw size={12} /> Atualizar
+              </>
+            ) : (
+              <>
+                <PlusCircle size={12} /> Add ao Dashboard
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </div>

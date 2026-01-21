@@ -1,193 +1,221 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Save, Eye, BadgeCheck, TrendingUp, Radio } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { DollarSign, Calendar, User, Eye, EyeOff, Percent } from "lucide-react"
 
-interface Lead {
-  id: number
-  clientName: string
-  visibleOnDashboard?: boolean
-  realOriginMedia?: string
-  salesCount?: number
-  verified?: boolean
+export interface EditableLeadData {
+  // Dados do Lead
+  clientName?: string
+  email?: string
+  phone?: string
+  // Dados da Venda
+  valor_venda?: number
+  comissao?: number
+  data_venda?: string
+  obs_venda?: string
+  status_dashboard?: boolean // true = Visível, false = Oculto
 }
 
 interface EditLeadModalProps {
-  lead: Lead | null
+  lead: any
   isOpen: boolean
   onClose: () => void
-  onSave: (leadId: number, data: EditableLeadData) => void
+  onSave: (id: number, data: EditableLeadData) => void
+  mode?: "edit" | "sale"
 }
 
-export interface EditableLeadData {
-  visibleOnDashboard: boolean
-  realOriginMedia: string
-  salesCount: number
-  verified: boolean
-}
+export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: EditLeadModalProps) {
+  const [formData, setFormData] = useState<EditableLeadData>({})
 
-export function EditLeadModal({ lead, isOpen, onClose, onSave }: EditLeadModalProps) {
-  const [formData, setFormData] = useState<EditableLeadData>({
-    visibleOnDashboard: true,
-    realOriginMedia: "",
-    salesCount: 0,
-    verified: false
-  })
-
-  // Sincroniza dados quando o lead muda
   useEffect(() => {
     if (lead) {
-      setFormData({
-        visibleOnDashboard: lead.visibleOnDashboard ?? true,
-        realOriginMedia: lead.realOriginMedia ?? "",
-        salesCount: lead.salesCount ?? 0,
-        verified: lead.verified ?? false
-      })
+      if (mode === "edit") {
+        setFormData({
+          clientName: lead.clientName,
+          email: lead.leadData?.email,
+          phone: lead.leadData?.phone,
+        })
+      } else {
+        // Modo SALE
+        setFormData({
+          clientName: lead.clientName,
+          valor_venda: lead.value || 0,
+          comissao: 5,
+          data_venda: new Date().toISOString().split('T')[0],
+          obs_venda: "",
+          status_dashboard: true // <--- Padrão: Visível
+        })
+      }
     }
-  }, [lead])
-
-  if (!isOpen || !lead) return null
+  }, [lead, mode, isOpen])
 
   const handleSave = () => {
-    onSave(lead.id, formData)
-    onClose()
+    if (lead) {
+      onSave(lead.id, formData)
+      onClose()
+    }
   }
 
+  if (!lead) return null
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-foreground/60 backdrop-blur-sm" 
-        onClick={onClose}
-      />
-      
-      {/* Modal */}
-      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-border animate-in fade-in zoom-in-95 duration-200">
-        
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-border bg-accent/30 flex justify-between items-center">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Editar Lead</h2>
-            <p className="text-xs text-muted-foreground">COD: {lead.id} - {lead.clientName}</p>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="p-2 hover:bg-accent rounded-full text-muted-foreground transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {mode === "sale" ? (
+              <>
+                <DollarSign className="text-emerald-500" />
+                Confirmar Venda
+              </>
+            ) : (
+              <>
+                <User className="text-primary" />
+                Editar Lead
+              </>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "sale" 
+              ? "Preencha os dados finais para lançar esta venda no Dashboard." 
+              : "Atualize as informações de contato deste lead."}
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Form Content */}
-        <div className="p-6 space-y-6">
+        <div className="grid gap-4 py-4">
           
-          {/* Visivel no Dashboard */}
-          <div className="flex items-center justify-between p-4 bg-accent/50 rounded-xl border border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <Eye size={20} />
-              </div>
-              <div>
-                <Label htmlFor="visibleOnDashboard" className="text-sm font-medium text-foreground cursor-pointer">
-                  Visivel no Dashboard
-                </Label>
-                <p className="text-xs text-muted-foreground">Exibir este lead no painel principal</p>
-              </div>
-            </div>
-            <Switch
-              id="visibleOnDashboard"
-              checked={formData.visibleOnDashboard}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, visibleOnDashboard: checked }))}
-            />
-          </div>
-
-          {/* Midia de Origem Real */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-600">
-                <Radio size={16} />
-              </div>
-              <Label htmlFor="realOriginMedia" className="text-sm font-medium text-foreground">
-                Midia de Origem Real
-              </Label>
-            </div>
+          <div className="grid gap-2">
+            <Label htmlFor="name">Nome do Cliente</Label>
             <Input
-              id="realOriginMedia"
-              type="text"
-              placeholder="Ex: Instagram, Google Ads, Indicacao..."
-              value={formData.realOriginMedia}
-              onChange={(e) => setFormData(prev => ({ ...prev, realOriginMedia: e.target.value }))}
-              className="h-11"
+              id="name"
+              value={formData.clientName || ""}
+              onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
             />
-            <p className="text-xs text-muted-foreground">Informe de qual canal o lead realmente veio</p>
           </div>
 
-          {/* Quantidade de Vendas */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                <TrendingUp size={16} />
-              </div>
-              <Label htmlFor="salesCount" className="text-sm font-medium text-foreground">
-                Quantidade de Vendas
-              </Label>
-            </div>
-            <Input
-              id="salesCount"
-              type="number"
-              min={0}
-              placeholder="0"
-              value={formData.salesCount}
-              onChange={(e) => setFormData(prev => ({ ...prev, salesCount: parseInt(e.target.value) || 0 }))}
-              className="h-11"
-            />
-            <p className="text-xs text-muted-foreground">Numero de vendas realizadas para este lead</p>
-          </div>
+          {mode === "sale" && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="valor" className="text-emerald-600 font-semibold">Valor da Venda (R$)</Label>
+                  <div className="relative">
+                    <DollarSign size={14} className="absolute left-3 top-3 text-muted-foreground" />
+                    <Input
+                      id="valor"
+                      type="number"
+                      className="pl-8 border-emerald-200 focus-visible:ring-emerald-500"
+                      value={formData.valor_venda}
+                      onChange={(e) => setFormData({ ...formData, valor_venda: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                </div>
 
-          {/* Verificado */}
-          <div className="flex items-center justify-between p-4 bg-accent/50 rounded-xl border border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                <BadgeCheck size={20} />
+                <div className="grid gap-2">
+                  <Label htmlFor="data">Data Fechamento</Label>
+                  <div className="relative">
+                    <Calendar size={14} className="absolute left-3 top-3 text-muted-foreground" />
+                    <Input
+                      id="data"
+                      type="date"
+                      className="pl-8"
+                      value={formData.data_venda}
+                      onChange={(e) => setFormData({ ...formData, data_venda: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="verified" className="text-sm font-medium text-foreground cursor-pointer">
-                  Verificado
-                </Label>
-                <p className="text-xs text-muted-foreground">Marcar lead como verificado</p>
+
+              <div className="grid gap-2">
+                <Label htmlFor="comissao">Comissão (%)</Label>
+                <div className="relative">
+                    <Percent size={14} className="absolute left-3 top-3 text-muted-foreground" />
+                    <Input
+                      id="comissao"
+                      type="number"
+                      step="0.1"
+                      className="pl-8"
+                      value={formData.comissao}
+                      onChange={(e) => setFormData({ ...formData, comissao: parseFloat(e.target.value) })}
+                    />
+                </div>
               </div>
-            </div>
-            <Switch
-              id="verified"
-              checked={formData.verified}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, verified: checked }))}
-            />
-          </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="obs">Observações da Venda</Label>
+                <Textarea
+                  id="obs"
+                  placeholder="Detalhes sobre pagamento, permuta, etc."
+                  value={formData.obs_venda || ""}
+                  onChange={(e) => setFormData({ ...formData, obs_venda: e.target.value })}
+                />
+              </div>
+
+              {/* --- CHECKBOX DE VISIBILIDADE --- */}
+              <div className={`flex items-center space-x-2 border p-3 rounded-md transition-colors ${formData.status_dashboard ? 'bg-emerald-50/50 border-emerald-100' : 'bg-muted/50'}`}>
+                <Checkbox 
+                  id="status_dashboard" 
+                  checked={formData.status_dashboard}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, status_dashboard: checked as boolean })
+                  }
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label 
+                    htmlFor="status_dashboard" 
+                    className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
+                  >
+                    {formData.status_dashboard ? <Eye size={14} className="text-emerald-600"/> : <EyeOff size={14} className="text-muted-foreground"/>}
+                    {formData.status_dashboard ? "Visível no Dashboard" : "Oculto no Dashboard"}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.status_dashboard 
+                      ? "Esta venda aparecerá nos gráficos e somatórios." 
+                      : "Esta venda ficará salva no banco, mas não aparecerá nos gráficos."}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {mode === "edit" && (
+            <>
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  value={formData.email || ""}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">Telefone</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone || ""}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+            </>
+          )}
 
         </div>
 
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-border bg-accent/20 flex gap-3">
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button 
-            variant="outline" 
-            className="flex-1 bg-transparent" 
-            onClick={onClose}
+            onClick={handleSave} 
+            className={mode === "sale" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
           >
-            Cancelar
+            {mode === "sale" ? "Confirmar e Lançar" : "Salvar Alterações"}
           </Button>
-          <Button 
-            className="flex-1 gap-2" 
-            onClick={handleSave}
-          >
-            <Save size={16} />
-            Salvar Alteracoes
-          </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

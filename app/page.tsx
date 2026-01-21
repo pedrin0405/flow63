@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, Suspense, useCallback } from "react"
 import { 
-  Menu, Users, DollarSign, Download, Plus, FileSpreadsheet, Search, Briefcase
+  Menu, Users, DollarSign, Plus, Search, Briefcase
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/central63/sidebar"
@@ -12,11 +12,9 @@ import { LeadCard } from "@/components/central63/lead-card"
 import { Pagination } from "@/components/central63/pagination"
 import { DetailsDrawer } from "@/components/central63/details-drawer"
 import { EditLeadModal, type EditableLeadData } from "@/components/central63/edit-lead-modal"
-import { BulkActionsBar } from "@/components/central63/bulk-actions-bar"
-import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/hooks/use-toast"
 import Loading from "./loading"
-import { supabase } from "@/lib/supabase" // <--- Importando Supabase
+import { supabase } from "@/lib/supabase"
 
 // --- DADOS CONSTANTES ---
 const TEAMS = ["Vendas A", "Vendas B", "Locacao Alpha", "Locacao Beta"]
@@ -31,7 +29,8 @@ const PHASES = [
   { id: 5, label: "Negociacao", percent: 90 },
   { id: 6, label: "Fechamento", percent: 100 },
 ]
-// Mock brokers para evitar erro se não vier do banco ainda
+
+// Mock brokers (enquanto não houver tabela de corretores)
 const MOCK_BROKERS = [
   { id: 1, name: "Mauricio Silva", avatar: "https://i.pravatar.cc/150?u=1" },
   { id: 2, name: "Mariana Costa", avatar: "https://i.pravatar.cc/150?u=2" },
@@ -41,17 +40,21 @@ export default function Central63App() {
   const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("atendimentos")
+  
+  // Estados de Dados
   const [selectedLead, setSelectedLead] = useState<any | null>(null)
-  const [editModalOpen, setEditModalOpen] = useState(false)
-  const [leadsData, setLeadsData] = useState<any[]>([]) // Começa vazio
+  const [leadsData, setLeadsData] = useState<any[]>([]) 
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<number>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 8
+
+  // Controle do Modal (Edição vs Venda)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<"edit" | "sale">("edit")
   
-  // Estados dos Filtros
+  // Filtros
   const [filters, setFilters] = useState({
-    city: "Palmas", // Default para Palmas para carregar PMW de inicio
+    city: "Palmas", // Default
     team: "",
     purpose: "Todos",
     status: "",
@@ -62,17 +65,17 @@ export default function Central63App() {
     dateEnd: ""
   })
 
-  // --- FUNÇÃO DE BUSCA (COM VERIFICAÇÃO "REVERSA" DE STRING) ---
+  // --- FUNÇÃO DE BUSCA (SUPABASE + VERIFICAÇÃO DE VENDAS) ---
   const fetchLeads = useCallback(async () => {
     setIsLoading(true)
     try {
-      // 1. Define qual tabela consultar baseada na cidade
+      // 1. Define contexto baseado na cidade
       const isPmw = !filters.city || filters.city === "Palmas"
-      const currentPrefix = isPmw ? "pmw" : "aux" // Prefixo esperado
+      const currentPrefix = isPmw ? "pmw" : "aux"
       const tableName = isPmw ? "atendimento_pmw" : "atendimento_aux"
       const leadRelation = isPmw ? "lead_pmw" : "lead_aux"
       
-      // 2. Busca os dados da tabela de Atendimento
+      // 2. Query Principal na tabela de atendimentos
       let query = supabase
         .from(tableName)
         .select(`
@@ -86,22 +89,20 @@ export default function Central63App() {
       const { data, error } = await query
       if (error) throw error
 
-      // 3. VERIFICAÇÃO REVERSA (Desmontando o ID da tabela vendas)
+      // 3. VERIFICAÇÃO REVERSA: Checa quais cards já estão no Dashboard de Vendas
       let leadsInDashboard = new Set();
       
-      // Buscamos na tabela 'vendas' todos os IDs que começam com o prefixo da tabela atual (ex: 'pmw_%')
+      // Busca apenas IDs na tabela vendas que começam com o prefixo atual (ex: 'pmw_%')
       const { data: vendasIds, error: vendasError } = await supabase
         .from('vendas')
         .select('id')
-        .ilike('id', `${currentPrefix}_%`) // Otimização: Traz apenas o que interessa
+        .ilike('id', `${currentPrefix}_%`) 
       
       if (!vendasError && vendasIds) {
         vendasIds.forEach((item: any) => {
-          // "Desmonta" o ID: pmw_32464 -> ["pmw", "32464"]
+          // Desmonta o ID: "pmw_32464" -> ["pmw", "32464"] para achar o ID original
           const parts = item.id.split('_');
-          
           if (parts.length === 2 && parts[0] === currentPrefix) {
-             // O segundo pedaço é o ID original numérico
              const originalId = parseInt(parts[1]);
              if (!isNaN(originalId)) {
                leadsInDashboard.add(originalId);
@@ -110,12 +111,13 @@ export default function Central63App() {
         })
       }
 
-      // 4. Mapeamento dos dados
+      // 4. Mapeamento (Banco -> Interface UI)
       const mappedLeads = data?.map((item: any, index: number) => {
         const linkedLead = item[leadRelation] || {}
+        // Fallback seguro para ID se vier nulo
         const safeId = item.id || item.codigo || index;
         
-        // Verifica se o ID deste item foi encontrado na lista desmontada
+        // Verifica se o ID deste card está na lista de vendas
         const isOnDash = leadsInDashboard.has(safeId);
 
         return {
@@ -125,15 +127,11 @@ export default function Central63App() {
           clientName: linkedLead.nome || "Cliente (Sem Nome)",
           clientAvatar: linkedLead.avatar_url || `https://i.pravatar.cc/150?u=${safeId}`,
           
-          broker: { 
-            id: 1, 
-            name: "Corretor", 
-            avatar: "https://i.pravatar.cc/150?u=99" 
-          },
+          broker: MOCK_BROKERS[0],
           phase: PHASES[0], 
           
           team: "Vendas",
-          city: filters.city || (isPmw ? "Palmas" : "Auxiliar"),
+          city: filters.city || (isPmw ? "Palmas" : "Outra"),
           purpose: item.finalidade || "Indefinido",
           status: item.situacao || "Novo",
           
@@ -162,10 +160,11 @@ export default function Central63App() {
              }
           ],
           
+          // Campos técnicos
           raw_codigo: item.codigo,
           raw_midia: item.midia,
 
-          // Flag baseada na verificação reversa
+          // Flag que ativa a etiqueta "No Dashboard"
           visibleOnDashboard: isOnDash 
         }
       }) || []
@@ -176,7 +175,7 @@ export default function Central63App() {
       console.error("Erro ao buscar leads:", error)
       toast({
         title: "Erro ao carregar",
-        description: "Falha ao verificar dados.",
+        description: "Não foi possível buscar os atendimentos.",
         variant: "destructive"
       })
     } finally {
@@ -184,16 +183,13 @@ export default function Central63App() {
     }
   }, [filters.city, filters.status, filters.purpose, toast])
 
-  // Dispara a busca quando mudar a cidade ou filtros principais
   useEffect(() => {
     fetchLeads()
   }, [fetchLeads])
 
-
-  // --- LÓGICA DE FILTRAGEM CLIENT-SIDE (Mantida para busca textual rápida) ---
+  // --- FILTROS CLIENT-SIDE ---
   const filteredLeads = useMemo(() => {
     return leadsData.filter(lead => {
-      // Filtros já aplicados no banco podem ser removidos daqui se quiser
       if (filters.search) {
         const searchLower = filters.search.toLowerCase()
         const matchesName = lead.clientName.toLowerCase().includes(searchLower)
@@ -204,14 +200,14 @@ export default function Central63App() {
     })
   }, [filters, leadsData])
 
-  // Paginacao
+  // Paginação
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
   const paginatedLeads = filteredLeads.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
 
-  // KPI calculations
+  // KPIs
   const stats = useMemo(() => {
     return {
       total: filteredLeads.length,
@@ -228,7 +224,7 @@ export default function Central63App() {
 
   const handleClearFilters = () => {
     setFilters({
-      city: "Palmas", // Reseta para padrão
+      city: "Palmas",
       team: "",
       purpose: "Todos",
       status: "",
@@ -243,112 +239,86 @@ export default function Central63App() {
   const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
   const formatCompact = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(value)
 
-  const handleSaveLead = (leadId: number, data: EditableLeadData) => {
-    // TODO: Implementar update no Supabase aqui
-    console.log("Salvar lead no banco:", leadId, data)
+  // --- AÇÃO: BOTÃO "ADD/ATUALIZAR" NO CARD ---
+  const handleAddToDashboard = (lead: any) => {
+    // Define o modal para o modo de VENDA e abre
+    setSelectedLead(lead)
+    setModalMode("sale") 
+    setEditModalOpen(true)
   }
 
-  // --- INTEGRACAO: ADD AO DASHBOARD (TABELA VENDAS) ---
-  const handleBulkAddToDashboard = async () => {
-    const leadsToAdd = leadsData.filter(l => selectedLeadIds.has(l.id))
+  // --- SALVAMENTO (UPSERT NA TABELA VENDAS) ---
+  const handleSaveData = async (leadId: number, data: EditableLeadData) => {
     
-    if (leadsToAdd.length === 0) return
+    // MODO VENDA: Inserir ou Atualizar na tabela 'vendas'
+    if (modalMode === "sale") {
+      try {
+        const lead = leadsData.find(l => l.id === leadId)
+        if (!lead) return
 
-    try {
-      // 1. Prepara os dados para inserir na tabela Vendas
-      const payload = leadsToAdd.map(lead => {
-        // Define prefixo do ID para evitar colisão (pmw_10, aux_10)
+        // Cria o ID prefixado (ex: pmw_10)
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
         const newId = `${prefix}_${lead.id}`
 
-        return {
-          id: newId, // Coluna ID na tabela vendas deve ser texto/varchar
+        const payload = {
+          id: newId, // Chave primária
           id_origem: lead.id,
           tabela_origem: lead.sourceTable,
           
-          // Campos Solicitados Explicitamente
+          // Dados Automáticos
           codigo: lead.raw_codigo,
           finalidade: lead.purpose,
-          situacao: lead.status,
+          situacao: "Vendido", 
           midia: lead.raw_midia,
 
-          // --- AREA PARA ADICIONAR OUTROS CAMPOS MANUALMENTE ---
-          // Exemplo: nome_cliente: lead.clientName,
-          // Exemplo: telefone: lead.leadData.phone,
-          // Exemplo: valor: lead.value,
-          // -----------------------------------------------------
-
+          // Dados Manuais do Modal
+          nome_cliente: data.clientName,
+          valor_venda: data.valor_venda,
+          data_venda: data.data_venda,
+          comissao: data.comissao,
+          obs_venda: data.obs_venda,
+          
+          // Visibilidade
+          status_dashboard: data.status_dashboard ? "Visível" : "Oculto",
+          
           created_at: new Date().toISOString()
         }
-      })
 
-      // 2. Envia para o Supabase
-      const { error } = await supabase
-        .from('vendas')
-        .insert(payload) // insert aceita array para bulk insert
+        // UPSERT: Atualiza se existir, Insere se não
+        const { error } = await supabase.from('vendas').upsert([payload])
 
-      if (error) {
-        // Se der erro de chave duplicada (já adicionado), avisa
-        if (error.code === '23505') { 
-            throw new Error("Alguns itens já foram adicionados ao dashboard.")
-        }
-        throw error
+        if (error) throw error
+
+        // Sucesso: Atualiza UI Local
+        setLeadsData(prev => prev.map(l => 
+          l.id === leadId ? { ...l, visibleOnDashboard: true } : l
+        ))
+        
+        toast({
+          title: lead.visibleOnDashboard ? "Venda Atualizada!" : "Venda Lançada!",
+          description: `Os dados de ${data.clientName} foram salvos com sucesso.`,
+          className: "bg-emerald-500 text-white border-none"
+        })
+
+      } catch (error: any) {
+        console.error("Erro venda:", error)
+        toast({ 
+          title: "Erro ao salvar", 
+          description: error.message || "Verifique o console.", 
+          variant: "destructive" 
+        })
       }
-
-      // 3. Sucesso: Atualiza UI Local
+    } 
+    
+    // MODO EDIÇÃO: Apenas atualiza dados locais
+    else {
+      console.log("Atualizando lead (modo edit):", data)
       setLeadsData(prev => prev.map(lead => 
-        selectedLeadIds.has(lead.id) 
-          ? { ...lead, visibleOnDashboard: true }
-          : lead
+        lead.id === leadId ? { ...lead, ...data } : lead
       ))
-      
-      setSelectedLeadIds(new Set())
-      
-      toast({
-        title: "Sucesso!",
-        description: `${leadsToAdd.length} leads enviados para o Dashboard de Vendas.`,
-        variant: "default", 
-        className: "bg-emerald-500 text-white border-none"
-      })
-
-    } catch (error: any) {
-      console.error("Erro ao add dashboard:", error)
-      toast({
-        title: "Erro ao processar",
-        description: error.message || "Falha ao conectar com Supabase.",
-        variant: "destructive"
-      })
+      toast({ title: "Lead Atualizado", description: "Alterações salvas localmente." })
     }
   }
-
-  const handleBulkRemoveFromDashboard = () => {
-      // Implementar logica de delete da tabela vendas se necessario
-      toast({ title: "Funcionalidade em breve" })
-  }
-  const handleBulkMarkAsVerified = () => {} // Implementar se necessario
-
-  // Handlers de seleção
-  const handleSelectLead = (id: number, selected: boolean) => {
-    setSelectedLeadIds(prev => {
-      const newSet = new Set(prev)
-      if (selected) newSet.add(id)
-      else newSet.delete(id)
-      return newSet
-    })
-  }
-
-  const handleSelectAll = () => {
-    const allIds = filteredLeads.map(l => l.id)
-    setSelectedLeadIds(new Set(allIds))
-  }
-
-  const handleDeselectAll = () => setSelectedLeadIds(new Set())
-
-  const selectionMode = selectedLeadIds.size > 0
-  const allFilteredSelected = filteredLeads.length > 0 && filteredLeads.every(l => selectedLeadIds.has(l.id))
-
-  // Renderização condicional para loading inicial
-  // ...
 
   return (
     <Suspense fallback={<Loading />}>
@@ -361,12 +331,14 @@ export default function Central63App() {
           onTabChange={setActiveTab}
         />
 
+        {/* Overlay Mobile */}
         {sidebarOpen && (
           <div className="fixed inset-0 bg-foreground/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
         )}
 
         <main className="flex-1 flex flex-col h-full overflow-hidden relative">
           
+          {/* Header */}
           <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
             <div className="flex items-center gap-4">
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}>
@@ -382,12 +354,14 @@ export default function Central63App() {
 
           <div className="flex-1 overflow-y-auto bg-background p-4 lg:p-8 space-y-6">
             
+            {/* KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StatCard title="Total na Lista" value={stats.total} icon={Users} trend="Atual" color="bg-primary" />
               <StatCard title="Em Negociacao" value={stats.negotiation} icon={Briefcase} trend="Funil" color="bg-amber-500" />
               <StatCard title="Volume Potencial" value={formatCompact(stats.volume)} icon={DollarSign} trend="R$" color="bg-emerald-500" />
             </div>
 
+            {/* Filtros */}
             <Filters 
               filters={filters}
               onFilterChange={handleFilterChange}
@@ -406,7 +380,7 @@ export default function Central63App() {
               </h3>
             </div>
 
-            {/* LOADING STATE */}
+            {/* Grid de Cards */}
             {isLoading ? (
                <div className="flex justify-center items-center py-20">
                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -415,13 +389,17 @@ export default function Central63App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
                 {paginatedLeads.map(lead => (
                   <LeadCard 
-                    key={`${lead.sourceTable}-${lead.id}`} // Chave única composta
+                    key={`${lead.sourceTable}-${lead.id}`} // Chave única
                     lead={lead}
                     formatCurrency={formatCurrency}
-                    onClick={() => setSelectedLead(lead)}
-                    isSelected={selectedLeadIds.has(lead.id)}
-                    onSelect={handleSelectLead}
-                    selectionMode={selectionMode}
+                    
+                    // Clique no card abre detalhes (Drawer)
+                    onClick={() => {
+                      setSelectedLead(lead)
+                    }}
+                    
+                    // Ação do Botão "Add/Atualizar"
+                    onAddToDashboard={(e) => handleAddToDashboard(lead)}
                   />
                 ))}
               </div>
@@ -436,6 +414,7 @@ export default function Central63App() {
               </div>
             )}
 
+            {/* Paginação */}
             {filteredLeads.length > 0 && totalPages > 1 && (
               <div className="py-8">
                 <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -450,29 +429,27 @@ export default function Central63App() {
           </div>
         </main>
 
+        {/* Drawer de Detalhes */}
         <DetailsDrawer 
           lead={selectedLead} 
           onClose={() => setSelectedLead(null)} 
           formatCurrency={formatCurrency}
-          onEditClick={() => setEditModalOpen(true)}
+          onEditClick={() => {
+             setModalMode("edit") // Edição comum
+             setEditModalOpen(true)
+          }}
         />
 
+        {/* Modal Unificado (Edição ou Venda) */}
         <EditLeadModal
           lead={selectedLead}
           isOpen={editModalOpen}
-          onClose={() => setEditModalOpen(false)}
-          onSave={handleSaveLead}
-        />
-
-        <BulkActionsBar
-          selectedCount={selectedLeadIds.size}
-          totalCount={filteredLeads.length}
-          onSelectAll={handleSelectAll}
-          onDeselectAll={handleDeselectAll}
-          onAddToDashboard={handleBulkAddToDashboard}
-          onRemoveFromDashboard={handleBulkRemoveFromDashboard}
-          onMarkAsVerified={handleBulkMarkAsVerified}
-          allSelected={allFilteredSelected}
+          onClose={() => {
+             setEditModalOpen(false)
+             setModalMode("edit") 
+          }}
+          onSave={handleSaveData}
+          mode={modalMode} // Passa o modo atual (edit/sale)
         />
 
       </div>
