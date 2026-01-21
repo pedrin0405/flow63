@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { MapPin, LayoutDashboard, PlusCircle, RefreshCw } from "lucide-react" // Adicionado RefreshCw
+import { MapPin, LayoutDashboard, PlusCircle, RefreshCw, UserCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Lead {
@@ -67,7 +67,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
       className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden group relative"
       onClick={onClick}
     >
-      {/* Etiqueta Visual "No Dashboard" (Topo Direito) */}
+      {/* Etiqueta Visual "No Dashboard" */}
       {lead.visibleOnDashboard && (
         <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg z-10 flex items-center gap-1 shadow-sm">
           <LayoutDashboard size={10} />
@@ -75,25 +75,20 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
         </div>
       )}
 
-      {/* Cabeçalho do Card */}
+      {/* --- CABEÇALHO: AGORA COM DADOS DO CORRETOR --- */}
       <div className="p-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className={`absolute -inset-0.5 rounded-full bg-gradient-to-tr ${
-              lead.status === "Negócio Realizado" 
-                ? "from-emerald-400 to-emerald-600" 
-                : "from-primary to-violet-500"
-            } p-0.5`} />
             <img 
-              src={lead.clientAvatar || "/placeholder.svg"} 
-              className="relative w-9 h-9 rounded-full border-2 border-card object-cover" 
-              alt="Avatar" 
+              src={lead.broker.avatar || "/placeholder.svg"} 
+              className="relative w-9 h-9 rounded-full border-2 border-card object-cover bg-muted" 
+              alt="Corretor" 
             />
           </div>
           <div className="leading-tight">
-            <p className="font-bold text-sm text-foreground truncate w-32">{lead.clientName}</p>
+            <p className="font-bold text-sm text-foreground truncate w-32">{lead.broker.name}</p>
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <MapPin size={10} /> {lead.city}
+              <UserCheck size={10} /> Corretor
             </p>
           </div>
         </div>
@@ -124,17 +119,31 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
 
         <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
           
-          {/* Info do Corretor */}
+          {/* --- RODAPÉ ESQUERDA: AGORA COM DADOS DO CLIENTE --- */}
           <div className="flex items-center gap-2 min-w-0">
-            <img src={lead.broker.avatar || "/placeholder.svg"} className="w-5 h-5 rounded-full" alt="Corretor" />
-            <span className="text-xs text-muted-foreground truncate">{lead.broker.name}</span>
+            {/* Avatar do Cliente com Anel de Status (Mantive o anel pois é legal visualmente para o lead) */}
+            <div className="relative shrink-0">
+               <div className={`absolute -inset-0.5 rounded-full bg-gradient-to-tr ${
+                  lead.status === "Negócio Realizado" 
+                    ? "from-emerald-400 to-emerald-600" 
+                    : "from-primary to-violet-500"
+                } p-[1px]`} />
+               <img src={lead.clientAvatar || "/placeholder.svg"} className="relative w-6 h-6 rounded-full border border-card object-cover" alt="Cliente" />
+            </div>
+            
+            <div className="flex flex-col overflow-hidden">
+               <span className="text-xs font-semibold text-foreground truncate block w-24">
+                 {lead.clientName}
+               </span>
+               <span className="text-[9px] text-muted-foreground flex items-center gap-0.5 truncate">
+                 <MapPin size={8} /> {lead.city}
+               </span>
+            </div>
           </div>
 
-          {/* BOTÃO INTELIGENTE: ADD OU ATUALIZAR */}
+          {/* Botão de Ação */}
           <Button 
             size="sm" 
-            // Se já estiver no dashboard, usa um estilo outline azulado para indicar atualização
-            // Se não, usa o estilo padrão primário
             variant={lead.visibleOnDashboard ? "outline" : "default"}
             className={`h-7 text-xs px-3 gap-1.5 transition-all shadow-sm ${
               lead.visibleOnDashboard 
@@ -142,10 +151,9 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
                 : "bg-primary hover:bg-primary/90"
             }`}
             onClick={(e) => {
-              e.stopPropagation(); // Impede abrir detalhes
-              onAddToDashboard(e); // Agora SEMPRE dispara a ação
+              e.stopPropagation(); 
+              onAddToDashboard(e); 
             }}
-            // REMOVIDO: disabled={lead.visibleOnDashboard} (Agora sempre habilitado)
           >
             {lead.visibleOnDashboard ? (
               <>

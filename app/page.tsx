@@ -20,7 +20,7 @@ import { supabase } from "@/lib/supabase"
 const TEAMS = ["Vendas A", "Vendas B", "Locacao Alpha", "Locacao Beta"]
 const CITIES = ["Palmas", "Araguaina", "Gurupi"]
 const PURPOSES = ["Venda", "Locacao"]
-const STATUS_OPTIONS = ["Em Atendimento", "Negócio Realizado", "Descartado", "Visita Agendada", "Proposta Enviada"]
+const STATUS_OPTIONS = ["Em atendimento", "Negócio realizado", "Descartado"]
 const PHASES = [
   { id: 1, label: "Pre-atendimento", percent: 10 },
   { id: 2, label: "Qualificacao", percent: 30 },
@@ -31,8 +31,9 @@ const PHASES = [
 ]
 
 const MOCK_BROKERS = [
-  { id: 1, name: "Mauricio Silva", avatar: "https://i.pravatar.cc/150?u=1" },
-  { id: 2, name: "Mariana Costa", avatar: "https://i.pravatar.cc/150?u=2" },
+  // Adicionado &bold=true para deixar a fonte mais grossa nos corretores também
+  { id: 1, name: "Mauricio Silva", avatar: "https://ui-avatars.com/api/?name=Mauricio+Silva&background=0D8ABC&color=fff&bold=true" },
+  { id: 2, name: "Mariana Costa", avatar: "https://ui-avatars.com/api/?name=Mariana+Costa&background=0D8ABC&color=fff&bold=true" },
 ]
 
 export default function Central63App() {
@@ -91,11 +92,11 @@ export default function Central63App() {
     return id1 > id2 ? 1 : -1;
   }
 
-  // --- FUNÇÃO DE BUSCA COMPLEXA ---
+  // --- FUNÇÃO DE BUSCA COMPLEXA (COM PAGINAÇÃO RECURSIVA) ---
   const fetchLeads = useCallback(async () => {
     setIsLoading(true)
     try {
-      // Configuração
+      // 1. Configuração do Contexto
       const isPmw = !filters.city || filters.city === "Palmas"
       const currentPrefix = isPmw ? "pmw" : "aux"
       
@@ -105,22 +106,43 @@ export default function Central63App() {
       const tableImovel = isPmw ? "imovel_pmw" : "imovel_aux"
       
       // ---------------------------------------------------------
-      // ETAPA 1: Busca Atendimentos (Com range estendido)
+      // ETAPA 1: Busca Atendimentos (LOOP PARA PEGAR TUDO)
       // ---------------------------------------------------------
-      let query = supabase
-        .from(tableAtendimento)
-        .select(`*, ${tableLead} (*)`)
-        .range(0, 4999) // Garante até 5000 registros
+      let allAtendimentos: any[] = [];
+      let hasMore = true;
+      let from = 0;
+      const batchSize = 1000;
 
-      if (filters.status) query = query.eq('situacao', filters.status)
-      if (filters.purpose !== "Todos") query = query.eq('finalidade', filters.purpose)
-      
-      const { data: atendimentos, error: errAtend } = await query
-      if (errAtend) throw errAtend
-      if (!atendimentos) return 
+      while (hasMore) {
+        let query = supabase
+          .from(tableAtendimento)
+          .select(`*, ${tableLead} (*)`)
+          .range(from, from + batchSize - 1);
 
-      // Prepara IDs Seguros e Lista de Códigos
-      const itemsWithSafeIds = atendimentos.map((item: any, index: number) => {
+        if (filters.status) query = query.eq('situacao', filters.status)
+        if (filters.purpose !== "Todos") query = query.eq('finalidade', filters.purpose)
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allAtendimentos = [...allAtendimentos, ...data];
+          from += batchSize;
+          if (data.length < batchSize) hasMore = false;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allAtendimentos.length === 0) {
+        setLeadsData([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Prepara IDs Seguros
+      const itemsWithSafeIds = allAtendimentos.map((item: any, index: number) => {
          const safeId = item.id || item.codigo || index;
          return { ...item, safeId };
       });
@@ -128,7 +150,7 @@ export default function Central63App() {
       const loadedCodigos = itemsWithSafeIds.map(a => a.codigo).filter(Boolean)
 
       // ---------------------------------------------------------
-      // ETAPA 2: Busca Imóvel no Carrinho (Imagem, Valor, Endereço)
+      // ETAPA 2: Busca Imóvel no Carrinho
       // ---------------------------------------------------------
       let imovelDetailsMap: Record<string, { url: string, valor: number, address: string }> = {}
 
@@ -189,26 +211,26 @@ export default function Central63App() {
       }
 
       // ---------------------------------------------------------
-      // ETAPA 3: Verificação de Dashboard (CORRIGIDA)
+      // ETAPA 3: Verificação de Dashboard
       // ---------------------------------------------------------
-      // Usamos Set para busca instantânea O(1)
       let leadsInDashboard = new Set<string>();
       
       if (itemsWithSafeIds.length > 0) {
-        // Monta os IDs completos esperados (Ex: "pmw_123")
         const idsToVerify = itemsWithSafeIds.map(item => `${currentPrefix}_${item.safeId}`)
 
-        // Busca APENAS os IDs exatos que estamos exibindo
-        const { data: vendasMatches, error: errVendas } = await supabase
-            .from('vendas')
-            .select('id')
-            .in('id', idsToVerify) 
-        
-        if (!errVendas && vendasMatches) {
-          vendasMatches.forEach((match: any) => {
-            // Guarda o ID exato que retornou do banco (ex: "pmw_123")
-            leadsInDashboard.add(match.id);
-          })
+        const verifyBatchSize = 1000;
+        for (let i = 0; i < idsToVerify.length; i += verifyBatchSize) {
+            const chunk = idsToVerify.slice(i, i + verifyBatchSize);
+            const { data: vendasMatches, error: errVendas } = await supabase
+                .from('vendas')
+                .select('id')
+                .in('id', chunk)
+            
+            if (!errVendas && vendasMatches) {
+                vendasMatches.forEach((match: any) => {
+                    leadsInDashboard.add(match.id);
+                })
+            }
         }
       }
 
@@ -218,10 +240,10 @@ export default function Central63App() {
       const mappedLeads = itemsWithSafeIds.map((item: any, index: number) => {
         const linkedLead = item.lead_pmw || item.lead_aux || {}
         
-        // Gera o ID completo deste item para verificar no Set
+        // Define o nome do cliente
+        const clientName = linkedLead.nome || "Cliente";
+
         const fullIdToCheck = `${currentPrefix}_${item.safeId}`;
-        
-        // Verifica se existe no Set de vendas encontradas
         const isOnDash = leadsInDashboard.has(fullIdToCheck);
         
         const details = imovelDetailsMap[item.codigo] || { url: null, valor: 0, address: "Endereço Pendente" }
@@ -233,8 +255,10 @@ export default function Central63App() {
           id: item.safeId, 
           sourceTable: isPmw ? "atendimento_pmw" : "atendimento_aux",
           
-          clientName: linkedLead.nome || "Cliente (Sem Nome)",
-          clientAvatar: linkedLead.avatar_url || `https://i.pravatar.cc/150?u=${item.safeId}`,
+          clientName: clientName,
+          
+          // --- AVATAR UI-AVATARS COM BOLT E BRANCO ---
+          clientAvatar: linkedLead.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=random&color=fff&bold=true`,
           
           broker: MOCK_BROKERS[0],
           phase: PHASES[0], 
@@ -317,24 +341,23 @@ export default function Central63App() {
     setEditModalOpen(true)
   }
 
-  // --- UPSERT (Salvar/Atualizar) ---
   const handleSaveData = async (leadId: number, data: EditableLeadData) => {
     if (modalMode === "sale") {
       try {
         const lead = leadsData.find(l => l.id === leadId)
         if (!lead) return
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
-        
-        // Garante a mesma chave usada na verificação
         const newId = `${prefix}_${lead.id}`
         
+        console.log("Lead:", lead)
+
         const payload = {
           id: newId, 
           id_origem: lead.id,
           tabela_origem: lead.sourceTable,
           codigo: lead.raw_codigo,
           finalidade: lead.purpose,
-          situacao: "Vendido", 
+          situacao: lead.phase.label, 
           midia: lead.raw_midia,
           nome_cliente: data.clientName,
           valor_venda: data.valor_venda,
