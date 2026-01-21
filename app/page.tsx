@@ -279,14 +279,14 @@ export default function Central63App() {
         const brokerName = item.corretor || "Corretor Desconhecido";
         // Tenta pegar a foto do banco, senão gera um avatar com iniciais
         const brokerAvatar = brokerMap[brokerName] 
-          || `https://ui-avatars.com/api/?name=${encodeURIComponent(brokerName)}&background=0D8ABC&color=fff&bold=true`;
+          || `https://static.vecteezy.com/ti/vetor-gratis/p1/15934676-icone-de-perfil-de-imagem-icone-masculino-humanos-ou-pessoas-assinam-e-simbolizam-vetor.jpg`;
 
         return {
           id: item.safeId, 
           sourceTable: isPmw ? "atendimento_pmw" : "atendimento_aux",
           
           clientName: clientName,
-          clientAvatar: linkedLead.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=random&color=fff&bold=true`,
+          clientAvatar: linkedLead.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=0D8ABC&color=fff&bold=true`,
           
           // Dados Reais do Corretor
           broker: {
@@ -382,6 +382,8 @@ export default function Central63App() {
         if (!lead) return
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
         const newId = `${prefix}_${lead.id}`
+
+        console.log("Lead:", lead, "Dados:", data)
         
         const payload = {
           id: newId, 
@@ -397,6 +399,7 @@ export default function Central63App() {
           comissao: data.comissao,
           obs_venda: data.obs_venda,
           status_dashboard: data.status_dashboard ? "Visível" : "Oculto",
+          imagem_corretor: lead.broker.avatar,
           created_at: new Date().toISOString()
         }
         
