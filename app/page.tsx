@@ -359,7 +359,7 @@ export default function Central63App() {
   const stats = useMemo(() => {
     return {
       total: filteredLeads.length,
-      negotiation: filteredLeads.filter(l => l.status === "Em Negociacao").length,
+      negotiation: filteredLeads.filter(l => l.status === "Negócio realizado").length,
       volume: filteredLeads.reduce((acc, curr) => acc + (curr.value || 0), 0)
     }
   }, [filteredLeads])
@@ -435,7 +435,7 @@ export default function Central63App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StatCard title="Total na Lista" value={stats.total} icon={Users} trend="Atual" color="bg-primary" />
               <StatCard title="Em Negociacao" value={stats.negotiation} icon={Briefcase} trend="Funil" color="bg-amber-500" />
-              <StatCard title="Volume Potencial" value={formatCompact(stats.volume)} icon={DollarSign} trend="R$" color="bg-emerald-500" />
+              <StatCard title="Valor Potencial" value={formatCompact(stats.volume)} icon={DollarSign} trend="R$" color="bg-emerald-500" />
             </div>
 
             <Filters filters={filters} onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} teams={TEAMS} cities={CITIES} brokers={MOCK_BROKERS} phases={PHASES} statuses={STATUS_OPTIONS} purposes={PURPOSES} />
