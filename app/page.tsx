@@ -18,7 +18,7 @@ import { supabase } from "@/lib/supabase"
 
 // --- CONSTANTES ---
 const TEAMS = ["Vendas A", "Vendas B", "Locacao Alpha", "Locacao Beta"]
-const CITIES = ["Palmas", "Araguaina", "Gurupi"]
+const CITIES = ["Palmas", "Araguaina"]
 const PURPOSES = ["Venda", "Locacao"]
 const STATUS_OPTIONS = ["Em atendimento", "Negócio realizado", "Descartado"]
 const PHASES = [
@@ -30,10 +30,9 @@ const PHASES = [
   { id: 6, label: "Fechamento", percent: 100 },
 ]
 
+// Removido MOCK_BROKERS pois agora é dinâmico
 const MOCK_BROKERS = [
-  // Adicionado &bold=true para deixar a fonte mais grossa nos corretores também
-  { id: 1, name: "Mauricio Silva", avatar: "https://ui-avatars.com/api/?name=Mauricio+Silva&background=0D8ABC&color=fff&bold=true" },
-  { id: 2, name: "Mariana Costa", avatar: "https://ui-avatars.com/api/?name=Mariana+Costa&background=0D8ABC&color=fff&bold=true" },
+  { id: 1, name: "Carregando...", avatar: "" },
 ]
 
 export default function Central63App() {
@@ -92,7 +91,7 @@ export default function Central63App() {
     return id1 > id2 ? 1 : -1;
   }
 
-  // --- FUNÇÃO DE BUSCA COMPLEXA (COM PAGINAÇÃO RECURSIVA) ---
+  // --- FUNÇÃO DE BUSCA COMPLEXA (ATUALIZADA) ---
   const fetchLeads = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -104,9 +103,10 @@ export default function Central63App() {
       const tableLead = isPmw ? "lead_pmw" : "lead_aux"
       const tableCarrinho = isPmw ? "imovel_carrinho_pmw" : "imovel_carrinho_aux"
       const tableImovel = isPmw ? "imovel_pmw" : "imovel_aux"
+      const tableCorretores = isPmw ? "corretores_pmw" : "corretores_aux" // <--- NOVA TABELA
       
       // ---------------------------------------------------------
-      // ETAPA 1: Busca Atendimentos (LOOP PARA PEGAR TUDO)
+      // ETAPA 1: Busca Atendimentos (Paginação Automática)
       // ---------------------------------------------------------
       let allAtendimentos: any[] = [];
       let hasMore = true;
@@ -147,11 +147,37 @@ export default function Central63App() {
          return { ...item, safeId };
       });
 
-      const loadedCodigos = itemsWithSafeIds.map(a => a.codigo).filter(Boolean)
+      // ---------------------------------------------------------
+      // ETAPA 1.5: Busca Dados dos Corretores (NOVO)
+      // ---------------------------------------------------------
+      // Extrai nomes únicos de corretores dos atendimentos
+      const uniqueBrokerNames = Array.from(new Set(
+        allAtendimentos
+          .map((a: any) => a.corretor)
+          .filter((name: any) => name && typeof name === 'string')
+      )) as string[];
+
+      let brokerMap: Record<string, string> = {} // Nome -> URL Avatar
+
+      if (uniqueBrokerNames.length > 0) {
+        const { data: brokersData, error: errBrokers } = await supabase
+          .from(tableCorretores)
+          .select('nome, imagem_url')
+          .in('nome', uniqueBrokerNames)
+
+        if (!errBrokers && brokersData) {
+          brokersData.forEach((broker: any) => {
+            if (broker.imagem_url) {
+              brokerMap[broker.nome] = broker.imagem_url
+            }
+          })
+        }
+      }
 
       // ---------------------------------------------------------
       // ETAPA 2: Busca Imóvel no Carrinho
       // ---------------------------------------------------------
+      const loadedCodigos = itemsWithSafeIds.map(a => a.codigo).filter(Boolean)
       let imovelDetailsMap: Record<string, { url: string, valor: number, address: string }> = {}
 
       if (loadedCodigos.length > 0) {
@@ -240,9 +266,7 @@ export default function Central63App() {
       const mappedLeads = itemsWithSafeIds.map((item: any, index: number) => {
         const linkedLead = item.lead_pmw || item.lead_aux || {}
         
-        // Define o nome do cliente
         const clientName = linkedLead.nome || "Cliente";
-
         const fullIdToCheck = `${currentPrefix}_${item.safeId}`;
         const isOnDash = leadsInDashboard.has(fullIdToCheck);
         
@@ -251,18 +275,27 @@ export default function Central63App() {
         const resolvedValue = details.valor || 0
         const resolvedAddress = details.address
 
+        // --- RESOLUÇÃO DO CORRETOR ---
+        const brokerName = item.corretor || "Corretor Desconhecido";
+        // Tenta pegar a foto do banco, senão gera um avatar com iniciais
+        const brokerAvatar = brokerMap[brokerName] 
+          || `https://ui-avatars.com/api/?name=${encodeURIComponent(brokerName)}&background=0D8ABC&color=fff&bold=true`;
+
         return {
           id: item.safeId, 
           sourceTable: isPmw ? "atendimento_pmw" : "atendimento_aux",
           
           clientName: clientName,
-          
-          // --- AVATAR UI-AVATARS COM BOLT E BRANCO ---
           clientAvatar: linkedLead.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=random&color=fff&bold=true`,
           
-          broker: MOCK_BROKERS[0],
+          // Dados Reais do Corretor
+          broker: {
+            id: 0, // ID não é crítico para exibição
+            name: brokerName,
+            avatar: brokerAvatar
+          },
+
           phase: PHASES[0], 
-          
           team: "Vendas",
           city: filters.city || (isPmw ? "Palmas" : "Outra"),
           purpose: item.finalidade || "Indefinido",
@@ -313,7 +346,8 @@ export default function Central63App() {
         const searchLower = filters.search.toLowerCase()
         const matchesName = lead.clientName.toLowerCase().includes(searchLower)
         const matchesId = lead.id.toString().includes(searchLower)
-        if (!matchesName && !matchesId) return false
+        const matchesBroker = lead.broker.name.toLowerCase().includes(searchLower) // Busca também por corretor
+        if (!matchesName && !matchesId && !matchesBroker) return false
       }
       return true
     })
@@ -349,8 +383,6 @@ export default function Central63App() {
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
         const newId = `${prefix}_${lead.id}`
         
-        console.log("Lead:", lead)
-
         const payload = {
           id: newId, 
           id_origem: lead.id,
