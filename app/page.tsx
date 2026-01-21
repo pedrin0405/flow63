@@ -98,12 +98,13 @@ export default function Central63App() {
       // 1. Configuração do Contexto
       const isPmw = !filters.city || filters.city === "Palmas"
       const currentPrefix = isPmw ? "pmw" : "aux"
-      
+
+      const tableInteracao = isPmw ? "interacao_pmw" : "interacao_aux"
       const tableAtendimento = isPmw ? "atendimento_pmw" : "atendimento_aux"
       const tableLead = isPmw ? "lead_pmw" : "lead_aux"
       const tableCarrinho = isPmw ? "imovel_carrinho_pmw" : "imovel_carrinho_aux"
       const tableImovel = isPmw ? "imovel_pmw" : "imovel_aux"
-      const tableCorretores = isPmw ? "corretores_pmw" : "corretores_aux" // <--- NOVA TABELA
+      const tableCorretores = isPmw ? "corretores_pmw" : "corretores_aux" 
       
       // ---------------------------------------------------------
       // ETAPA 1: Busca Atendimentos (Paginação Automática)
@@ -148,16 +149,15 @@ export default function Central63App() {
       });
 
       // ---------------------------------------------------------
-      // ETAPA 1.5: Busca Dados dos Corretores (NOVO)
+      // ETAPA 1.5: Busca Dados dos Corretores 
       // ---------------------------------------------------------
-      // Extrai nomes únicos de corretores dos atendimentos
       const uniqueBrokerNames = Array.from(new Set(
         allAtendimentos
           .map((a: any) => a.corretor)
           .filter((name: any) => name && typeof name === 'string')
       )) as string[];
 
-      let brokerMap: Record<string, string> = {} // Nome -> URL Avatar
+      let brokerMap: Record<string, string> = {} 
 
       if (uniqueBrokerNames.length > 0) {
         const { data: brokersData, error: errBrokers } = await supabase
@@ -261,6 +261,48 @@ export default function Central63App() {
       }
 
       // ---------------------------------------------------------
+      // ETAPA 4: Busca TIMELINE (Interações) - CORREÇÃO DA TIMELINE
+      // ---------------------------------------------------------
+      let interactionsMap: Record<number, any[]> = {}
+
+      // Coleta apenas IDs numéricos válidos
+      const atendimentoIds = itemsWithSafeIds
+        .map(i => i.id)
+        .filter(id => typeof id === 'number');
+
+      if (atendimentoIds.length > 0) {
+        const interBatchSize = 1000;
+        
+        for (let i = 0; i < atendimentoIds.length; i += interBatchSize) {
+           const chunk = atendimentoIds.slice(i, i + interBatchSize);
+           
+           // Busca as interações vinculadas aos atendimentos carregados
+           const { data: interacoes, error: errInter } = await supabase
+             .from(tableInteracao)
+             .select('*') 
+             .in('atendimento_id', chunk)
+             .order('data', { ascending: false }) // Ordena do mais recente
+
+           if (!errInter && interacoes) {
+             interacoes.forEach((int: any) => {
+               if (!interactionsMap[int.atendimento_id]) {
+                 interactionsMap[int.atendimento_id] = []
+               }
+               
+               // Formata a interação para o padrão do componente
+               interactionsMap[int.atendimento_id].push({
+                 date: int.data ? new Date(int.data).toLocaleDateString('pt-BR') : "Data N/A",
+                 action: int.tipo || "Interação",
+                 user: int.usuario || int.responsavel || "Sistema",
+                 desc: int.descricao || int.texto || int.obs || int.mensagem || "", 
+                 type: "action" 
+               })
+             })
+           }
+        }
+      }
+
+      // ---------------------------------------------------------
       // Mapeamento Final
       // ---------------------------------------------------------
       const mappedLeads = itemsWithSafeIds.map((item: any, index: number) => {
@@ -277,9 +319,19 @@ export default function Central63App() {
 
         // --- RESOLUÇÃO DO CORRETOR ---
         const brokerName = item.corretor || "Corretor Desconhecido";
-        // Tenta pegar a foto do banco, senão gera um avatar com iniciais
         const brokerAvatar = brokerMap[brokerName] 
           || `https://static.vecteezy.com/ti/vetor-gratis/p1/15934676-icone-de-perfil-de-imagem-icone-masculino-humanos-ou-pessoas-assinam-e-simbolizam-vetor.jpg`;
+        
+        // --- RESOLUÇÃO DA TIMELINE ---
+        const resolvedHistory = interactionsMap[item.id] || [
+          { 
+            date: new Date().toLocaleDateString("pt-BR"), 
+            action: "Importado", 
+            user: "Sistema", 
+            desc: "Sem interações registradas no momento.", 
+            type: "system" 
+          }
+        ];
 
         return {
           id: item.safeId, 
@@ -287,10 +339,11 @@ export default function Central63App() {
           
           clientName: clientName,
           clientAvatar: linkedLead.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=0D8ABC&color=fff&bold=true`,
+
+          history: resolvedHistory, // <--- CAMPO CORRIGIDO
           
-          // Dados Reais do Corretor
           broker: {
-            id: 0, // ID não é crítico para exibição
+            id: 0, 
             name: brokerName,
             avatar: brokerAvatar
           },
@@ -316,7 +369,6 @@ export default function Central63App() {
             origin: item.midia || "Desconhecido",
             createdAt: new Date().toLocaleDateString("pt-BR")
           },
-          history: [{ date: new Date().toLocaleDateString("pt-BR"), action: "Importado", user: "Sistema", desc: "Lead carregado", type: "system" }],
           
           raw_codigo: item.codigo,
           raw_midia: item.midia,
@@ -346,7 +398,7 @@ export default function Central63App() {
         const searchLower = filters.search.toLowerCase()
         const matchesName = lead.clientName.toLowerCase().includes(searchLower)
         const matchesId = lead.id.toString().includes(searchLower)
-        const matchesBroker = lead.broker.name.toLowerCase().includes(searchLower) // Busca também por corretor
+        const matchesBroker = lead.broker.name.toLowerCase().includes(searchLower)
         if (!matchesName && !matchesId && !matchesBroker) return false
       }
       return true

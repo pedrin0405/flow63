@@ -1,204 +1,208 @@
-"use client"
-
-import { X, Mail, Phone, Calendar, MapPin, Clock, User } from "lucide-react"
-
-interface HistoryEntry {
-  date: string
-  action: string
-  user: string
-  desc: string
-  status?: string
-  type: "action" | "visit" | "system"
-}
-
-interface Lead {
-  id: number
-  clientName: string
-  clientAvatar: string
-  broker: { id: number; name: string; avatar: string }
-  team: string
-  city: string
-  purpose: string
-  status: string
-  phase: { id: number; label: string; percent: number }
-  propertyTitle: string
-  propertyLocation: string
-  propertyAddress: string
-  value: number
-  image: string
-  updatedAt: string
-  leadData: {
-    email: string
-    phone: string
-    origin: string
-    createdAt: string
-  }
-  history: HistoryEntry[]
-}
+import { X, Edit, Phone, Mail, Calendar, User, MapPin, Building, Info, FileText, Clock } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 
 interface DetailsDrawerProps {
-  lead: Lead | null
+  lead: any
   onClose: () => void
-  formatCurrency: (value: number) => string
+  formatCurrency: (val: number) => string
   onEditClick: () => void
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    "Negócio Realizado": "bg-emerald-100 text-emerald-700 border-emerald-200",
-    "Em Atendimento": "bg-blue-100 text-blue-700 border-blue-200",
-    "Visita Agendada": "bg-amber-100 text-amber-700 border-amber-200",
-    "Proposta Enviada": "bg-violet-100 text-violet-700 border-violet-200",
-    "Descartado": "bg-red-100 text-red-700 border-red-200",
-  }
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold border tracking-wide ${colors[status] || "bg-muted text-muted-foreground"}`}>
-      {status}
-    </span>
-  )
 }
 
 export function DetailsDrawer({ lead, onClose, formatCurrency, onEditClick }: DetailsDrawerProps) {
   if (!lead) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-foreground/40 backdrop-blur-sm transition-opacity" 
-        onClick={onClose}
-      />
-      
-      {/* Drawer */}
-      <div className="relative w-full max-w-lg bg-card h-full shadow-2xl overflow-y-auto transform transition-transform duration-300 flex flex-col">
+    <Sheet open={!!lead} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent className="w-full sm:max-w-md md:max-w-lg overflow-hidden flex flex-col p-0 border-l shadow-2xl">
         
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-border sticky top-0 bg-card z-10 flex justify-between items-center shadow-sm">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-muted-foreground">COD: {lead.id}</span>
-              <StatusBadge status={lead.status} />
-            </div>
-            <h2 className="text-lg font-bold text-foreground mt-1">{lead.clientName}</h2>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="p-2 hover:bg-accent rounded-full text-muted-foreground transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-accent/30">
+        {/* Header com Imagem de Fundo */}
+        <div className="relative h-48 bg-muted">
+          <img 
+            src={lead.image || "/placeholder.jpg"} 
+            alt="Imóvel" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
           
-          {/* Seção 1: Dados do Lead */}
-          <section className="bg-card p-4 rounded-xl border border-border shadow-sm">
-            <div className="flex items-center gap-4 mb-4 border-b border-border pb-4">
-              <img 
-                src={lead.clientAvatar || "/placeholder.svg"} 
-                className="w-16 h-16 rounded-full object-cover border-2 border-primary/20" 
-                alt="Cliente" 
-              />
-              <div>
-                <h3 className="font-bold text-foreground">Dados de Contato</h3>
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-medium">
-                  Origem: {lead.leadData.origin}
-                </span>
-              </div>
+          <SheetHeader className="absolute bottom-0 left-0 right-0 p-6 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="outline" className="bg-black/40 text-white border-white/20 backdrop-blur-sm">
+                {lead.purpose}
+              </Badge>
+              <Badge variant="secondary" className="bg-white/90 text-black">
+                {lead.status}
+              </Badge>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-muted-foreground">
-                  <Mail size={16}/>
-                </div>
-                {lead.leadData.email}
-              </div>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-muted-foreground">
-                  <Phone size={16}/>
-                </div>
-                {lead.leadData.phone}
-              </div>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-muted-foreground">
-                  <Calendar size={16}/>
-                </div>
-                Entrou em: {lead.leadData.createdAt}
-              </div>
-            </div>
-          </section>
+            <SheetTitle className="text-white text-2xl font-bold tracking-tight">
+              {lead.clientName}
+            </SheetTitle>
+            <p className="text-white/80 text-sm flex items-center gap-1">
+              <User size={14} /> Atendimento #{lead.raw_codigo || lead.id}
+            </p>
+          </SheetHeader>
 
-          {/* Seção 2: Imóvel */}
-          <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-            <div className="h-32 bg-accent w-full relative">
-              <img src={lead.image || "/placeholder.svg"} className="w-full h-full object-cover" alt="Imóvel" />
-              <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 to-transparent flex items-end p-4">
-                <h4 className="text-card font-bold text-lg leading-tight">{lead.propertyTitle}</h4>
-              </div>
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="flex justify-between items-start">
-                <p className="text-muted-foreground text-sm flex items-start gap-2 leading-snug">
-                  <MapPin size={16} className="mt-0.5 flex-shrink-0 text-primary" />
-                  <span>
-                    {lead.propertyAddress} <br/> 
-                    <span className="text-muted-foreground/70">{lead.propertyLocation} - {lead.city}/TO</span>
-                  </span>
-                </p>
-              </div>
-              <div className="pt-2 border-t border-border flex justify-between items-center">
-                <span className="text-xs font-bold text-muted-foreground uppercase">Valor do Imóvel</span>
-                <p className="text-xl font-bold text-primary">{formatCurrency(lead.value)}</p>
-              </div>
-            </div>
-          </section>
+          <SheetClose className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-sm transition-colors border border-white/10">
+            <X size={18} />
+          </SheetClose>
+        </div>
 
-          {/* Seção 3: Timeline */}
-          <section>
-            <h3 className="text-sm font-bold uppercase text-muted-foreground mb-4 flex items-center gap-2">
-              <Clock size={16} /> Timeline de Atendimento
-            </h3>
-            <div className="relative border-l-2 border-border ml-3 space-y-8 pb-2">
-              {lead.history.map((log, idx) => (
-                <div key={idx} className="relative pl-8 group">
-                  <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-4 border-card shadow-sm transition-transform group-hover:scale-125
-                    ${log.type === "action" ? "bg-primary" : log.type === "visit" ? "bg-emerald-500" : "bg-muted-foreground"}`}>
-                  </div>
-                  <div className="flex flex-col bg-card p-3 rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{log.date}</span>
-                      {log.status && (
-                        <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 rounded">{log.status}</span>
-                      )}
-                    </div>
-                    <h4 className="font-bold text-foreground text-sm mb-1">{log.action}</h4>
-                    <p className="text-muted-foreground text-xs italic">
-                      &ldquo;{log.desc}&rdquo;
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-8">
+            
+            {/* Informações Principais do Imóvel */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <Building size={18} className="text-primary" />
+                    Detalhes do Imóvel
+                  </h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Valor Proposto</p>
+                  <p className="text-xl font-bold text-emerald-600">
+                    {formatCurrency(lead.value)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-muted/40 p-4 rounded-xl border border-border space-y-3">
+                <div className="flex items-start gap-3">
+                  <MapPin className="text-muted-foreground mt-0.5 shrink-0" size={18} />
+                  <div>
+                    <p className="font-medium text-foreground">
+                       {lead.propertyAddress}
                     </p>
-                    <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-1 text-[10px] text-muted-foreground">
-                      <User size={10} /> Registrado por: <span className="font-medium text-foreground">{log.user}</span>
-                    </div>
+                    <p className="text-sm text-muted-foreground">
+                       {lead.propertyTitle}
+                    </p>
                   </div>
                 </div>
-              ))}
+                
+                {lead.propertyLocation && lead.propertyLocation !== "----" && (
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground pl-0.5">
+                        <Info size={16} />
+                        <span>Código do Imóvel: {lead.propertyLocation}</span>
+                    </div>
+                )}
+              </div>
             </div>
-          </section>
 
+            <Separator />
+
+            {/* --- NOVA SEÇÃO: TIMELINE DE ATENDIMENTO --- */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Clock size={18} className="text-primary" />
+                Histórico de Atendimento
+              </h3>
+
+              <div className="relative border-l border-border ml-3 space-y-6">
+                {lead.history && lead.history.length > 0 ? (
+                  lead.history.map((item: any, i: number) => (
+                    <div key={i} className="ml-6 relative">
+                      {/* Bolinha na linha do tempo */}
+                      <span className={`absolute -left-[31px] top-1 w-4 h-4 rounded-full border-2 border-background ${
+                        i === 0 ? "bg-primary" : "bg-muted-foreground/30"
+                      }`} />
+                      
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="font-medium">{item.date}</span>
+                          <span>{item.user}</span>
+                        </div>
+                        <p className="text-sm font-medium text-foreground">
+                          {item.action}
+                        </p>
+                        {item.desc && (
+                            <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 p-2 rounded-md">
+                              {item.desc}
+                            </p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="ml-6 text-sm text-muted-foreground italic">
+                    Nenhuma interação registrada.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Dados de Contato */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <User size={18} className="text-primary" />
+                  Contato
+                </h3>
+                <Button variant="outline" size="sm" onClick={onEditClick} className="gap-2 h-8">
+                  <Edit size={14} /> Editar
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <Phone size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">Telefone</p>
+                    <p className="text-sm font-medium truncate">{lead.leadData?.phone || "Não informado"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <Mail size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">Email</p>
+                    <p className="text-sm font-medium truncate">{lead.leadData?.email || "Não informado"}</p>
+                  </div>
+                </div>
+
+                 <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <Calendar size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">Data de Criação</p>
+                    <p className="text-sm font-medium truncate">{lead.leadData?.createdAt}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+            
+            {/* Histórico / Observações */}
+            <div>
+               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                  <FileText size={18} className="text-primary" />
+                  Origem
+               </h3>
+               <div className="bg-accent/30 p-4 rounded-lg text-sm text-muted-foreground">
+                  <p>Midia de Origem: <span className="font-medium text-foreground">{lead.raw_midia || "Orgânico"}</span></p>
+               </div>
+            </div>
+
+          </div>
+        </ScrollArea>
+
+        <div className="p-4 border-t bg-background">
+          <Button className="w-full" size="lg" onClick={onClose}>
+            Fechar Detalhes
+          </Button>
         </div>
-        
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-border bg-card flex gap-2">
-          <button className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm shadow-primary/20">
-            Adicionar Interacao
-          </button>
-          <button 
-            className="flex-1 bg-card border border-border hover:bg-accent text-foreground py-2.5 rounded-lg font-medium text-sm transition-colors"
-            onClick={onEditClick}
-          >
-            Editar Lead
-          </button>
-        </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }
