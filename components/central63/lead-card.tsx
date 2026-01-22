@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { MapPin, LayoutDashboard, PlusCircle, RefreshCw, UserCheck } from "lucide-react"
+import { MapPin, LayoutDashboard, PlusCircle, RefreshCw, UserCheck, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Lead {
@@ -62,20 +62,22 @@ function StatusBadge({ status }: { status: string }) {
 
 export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: LeadCardProps) {
   
+  // Define se o card está "ativo" no dashboard para estilização
+  const isActive = lead.visibleOnDashboard;
+
   return (
     <div 
-      className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden group relative"
+      className={`
+        bg-card rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden group relative
+        ${isActive 
+            ? "border-emerald-500 ring-1 ring-emerald-500/50 shadow-lg shadow-emerald-500/10" // Estilo quando está no Dashboard
+            : "border-border shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30" // Estilo padrão
+        }
+      `}
       onClick={onClick}
     >
-      {/* Etiqueta Visual "No Dashboard" */}
-      {lead.visibleOnDashboard && (
-        <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg z-10 flex items-center gap-1 shadow-sm">
-          <LayoutDashboard size={10} />
-          No Dashboard
-        </div>
-      )}
-
-      {/* --- CABEÇALHO: AGORA COM DADOS DO CORRETOR --- */}
+      
+      {/* --- CABEÇALHO: DADOS DO CORRETOR --- */}
       <div className="p-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -94,34 +96,49 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
         </div>
       </div>
 
-      {/* Imagem do Imóvel */}
-      <div className="relative aspect-square bg-accent">
+      {/* --- IMAGEM DO IMÓVEL --- */}
+      <div className="relative aspect-square bg-accent group-hover:opacity-95 transition-opacity">
         <img src={lead.image || "/placeholder.svg"} alt="Imóvel" className="w-full h-full object-cover" />
+        
+        {/* BADGE "NO DASHBOARD" (REDESENHADO) */}
+        {isActive && (
+          <div className="absolute top-3 left-3 z-20 animate-in fade-in zoom-in duration-300">
+             <span className="flex items-center gap-1.5 bg-emerald-600/90 text-white text-[10px] uppercase font-bold px-2.5 py-1 rounded-full shadow-lg backdrop-blur-sm border border-emerald-400/30">
+               <LayoutDashboard size={12} className="text-white" />
+               No Dashboard
+             </span>
+          </div>
+        )}
+
+        {/* Badge de Propósito (Venda/Locação) */}
         <div className="absolute top-3 right-3">
-          <span className={`px-2 py-1 rounded-md text-xs font-bold shadow-sm backdrop-blur-md 
+          <span className={`px-2 py-1 rounded-md text-xs font-bold shadow-sm backdrop-blur-md border border-white/20 
             ${lead.purpose === "Venda" ? "bg-card/90 text-primary" : "bg-card/90 text-amber-600"}`}>
             {lead.purpose}
           </span>
         </div>
+
+        {/* Rodapé da Imagem (Data) */}
         <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
-          <span className="bg-foreground/60 backdrop-blur-sm text-card px-2 py-1 rounded text-xs font-medium">
+          <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded text-[10px] font-medium border border-white/10">
             Atualizado: {lead.updatedAt}
           </span>
         </div>
       </div>
 
-      {/* Rodapé do Card */}
+      {/* --- RODAPÉ DO CARD --- */}
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-lg text-foreground">{formatCurrency(lead.value)}</span>
+          <span className={`font-bold text-lg ${isActive ? "text-emerald-700" : "text-foreground"}`}>
+            {formatCurrency(lead.value)}
+          </span>
           <StatusBadge status={lead.status} />
         </div>
 
         <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
           
-          {/* --- RODAPÉ ESQUERDA: AGORA COM DADOS DO CLIENTE --- */}
+          {/* Dados do Cliente */}
           <div className="flex items-center gap-2 min-w-0">
-            {/* Avatar do Cliente com Anel de Status (Mantive o anel pois é legal visualmente para o lead) */}
             <div className="relative shrink-0">
                <div className={`absolute -inset-0.5 rounded-full bg-gradient-to-tr ${
                   lead.status === "Negócio Realizado" 
@@ -144,10 +161,10 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
           {/* Botão de Ação */}
           <Button 
             size="sm" 
-            variant={lead.visibleOnDashboard ? "outline" : "default"}
+            variant={isActive ? "outline" : "default"}
             className={`h-7 text-xs px-3 gap-1.5 transition-all shadow-sm ${
-              lead.visibleOnDashboard 
-                ? "text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700" 
+              isActive 
+                ? "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300" 
                 : "bg-primary hover:bg-primary/90"
             }`}
             onClick={(e) => {
@@ -155,7 +172,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
               onAddToDashboard(e); 
             }}
           >
-            {lead.visibleOnDashboard ? (
+            {isActive ? (
               <>
                 <RefreshCw size={12} /> Atualizar
               </>
