@@ -50,6 +50,7 @@ export default function Central63App() {
   // Controle do Modal
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<"edit" | "sale">("edit")
+  const [listaCorretores, setListaCorretores] = useState<any[]>(MOCK_BROKERS)
   
   // Filtros
   const [filters, setFilters] = useState({
@@ -340,6 +341,45 @@ export default function Central63App() {
         const brokerAvatar = brokerMap[brokerName] 
           || `https://static.vecteezy.com/ti/vetor-gratis/p1/15934676-icone-de-perfil-de-imagem-icone-masculino-humanos-ou-pessoas-assinam-e-simbolizam-vetor.jpg`;
         
+        // ---------------------------------------------------------
+        // NOVO: Busca Corretores das tabelas auxiliares (CORREÇÃO)
+        // ---------------------------------------------------------
+        useEffect(() => {
+          const fetchBrokers = async () => {
+            try {
+              // Busca nas duas tabelas em paralelo
+              const [resPmw, resAux] = await Promise.all([
+                supabase.from('corretores_pmw').select('nome'),
+                supabase.from('corretores_aux').select('nome')
+              ]);
+
+              const nomesPmw = (resPmw.data || []).map((c: any) => c.nome);
+              const nomesAux = (resAux.data || []).map((c: any) => c.nome);
+
+              // Junta, remove duplicatas e remove vazios
+              const todosNomes = Array.from(new Set([...nomesPmw, ...nomesAux]))
+                .filter(nome => nome && nome.trim() !== "")
+                .sort();
+
+              // Formata para o padrão que o componente Filters espera (id + name)
+              const corretoresFormatados = todosNomes.map((nome, index) => ({
+                id: index + 100, // ID fictício apenas para o loop do React
+                name: nome,
+                avatar: "" // Avatar vazio ou padrão
+              }));
+
+              setListaCorretores(corretoresFormatados);
+            } catch (error) {
+              console.error("Erro ao carregar lista de corretores:", error);
+            }
+          };
+
+          fetchBrokers();
+        }, []);
+
+
+
+
         // --- RESOLUÇÃO DA TIMELINE ---
         const resolvedHistory = interactionsMap[item.codigo] || [
           { 
@@ -511,8 +551,17 @@ export default function Central63App() {
               <StatCard title="Valor Potencial" value={formatCompact(stats.volume)} icon={DollarSign} trend="R$" color="bg-emerald-500" />
             </div>
 
-            <Filters filters={filters} onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} teams={TEAMS} cities={CITIES} brokers={MOCK_BROKERS} phases={PHASES} statuses={STATUS_OPTIONS} purposes={PURPOSES} />
-
+            <Filters 
+              filters={filters} 
+              onFilterChange={handleFilterChange} 
+              onClearFilters={handleClearFilters} 
+              teams={TEAMS} 
+              cities={CITIES} 
+              brokers={listaCorretores}
+              phases={PHASES} 
+              statuses={STATUS_OPTIONS} 
+              purposes={PURPOSES} 
+            />
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h3 className="text-muted-foreground font-medium"><span className="text-foreground font-bold">{filteredLeads.length}</span> resultados encontrados</h3>
             </div>
