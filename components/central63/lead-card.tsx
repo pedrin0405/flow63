@@ -120,8 +120,8 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
 
         {/* Rodapé da Imagem (Data) */}
         <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
-          <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded text-[10px] font-medium border border-white/10">
-            Atualizado: {lead.updatedAt}
+          <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[10px] font-medium border border-white/10">
+            {lead.history[0]?.date || lead.updatedAt}
           </span>
         </div>
       </div>
