@@ -30,9 +30,8 @@ const PHASES = [
   { id: 6, label: "Fechamento", percent: 100 },
 ]
 
-// Removido MOCK_BROKERS pois agora é dinâmico
 const MOCK_BROKERS = [
-  { id: 1, name: "Carregando...", avatar: "" },
+  { id: 0, name: "Carregando...", avatar: "" },
 ]
 
 export default function Central63App() {
@@ -92,7 +91,53 @@ export default function Central63App() {
     return id1 > id2 ? 1 : -1;
   }
 
-  // --- FUNÇÃO DE BUSCA COMPLEXA (ATUALIZADA) ---
+  // --- HELPER: Parse Date (dd/mm/yyyy para Date object) ---
+  const parseDateBr = (dateStr: string) => {
+    if (!dateStr) return null;
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+    return null;
+  }
+
+  // --- EFEITO: Buscar Lista de Corretores (Executa uma vez) ---
+  useEffect(() => {
+    const fetchBrokersList = async () => {
+      try {
+        const [resPmw, resAux] = await Promise.all([
+          supabase.from('corretores_pmw').select('nome, imagem_url'),
+          supabase.from('corretores_aux').select('nome, imagem_url')
+        ]);
+
+        const corretoresPmw = resPmw.data || [];
+        const corretoresAux = resAux.data || [];
+        
+        // Unifica listas
+        const mapNomes = new Map();
+        [...corretoresPmw, ...corretoresAux].forEach(c => {
+            if (c.nome && !mapNomes.has(c.nome)) {
+                mapNomes.set(c.nome, c.imagem_url || "");
+            }
+        });
+
+        const corretoresFormatados = Array.from(mapNomes.keys())
+          .sort()
+          .map((nome, index) => ({
+            id: index + 100, // ID fictício para o Select
+            name: nome,
+            avatar: mapNomes.get(nome)
+          }));
+
+        setListaCorretores(corretoresFormatados);
+      } catch (error) {
+        console.error("Erro ao carregar lista de corretores:", error);
+      }
+    };
+    fetchBrokersList();
+  }, []);
+
+  // --- FUNÇÃO DE BUSCA COMPLEXA ---
   const fetchLeads = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -150,7 +195,7 @@ export default function Central63App() {
       });
 
       // ---------------------------------------------------------
-      // ETAPA 1.5: Busca Dados dos Corretores 
+      // ETAPA 1.5: Busca Dados dos Corretores (Para Avatar no Card)
       // ---------------------------------------------------------
       const uniqueBrokerNames = Array.from(new Set(
         allAtendimentos
@@ -262,7 +307,7 @@ export default function Central63App() {
       }
 
       // ---------------------------------------------------------
-      // ETAPA 4: Busca TIMELINE (Interações) - CORRIGIDA (datahora)
+      // ETAPA 4: Busca TIMELINE
       // ---------------------------------------------------------
       let interactionsMap: Record<string, any[]> = {}
 
@@ -272,37 +317,25 @@ export default function Central63App() {
 
       if (codigosParaBuscar.length > 0) {
         const interBatchSize = 1000;
-        
         for (let i = 0; i < codigosParaBuscar.length; i += interBatchSize) {
            const chunk = codigosParaBuscar.slice(i, i + interBatchSize);
-           
-           // AGORA USANDO 'datahora' (formato texto)
            const { data: interacoes, error: errInter } = await supabase
              .from(tableInteracao)
              .select('*') 
              .in('atendimento_codigo', chunk) 
-             // Ordenamos por datahora. Obs: Se o texto for dd/mm/yyyy, a ordenação pode não ser cronológica perfeita no SQL,
-             // mas é o melhor possível sem converter no banco.
              .order('datahora', { ascending: false }) 
 
            if (!errInter && interacoes) {
              interacoes.forEach((int: any) => {
                const key = int.atendimento_codigo;
+               if (!interactionsMap[key]) interactionsMap[key] = []
                
-               if (!interactionsMap[key]) {
-                 interactionsMap[key] = []
-               }
-               
-               // Lógica para tratar o campo texto 'datahora'
                let dataFormatada = "Data N/A";
                if (int.datahora) {
-                   // Tenta criar uma data JS
                    const dateObj = new Date(int.datahora);
-                   // Verifica se é uma data válida (ex: formato ISO "2023-01-01")
                    if (!isNaN(dateObj.getTime())) {
                        dataFormatada = dateObj.toLocaleDateString('pt-BR');
                    } else {
-                       // Se falhar (ex: formato brasileiro "01/01/2023"), usa o texto original direto
                        dataFormatada = int.datahora;
                    }
                }
@@ -315,8 +348,6 @@ export default function Central63App() {
                  type: "action" 
                })
              })
-           } else if (errInter) {
-             console.error("❌ [DEBUG] Erro ao buscar interações:", errInter);
            }
         }
       }
@@ -336,51 +367,10 @@ export default function Central63App() {
         const resolvedValue = details.valor || 0
         const resolvedAddress = details.address
 
-        // --- RESOLUÇÃO DO CORRETOR ---
         const brokerName = item.corretor || "Corretor Desconhecido";
         const brokerAvatar = brokerMap[brokerName] 
           || `https://static.vecteezy.com/ti/vetor-gratis/p1/15934676-icone-de-perfil-de-imagem-icone-masculino-humanos-ou-pessoas-assinam-e-simbolizam-vetor.jpg`;
-        
-        // ---------------------------------------------------------
-        // NOVO: Busca Corretores das tabelas auxiliares (CORREÇÃO)
-        // ---------------------------------------------------------
-        useEffect(() => {
-          const fetchBrokers = async () => {
-            try {
-              // Busca nas duas tabelas em paralelo
-              const [resPmw, resAux] = await Promise.all([
-                supabase.from('corretores_pmw').select('nome'),
-                supabase.from('corretores_aux').select('nome')
-              ]);
 
-              const nomesPmw = (resPmw.data || []).map((c: any) => c.nome);
-              const nomesAux = (resAux.data || []).map((c: any) => c.nome);
-
-              // Junta, remove duplicatas e remove vazios
-              const todosNomes = Array.from(new Set([...nomesPmw, ...nomesAux]))
-                .filter(nome => nome && nome.trim() !== "")
-                .sort();
-
-              // Formata para o padrão que o componente Filters espera (id + name)
-              const corretoresFormatados = todosNomes.map((nome, index) => ({
-                id: index + 100, // ID fictício apenas para o loop do React
-                name: nome,
-                avatar: "" // Avatar vazio ou padrão
-              }));
-
-              setListaCorretores(corretoresFormatados);
-            } catch (error) {
-              console.error("Erro ao carregar lista de corretores:", error);
-            }
-          };
-
-          fetchBrokers();
-        }, []);
-
-
-
-
-        // --- RESOLUÇÃO DA TIMELINE ---
         const resolvedHistory = interactionsMap[item.codigo] || [
           { 
             date: new Date().toLocaleDateString("pt-BR"), 
@@ -391,6 +381,14 @@ export default function Central63App() {
           }
         ];
 
+        // Tenta resolver a fase com base em 'etapa', 'fase' ou 'situacao'
+        const rawPhase = item.etapa || item.fase || item.situacao;
+        const matchedPhase = PHASES.find(p => p.label === rawPhase) || PHASES[0];
+
+        // Tenta resolver a data de criação
+        const rawDate = item.created_at || item.data_cadastro || new Date().toISOString();
+        const formattedDate = new Date(rawDate).toLocaleDateString("pt-BR");
+
         return {
           id: item.safeId, 
           sourceTable: isPmw ? "atendimento_pmw" : "atendimento_aux",
@@ -398,16 +396,16 @@ export default function Central63App() {
           clientName: clientName,
           clientAvatar: linkedLead.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=0D8ABC&color=fff&bold=true`,
 
-          history: resolvedHistory, // <--- CAMPO CORRIGIDO
+          history: resolvedHistory,
           
           broker: {
-            id: 0, 
+            id: 0, // Será resolvido no filtro pelo nome
             name: brokerName,
             avatar: brokerAvatar
           },
 
-          phase: PHASES[0], 
-          team: "Vendas",
+          phase: matchedPhase, 
+          team: item.equipe || "Vendas", // Tenta pegar do banco ou usa padrão
           city: filters.city || (isPmw ? "Palmas" : "Outra"),
           purpose: item.finalidade || "Indefinido",
           status: item.situacao || "Novo",
@@ -425,7 +423,7 @@ export default function Central63App() {
             email: linkedLead.email || "",
             phone: linkedLead.telefone || "",
             origin: item.midia || "Desconhecido",
-            createdAt: new Date().toLocaleDateString("pt-BR")
+            createdAt: formattedDate
           },
           
           raw_codigo: item.codigo,
@@ -449,9 +447,10 @@ export default function Central63App() {
     fetchLeads()
   }, [fetchLeads])
 
-  // --- FILTROS ---
+  // --- FILTROS (Lógica Client-Side Corrigida) ---
   const filteredLeads = useMemo(() => {
     return leadsData.filter(lead => {
+      // 1. Busca por Texto
       if (filters.search) {
         const searchLower = filters.search.toLowerCase()
         const matchesName = lead.clientName.toLowerCase().includes(searchLower)
@@ -459,9 +458,46 @@ export default function Central63App() {
         const matchesBroker = lead.broker.name.toLowerCase().includes(searchLower)
         if (!matchesName && !matchesId && !matchesBroker) return false
       }
+
+      // 2. Filtro por Corretor
+      if (filters.brokerId) {
+        const selectedBroker = listaCorretores.find(b => b.id.toString() === filters.brokerId.toString())
+        // Compara nomes pois o ID no lead pode não existir ou ser diferente
+        if (selectedBroker && lead.broker.name !== selectedBroker.name) return false
+      }
+
+      // 3. Filtro por Equipe
+      if (filters.team && lead.team !== filters.team) {
+         // Se o lead não tiver equipe definida e o filtro for ativado, oculta
+         if (filters.team !== "Todas as Equipes") return false;
+      }
+
+      // 4. Filtro por Fase (Funil)
+      if (filters.phase) {
+         if (lead.phase.id.toString() !== filters.phase.toString()) return false;
+      }
+
+      // 5. Filtro por Data (Range)
+      if (filters.dateStart || filters.dateEnd) {
+        const leadDate = parseDateBr(lead.leadData.createdAt);
+        if (leadDate) {
+           if (filters.dateStart) {
+             const startDate = new Date(filters.dateStart);
+             // Zera horas para comparação justa
+             startDate.setHours(0,0,0,0);
+             if (leadDate < startDate) return false;
+           }
+           if (filters.dateEnd) {
+             const endDate = new Date(filters.dateEnd);
+             endDate.setHours(23,59,59,999);
+             if (leadDate > endDate) return false;
+           }
+        }
+      }
+
       return true
     })
-  }, [filters, leadsData])
+  }, [filters, leadsData, listaCorretores])
 
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
   const paginatedLeads = filteredLeads.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
@@ -493,8 +529,6 @@ export default function Central63App() {
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
         const newId = `${prefix}_${lead.id}`
 
-        console.log("Lead:", lead, "Dados:", data)
-        
         const payload = {
           id: newId, 
           id_origem: lead.id,
@@ -584,7 +618,7 @@ export default function Central63App() {
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                 <Search size={48} className="mb-4 opacity-20" />
                 <p className="text-lg font-medium">Nenhum atendimento encontrado.</p>
-                <p className="text-sm">Tente mudar a Cidade no filtro.</p>
+                <p className="text-sm">Tente mudar a Cidade ou limpar os filtros.</p>
                 <Button variant="outline" className="mt-4 bg-transparent" onClick={handleClearFilters}>Limpar filtros</Button>
               </div>
             )}
