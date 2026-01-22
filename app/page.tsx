@@ -17,7 +17,6 @@ import Loading from "./loading"
 import { supabase } from "@/lib/supabase"
 
 // --- CONSTANTES ---
-const TEAMS = ["Vendas A", "Vendas B", "Locacao Alpha", "Locacao Beta"]
 const CITIES = ["Palmas", "Araguaina"]
 const PURPOSES = ["Venda", "Locacao"]
 const STATUS_OPTIONS = ["Em atendimento", "Negócio realizado", "Descartado"]
@@ -46,6 +45,9 @@ export default function Central63App() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 8
 
+  // Estado para Equipes Dinâmicas (Departamentos dos Corretores)
+  const [teams, setTeams] = useState<string[]>([])
+
   // Controle do Modal
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<"edit" | "sale">("edit")
@@ -56,7 +58,7 @@ export default function Central63App() {
     city: "Palmas",
     team: "",
     purpose: "Todos",
-    status: "",
+    status: "Negócio realizado",
     phase: "",
     search: "",
     brokerId: "",
@@ -79,16 +81,23 @@ export default function Central63App() {
   }
 
   // --- HELPER: Comparar IDs ---
-  const compareIds = (id1: string, id2: string) => {
+  const compareIds = (id1: any, id2: any) => {
     if (id1 === id2) return 0;
-    const parts1 = id1.toString().split('_');
-    const parts2 = id2.toString().split('_');
+    if (!id1) return -1;
+    if (!id2) return 1;
+    
+    const s1 = String(id1);
+    const s2 = String(id2);
+    
+    const parts1 = s1.split('_');
+    const parts2 = s2.split('_');
+    
     if (parts1.length === 2 && parts2.length === 2) {
         const num1 = parseInt(parts1[1]);
         const num2 = parseInt(parts2[1]);
         if (!isNaN(num1) && !isNaN(num2)) return num1 - num2;
     }
-    return id1 > id2 ? 1 : -1;
+    return s1 > s2 ? 1 : -1;
   }
 
   // --- HELPER: Parse Date (dd/mm/yyyy para Date object) ---
@@ -101,40 +110,48 @@ export default function Central63App() {
     return null;
   }
 
-  // --- EFEITO: Buscar Lista de Corretores (Executa uma vez) ---
+  // --- EFEITO: Buscar Lista de Corretores e DEPARTAMENTOS ---
   useEffect(() => {
-    const fetchBrokersList = async () => {
+    const fetchBrokersAndTeams = async () => {
       try {
+        // Busca corretores e seus departamentos em ambas as tabelas
         const [resPmw, resAux] = await Promise.all([
-          supabase.from('corretores_pmw').select('nome, imagem_url'),
-          supabase.from('corretores_aux').select('nome, imagem_url')
+          supabase.from('corretores_pmw').select('nome, imagem_url, departamento'),
+          supabase.from('corretores_aux').select('nome, imagem_url, departamento')
         ]);
 
         const corretoresPmw = resPmw.data || [];
         const corretoresAux = resAux.data || [];
         
-        // Unifica listas
         const mapNomes = new Map();
+        const departamentosSet = new Set<string>();
+
         [...corretoresPmw, ...corretoresAux].forEach(c => {
             if (c.nome && !mapNomes.has(c.nome)) {
                 mapNomes.set(c.nome, c.imagem_url || "");
+            }
+            // Coleta departamentos válidos para o filtro de equipes
+            if (c.departamento && c.departamento.trim() !== "") {
+              departamentosSet.add(c.departamento.trim());
             }
         });
 
         const corretoresFormatados = Array.from(mapNomes.keys())
           .sort()
           .map((nome, index) => ({
-            id: index + 100, // ID fictício para o Select
+            id: index + 100,
             name: nome,
             avatar: mapNomes.get(nome)
           }));
 
         setListaCorretores(corretoresFormatados);
+        setTeams(Array.from(departamentosSet).sort()); // Define as opções do filtro de equipe
+
       } catch (error) {
-        console.error("Erro ao carregar lista de corretores:", error);
+        console.error("Erro ao carregar lista de corretores e equipes:", error);
       }
     };
-    fetchBrokersList();
+    fetchBrokersAndTeams();
   }, []);
 
   // --- FUNÇÃO DE BUSCA COMPLEXA ---
@@ -171,7 +188,10 @@ export default function Central63App() {
         
         const { data, error } = await query;
         
-        if (error) throw error;
+        if (error) {
+            console.error("Erro na query Supabase:", error);
+            throw error;
+        }
         
         if (data && data.length > 0) {
           allAtendimentos = [...allAtendimentos, ...data];
@@ -195,7 +215,7 @@ export default function Central63App() {
       });
 
       // ---------------------------------------------------------
-      // ETAPA 1.5: Busca Dados dos Corretores (Para Avatar no Card)
+      // ETAPA 1.5: Busca Dados dos Corretores (Avatar e Departamento)
       // ---------------------------------------------------------
       const uniqueBrokerNames = Array.from(new Set(
         allAtendimentos
@@ -203,18 +223,21 @@ export default function Central63App() {
           .filter((name: any) => name && typeof name === 'string')
       )) as string[];
 
-      let brokerMap: Record<string, string> = {} 
+      let brokerAvatarMap: Record<string, string> = {} 
+      let brokerDeptMap: Record<string, string> = {} // Mapa para armazenar departamento por nome
 
       if (uniqueBrokerNames.length > 0) {
         const { data: brokersData, error: errBrokers } = await supabase
           .from(tableCorretores)
-          .select('nome, imagem_url')
+          .select('nome, imagem_url, departamento')
           .in('nome', uniqueBrokerNames)
 
         if (!errBrokers && brokersData) {
           brokersData.forEach((broker: any) => {
-            if (broker.imagem_url) {
-              brokerMap[broker.nome] = broker.imagem_url
+            if (broker.nome) {
+                if (broker.imagem_url) brokerAvatarMap[broker.nome] = broker.imagem_url
+                // Armazena o departamento limpo (trim) para facilitar comparação
+                if (broker.departamento) brokerDeptMap[broker.nome] = broker.departamento.trim()
             }
           })
         }
@@ -368,8 +391,12 @@ export default function Central63App() {
         const resolvedAddress = details.address
 
         const brokerName = item.corretor || "Corretor Desconhecido";
-        const brokerAvatar = brokerMap[brokerName] 
+        const brokerAvatar = brokerAvatarMap[brokerName] 
           || `https://static.vecteezy.com/ti/vetor-gratis/p1/15934676-icone-de-perfil-de-imagem-icone-masculino-humanos-ou-pessoas-assinam-e-simbolizam-vetor.jpg`;
+        
+        // Define a equipe com base no departamento do corretor mapeado
+        // Prioridade: Mapa (tabela corretores) -> Item direto (tabela atendimento) -> Fallback
+        const teamName = brokerDeptMap[brokerName] || (item.equipe ? item.equipe.trim() : "Sem Equipe");
 
         const resolvedHistory = interactionsMap[item.codigo] || [
           { 
@@ -381,11 +408,9 @@ export default function Central63App() {
           }
         ];
 
-        // Tenta resolver a fase com base em 'etapa', 'fase' ou 'situacao'
         const rawPhase = item.etapa || item.fase || item.situacao;
         const matchedPhase = PHASES.find(p => p.label === rawPhase) || PHASES[0];
 
-        // Tenta resolver a data de criação
         const rawDate = item.created_at || item.data_cadastro || new Date().toISOString();
         const formattedDate = new Date(rawDate).toLocaleDateString("pt-BR");
 
@@ -399,13 +424,13 @@ export default function Central63App() {
           history: resolvedHistory,
           
           broker: {
-            id: 0, // Será resolvido no filtro pelo nome
+            id: 0, 
             name: brokerName,
             avatar: brokerAvatar
           },
 
           phase: matchedPhase, 
-          team: item.equipe || "Vendas", // Tenta pegar do banco ou usa padrão
+          team: teamName, // Agora contém o departamento correto
           city: filters.city || (isPmw ? "Palmas" : "Outra"),
           purpose: item.finalidade || "Indefinido",
           status: item.situacao || "Novo",
@@ -435,9 +460,9 @@ export default function Central63App() {
 
       setLeadsData(mappedLeads)
 
-    } catch (error) {
-      console.error("Erro ao buscar leads:", error)
-      toast({ title: "Erro", description: "Falha ao carregar atendimentos.", variant: "destructive" })
+    } catch (error: any) {
+      console.error("Erro ao buscar leads:", error.message || error)
+      toast({ title: "Erro", description: "Falha ao carregar atendimentos: " + (error.message || "Erro desconhecido"), variant: "destructive" })
     } finally {
       setIsLoading(false)
     }
@@ -447,7 +472,7 @@ export default function Central63App() {
     fetchLeads()
   }, [fetchLeads])
 
-  // --- FILTROS (Lógica Client-Side Corrigida) ---
+  // --- FILTROS (Lógica Client-Side) ---
   const filteredLeads = useMemo(() => {
     return leadsData.filter(lead => {
       // 1. Busca por Texto
@@ -462,28 +487,26 @@ export default function Central63App() {
       // 2. Filtro por Corretor
       if (filters.brokerId) {
         const selectedBroker = listaCorretores.find(b => b.id.toString() === filters.brokerId.toString())
-        // Compara nomes pois o ID no lead pode não existir ou ser diferente
         if (selectedBroker && lead.broker.name !== selectedBroker.name) return false
       }
 
-      // 3. Filtro por Equipe
-      if (filters.team && lead.team !== filters.team) {
-         // Se o lead não tiver equipe definida e o filtro for ativado, oculta
-         if (filters.team !== "Todas as Equipes") return false;
+      // 3. Filtro por Equipe (Departamento)
+      if (filters.team) {
+         // Compara o departamento do lead (obtido do corretor) com o filtro selecionado
+         if (lead.team !== filters.team) return false;
       }
 
-      // 4. Filtro por Fase (Funil)
+      // 4. Filtro por Fase
       if (filters.phase) {
          if (lead.phase.id.toString() !== filters.phase.toString()) return false;
       }
 
-      // 5. Filtro por Data (Range)
+      // 5. Filtro por Data
       if (filters.dateStart || filters.dateEnd) {
         const leadDate = parseDateBr(lead.leadData.createdAt);
         if (leadDate) {
            if (filters.dateStart) {
              const startDate = new Date(filters.dateStart);
-             // Zera horas para comparação justa
              startDate.setHours(0,0,0,0);
              if (leadDate < startDate) return false;
            }
@@ -589,7 +612,7 @@ export default function Central63App() {
               filters={filters} 
               onFilterChange={handleFilterChange} 
               onClearFilters={handleClearFilters} 
-              teams={TEAMS} 
+              teams={teams} 
               cities={CITIES} 
               brokers={listaCorretores}
               phases={PHASES} 
