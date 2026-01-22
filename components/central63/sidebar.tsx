@@ -167,6 +167,13 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange }: SidebarProp
               collapsed={isCollapsed}
             />
             <SidebarItem 
+              icon={Users} 
+              label="Corretores" 
+              active={activeTab === "corretores"} 
+              onClick={() => onTabChange("corretores")}
+              collapsed={isCollapsed}
+            />
+            <SidebarItem 
               icon={Building2} 
               label="Imóveis" 
               active={activeTab === "imoveis"} 

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, Suspense, useCallback } from "react"
 import { 
-  Menu, Users, DollarSign, Plus, Search, Briefcase
+  Menu, Users, DollarSign, Plus, Search, Briefcase, LayoutDashboard
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/central63/sidebar"
@@ -12,6 +12,7 @@ import { LeadCard } from "@/components/central63/lead-card"
 import { Pagination } from "@/components/central63/pagination"
 import { DetailsDrawer } from "@/components/central63/details-drawer"
 import { EditLeadModal, type EditableLeadData } from "@/components/central63/edit-lead-modal"
+import { BrokerList } from "@/components/central63/broker-list"
 import { useToast } from "@/hooks/use-toast"
 import Loading from "./loading"
 import { supabase } from "@/lib/supabase"
@@ -31,7 +32,7 @@ const PHASES = [
 ]
 
 // Removido MOCK_BROKERS pois agora é dinâmico
-const MOCK_BROKERS = [
+const MOCK_BROKERS_INIT = [
   { id: 1, name: "Carregando...", avatar: "" },
 ]
 
@@ -43,6 +44,7 @@ export default function Central63App() {
   // Estados de Dados
   const [selectedLead, setSelectedLead] = useState<any | null>(null)
   const [leadsData, setLeadsData] = useState<any[]>([]) 
+  const [brokersList, setBrokersList] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 8
@@ -91,10 +93,29 @@ export default function Central63App() {
     return id1 > id2 ? 1 : -1;
   }
 
+  const fetchBrokers = useCallback(async () => {
+    if (!supabase) return
+    try {
+      const isPmw = !filters.city || filters.city === "Palmas"
+      const table = isPmw ? "corretores_pmw" : "corretores_aux"
+      const { data, error } = await supabase.from(table).select('*')
+      if (error) throw error
+      if (data) setBrokersList(data.map((b: any) => ({ ...b, cidade: filters.city })))
+    } catch (err: any) {
+      console.error("Erro fetch brokers:", err)
+    }
+  }, [filters.city])
+
   // --- FUNÇÃO DE BUSCA COMPLEXA (ATUALIZADA) ---
   const fetchLeads = useCallback(async () => {
     setIsLoading(true)
     try {
+      if (!supabase) {
+        setLeadsData([])
+        setIsLoading(false)
+        toast({ title: "Supabase não configurado", description: "Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY", variant: "destructive" })
+        return
+      }
       // 1. Configuração do Contexto
       const isPmw = !filters.city || filters.city === "Palmas"
       const currentPrefix = isPmw ? "pmw" : "aux"
@@ -388,8 +409,12 @@ export default function Central63App() {
   }, [filters.city, filters.status, filters.purpose, toast])
 
   useEffect(() => {
-    fetchLeads()
-  }, [fetchLeads])
+    if (activeTab === "atendimentos") {
+      fetchLeads()
+    } else if (activeTab === "corretores") {
+      fetchBrokers()
+    }
+  }, [fetchLeads, fetchBrokers, activeTab])
 
   // --- FILTROS ---
   const filteredLeads = useMemo(() => {
@@ -455,6 +480,7 @@ export default function Central63App() {
           created_at: new Date().toISOString()
         }
         
+        if (!supabase) throw new Error("Supabase não configurado")
         const { error } = await supabase.from('vendas').upsert([payload])
         if (error) throw error
         
@@ -487,44 +513,66 @@ export default function Central63App() {
           </header>
 
           <div className="flex-1 overflow-y-auto bg-background p-4 lg:p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard title="Total na Lista" value={stats.total} icon={Users} trend="Atual" color="bg-primary" />
-              <StatCard title="Em Negociacao" value={stats.negotiation} icon={Briefcase} trend="Funil" color="bg-amber-500" />
-              <StatCard title="Valor Potencial" value={formatCompact(stats.volume)} icon={DollarSign} trend="R$" color="bg-emerald-500" />
-            </div>
+            {activeTab === "atendimentos" && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <StatCard title="Total na Lista" value={stats.total} icon={Users} trend="Atual" color="bg-primary" />
+                  <StatCard title="Em Negociacao" value={stats.negotiation} icon={Briefcase} trend="Funil" color="bg-amber-500" />
+                  <StatCard title="Valor Potencial" value={formatCompact(stats.volume)} icon={DollarSign} trend="R$" color="bg-emerald-500" />
+                </div>
 
-            <Filters filters={filters} onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} teams={TEAMS} cities={CITIES} brokers={MOCK_BROKERS} phases={PHASES} statuses={STATUS_OPTIONS} purposes={PURPOSES} />
+                <Filters filters={filters} onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} teams={TEAMS} cities={CITIES} brokers={MOCK_BROKERS_INIT} phases={PHASES} statuses={STATUS_OPTIONS} purposes={PURPOSES} />
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-muted-foreground font-medium"><span className="text-foreground font-bold">{filteredLeads.length}</span> resultados encontrados</h3>
-            </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h3 className="text-muted-foreground font-medium"><span className="text-foreground font-bold">{filteredLeads.length}</span> resultados encontrados</h3>
+                </div>
 
-            {isLoading ? (
-               <div className="flex justify-center items-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>
-            ) : filteredLeads.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
-                {paginatedLeads.map(lead => (
-                  <LeadCard 
-                    key={`${lead.sourceTable}-${lead.id}`} 
-                    lead={lead}
-                    formatCurrency={formatCurrency}
-                    onClick={() => setSelectedLead(lead)}
-                    onAddToDashboard={(e) => handleAddToDashboard(lead)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                <Search size={48} className="mb-4 opacity-20" />
-                <p className="text-lg font-medium">Nenhum atendimento encontrado.</p>
-                <p className="text-sm">Tente mudar a Cidade no filtro.</p>
-                <Button variant="outline" className="mt-4 bg-transparent" onClick={handleClearFilters}>Limpar filtros</Button>
+                {isLoading ? (
+                  <div className="flex justify-center items-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>
+                ) : filteredLeads.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
+                    {paginatedLeads.map(lead => (
+                      <LeadCard 
+                        key={`${lead.sourceTable}-${lead.id}`} 
+                        lead={lead}
+                        formatCurrency={formatCurrency}
+                        onClick={() => setSelectedLead(lead)}
+                        onAddToDashboard={(e) => handleAddToDashboard(lead)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                    <Search size={48} className="mb-4 opacity-20" />
+                    <p className="text-lg font-medium">Nenhum atendimento encontrado.</p>
+                    <p className="text-sm">Tente mudar a Cidade no filtro.</p>
+                    <Button variant="outline" className="mt-4 bg-transparent" onClick={handleClearFilters}>Limpar filtros</Button>
+                  </div>
+                )}
+
+                {filteredLeads.length > 0 && totalPages > 1 && (
+                  <div className="py-8"><Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} /></div>
+                )}
+              </>
+            )}
+
+            {activeTab === "corretores" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="mb-6">
+                  <h1 className="text-3xl font-bold tracking-tight text-foreground">Gestão de Corretores</h1>
+                  <p className="text-muted-foreground mt-1 text-lg">Visualize e gerencie a equipe de corretores</p>
+                </div>
+                <BrokerList brokers={brokersList} onUpdate={fetchBrokers} />
               </div>
             )}
 
-            {filteredLeads.length > 0 && totalPages > 1 && (
-              <div className="py-8"><Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} /></div>
+            {activeTab === "dashboard" && (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                <LayoutDashboard size={48} className="mb-4 opacity-20" />
+                <h2 className="text-xl font-semibold">Dashboard em desenvolvimento</h2>
+              </div>
             )}
+
             <footer className="border-t border-border pt-6 pb-8 text-center"><p className="text-sm text-muted-foreground">2026 - <span className="font-semibold text-foreground">Central63</span></p></footer>
           </div>
         </main>
