@@ -261,43 +261,61 @@ export default function Central63App() {
       }
 
       // ---------------------------------------------------------
-      // ETAPA 4: Busca TIMELINE (Interações) - CORREÇÃO DA TIMELINE
+      // ETAPA 4: Busca TIMELINE (Interações) - CORRIGIDA (datahora)
       // ---------------------------------------------------------
-      let interactionsMap: Record<number, any[]> = {}
+      let interactionsMap: Record<string, any[]> = {}
 
-      // Coleta apenas IDs numéricos válidos
-      const atendimentoIds = itemsWithSafeIds
-        .map(i => i.id)
-        .filter(id => typeof id === 'number');
+      const codigosParaBuscar = itemsWithSafeIds
+        .map(i => i.codigo)
+        .filter(c => c !== null && c !== undefined && c !== "");
 
-      if (atendimentoIds.length > 0) {
+      if (codigosParaBuscar.length > 0) {
         const interBatchSize = 1000;
         
-        for (let i = 0; i < atendimentoIds.length; i += interBatchSize) {
-           const chunk = atendimentoIds.slice(i, i + interBatchSize);
+        for (let i = 0; i < codigosParaBuscar.length; i += interBatchSize) {
+           const chunk = codigosParaBuscar.slice(i, i + interBatchSize);
            
-           // Busca as interações vinculadas aos atendimentos carregados
+           // AGORA USANDO 'datahora' (formato texto)
            const { data: interacoes, error: errInter } = await supabase
              .from(tableInteracao)
              .select('*') 
-             .in('atendimento_id', chunk)
-             .order('data', { ascending: false }) // Ordena do mais recente
+             .in('atendimento_codigo', chunk) 
+             // Ordenamos por datahora. Obs: Se o texto for dd/mm/yyyy, a ordenação pode não ser cronológica perfeita no SQL,
+             // mas é o melhor possível sem converter no banco.
+             .order('datahora', { ascending: false }) 
 
            if (!errInter && interacoes) {
              interacoes.forEach((int: any) => {
-               if (!interactionsMap[int.atendimento_id]) {
-                 interactionsMap[int.atendimento_id] = []
+               const key = int.atendimento_codigo;
+               
+               if (!interactionsMap[key]) {
+                 interactionsMap[key] = []
                }
                
-               // Formata a interação para o padrão do componente
-               interactionsMap[int.atendimento_id].push({
-                 date: int.data ? new Date(int.data).toLocaleDateString('pt-BR') : "Data N/A",
+               // Lógica para tratar o campo texto 'datahora'
+               let dataFormatada = "Data N/A";
+               if (int.datahora) {
+                   // Tenta criar uma data JS
+                   const dateObj = new Date(int.datahora);
+                   // Verifica se é uma data válida (ex: formato ISO "2023-01-01")
+                   if (!isNaN(dateObj.getTime())) {
+                       dataFormatada = dateObj.toLocaleDateString('pt-BR');
+                   } else {
+                       // Se falhar (ex: formato brasileiro "01/01/2023"), usa o texto original direto
+                       dataFormatada = int.datahora;
+                   }
+               }
+
+               interactionsMap[key].push({
+                 date: dataFormatada,
                  action: int.tipo || "Interação",
                  user: int.usuario || int.responsavel || "Sistema",
                  desc: int.descricao || int.texto || int.obs || int.mensagem || "", 
                  type: "action" 
                })
              })
+           } else if (errInter) {
+             console.error("❌ [DEBUG] Erro ao buscar interações:", errInter);
            }
         }
       }
@@ -323,7 +341,7 @@ export default function Central63App() {
           || `https://static.vecteezy.com/ti/vetor-gratis/p1/15934676-icone-de-perfil-de-imagem-icone-masculino-humanos-ou-pessoas-assinam-e-simbolizam-vetor.jpg`;
         
         // --- RESOLUÇÃO DA TIMELINE ---
-        const resolvedHistory = interactionsMap[item.id] || [
+        const resolvedHistory = interactionsMap[item.codigo] || [
           { 
             date: new Date().toLocaleDateString("pt-BR"), 
             action: "Importado", 
