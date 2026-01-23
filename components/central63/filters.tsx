@@ -197,27 +197,20 @@ export function Filters({
                   </div>
                 </FilterSection>
 
-                <Separator />
+                <Separator className="bg-border/60" />
 
+                {/* Filtro de Equipe agora usa o mesmo estilo do Corretor (Select Nativo) */}
                 <FilterSection title="Equipe">
-                   <div className="space-y-1">
-                      <SelectItemCustom 
-                        label="Todas as Equipes" 
-                        isSelected={!filters.team} 
-                        onClick={() => onFilterChange("team", "")} 
-                      />
-                      {teams.map(t => (
-                        <SelectItemCustom 
-                          key={t} 
-                          label={t} 
-                          isSelected={filters.team === t} 
-                          onClick={() => onFilterChange("team", t)} 
-                        />
-                      ))}
-                   </div>
+                    <select 
+                        className="w-full h-10 px-3 text-sm bg-background rounded-lg border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
+                        value={filters.team}
+                        onChange={(e) => onFilterChange("team", e.target.value)}
+                     >
+                       <option value="">Todas as Equipes</option>
+                       {teams.map(t => <option key={t} value={t}>{t}</option>)}
+                     </select>
                 </FilterSection>
 
-                <Separator />
 
                  {/* <FilterSection title="Fase do Funil">
                    <div className="space-y-1">
