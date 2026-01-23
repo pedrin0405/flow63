@@ -181,11 +181,6 @@ export function Filters({
 
                 <FilterSection title="Localização">
                   <div className="grid grid-cols-2 gap-2">
-                    <SelectItemCustom 
-                      label="Todas" 
-                      isSelected={!filters.city} 
-                      onClick={() => onFilterChange("city", "")} 
-                    />
                     {cities.map(c => (
                       <SelectItemCustom 
                         key={c} 

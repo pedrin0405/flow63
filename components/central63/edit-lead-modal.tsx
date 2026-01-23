@@ -72,7 +72,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
             {mode === "sale" ? (
               <>
                 <DollarSign className="text-emerald-500" />
-                Confirmar Venda
+                Lançar no Dashboard
               </>
             ) : (
               <>
@@ -157,7 +157,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
               </div>
 
               {/* --- CHECKBOX DE VISIBILIDADE --- */}
-              <div className={`flex items-center space-x-2 border p-3 rounded-md transition-colors ${formData.status_dashboard ? 'bg-emerald-50/50 border-emerald-100' : 'bg-muted/50'}`}>
+              <div className={`flex items-center space-x-2 border p-3 rounded-md transition-colors ${formData.status_dashboard ? 'bg-emerald-50/50 border-emerald-500' : 'bg-muted/50'}`}>
                 <Checkbox 
                   id="status_dashboard" 
                   checked={formData.status_dashboard}
