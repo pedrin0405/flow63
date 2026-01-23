@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, Suspense, useCallback } from "react"
 import { 
-  Menu, Users, DollarSign, Plus, Search, Briefcase
+  Menu, Users, DollarSign, Plus, Search, Briefcase, RefreshCw, Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/central63/sidebar"
@@ -43,6 +43,7 @@ export default function Central63App() {
   const [leadsData, setLeadsData] = useState<any[]>([]) 
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
+  const [isUpdating, setIsUpdating] = useState(false)
   const itemsPerPage = 8
 
   // Estado para Equipes Dinâmicas (Departamentos dos Corretores)
@@ -65,6 +66,31 @@ export default function Central63App() {
     dateStart: "",
     dateEnd: ""
   })
+
+  // Função para lidar com o click no botão Atualizar [!code ++]
+  const handleUpdateSupabase = async () => {
+    setIsUpdating(true)
+    try {
+      // Faz a requisição em background ("aciona" o link)
+      // mode: 'no-cors' permite disparar a requisição mesmo se o servidor não retornar headers CORS
+      await fetch("https://n8n.srv1207506.hstgr.cloud/webhook/f9908aaf-229a-4df3-a95c-0dba6546305e", { method: "GET", mode: "no-cors" })
+
+      toast({
+        title: "Atualização Disparada",
+        description: "O comando foi enviado para o Supabase com sucesso.",
+        className: "bg-emerald-500 text-white border-none"
+      })
+    } catch (error) {
+      console.error("Erro ao atualizar:", error)
+      toast({
+        title: "Erro",
+        description: "Falha ao acionar a atualização.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
 
   // --- HELPER: Normalizar Moeda ---
   const normalizeCurrency = (value: any): number => {
@@ -116,8 +142,8 @@ export default function Central63App() {
       try {
         // Busca corretores e seus departamentos em ambas as tabelas
         const [resPmw, resAux] = await Promise.all([
-          supabase.from('corretores_pmw').select('nome, imagem_url, departamento'),
-          supabase.from('corretores_aux').select('nome, imagem_url, departamento')
+          supabase.from('corretores_pmw').select('*'),
+          supabase.from('corretores_aux').select('*')
         ]);
 
         const corretoresPmw = resPmw.data || [];
@@ -593,7 +619,7 @@ export default function Central63App() {
   return (
     <Suspense fallback={<Loading />}>
       <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground selection:bg-primary/10 selection:text-primary">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={setActiveTab} atendimentosCount={stats.total}/>
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={setActiveTab} />
         {sidebarOpen && <div className="fixed inset-0 bg-foreground/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
         <main className="flex-1 flex flex-col h-full overflow-hidden relative">
           <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
@@ -601,8 +627,20 @@ export default function Central63App() {
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
               <h2 className="text-2xl font-bold text-foreground tracking-tight">Gestao de Atendimentos</h2>
             </div>
-            <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition shadow-sm shadow-primary/20">
-              <Plus size={18} /><span className="hidden sm:inline">Novo Atendimento</span>
+            {/* Botão Modificado para Atualizar Supabase */}
+            <button 
+              onClick={handleUpdateSupabase}
+              disabled={isUpdating}
+              className={`bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition shadow-sm shadow-primary/20 ${isUpdating ? "opacity-80 cursor-wait" : ""}`}
+            >
+              {isUpdating ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <RefreshCw size={18} />
+              )}
+              <span className="hidden sm:inline">
+                {isUpdating ? "Atualizando..." : "Atualizar Supabase"} 
+              </span>
             </button>
           </header>
 
