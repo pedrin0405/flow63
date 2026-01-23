@@ -48,7 +48,7 @@ function SidebarItem({ icon: Icon, label, active, onClick, badge, collapsed }: S
         {!collapsed && <span className="font-medium whitespace-nowrap">{label}</span>}
       </div>
       
-      {!collapsed && badge && (
+      {!collapsed && badge !== undefined && ( // Verificação ajustada para aceitar 0
         <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
           active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
         }`}>
@@ -56,12 +56,11 @@ function SidebarItem({ icon: Icon, label, active, onClick, badge, collapsed }: S
         </span>
       )}
 
-      {/* Badge em modo colapsado vira um ponto */}
-      {collapsed && badge && (
+      {collapsed && badge !== undefined && badge > 0 && (
         <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-card" />
       )}
 
-      {!collapsed && !badge && (
+      {!collapsed && badge === undefined && (
         <ChevronRight size={16} className={`opacity-0 transition-opacity ${active ? "opacity-100" : "group-hover:opacity-50"}`} />
       )}
     </button>
@@ -91,9 +90,10 @@ interface SidebarProps {
   onClose: () => void
   activeTab: string
   onTabChange: (tab: string) => void
+  atendimentosCount?: number
 }
 
-export function Sidebar({ isOpen, onClose, activeTab, onTabChange }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosCount }: SidebarProps) {
   // Estado para controlar se está minimizada no Desktop
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -163,7 +163,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange }: SidebarProp
               label="Atendimentos" 
               active={activeTab === "atendimentos"} 
               onClick={() => onTabChange("atendimentos")}
-              badge={12}
+              badge={atendimentosCount}
               collapsed={isCollapsed}
             />
             <SidebarItem 
