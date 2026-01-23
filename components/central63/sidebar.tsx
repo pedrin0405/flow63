@@ -10,7 +10,6 @@ import {
   HelpCircle, 
   ChevronRight, 
   ChevronLeft,
-  PanelLeft,
   type LucideIcon 
 } from "lucide-react"
 import {
@@ -19,7 +18,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils" // Certifique-se que você tem essa função utilitária padrão
+import { cn } from "@/lib/utils"
+import { useRouter, usePathname } from "next/navigation"
 
 interface SidebarItemProps {
   icon: LucideIcon
@@ -31,7 +31,6 @@ interface SidebarItemProps {
 }
 
 function SidebarItem({ icon: Icon, label, active, onClick, badge, collapsed }: SidebarItemProps) {
-  // O conteúdo do botão extraído para reutilização
   const buttonContent = (
     <button
       onClick={onClick}
@@ -48,7 +47,7 @@ function SidebarItem({ icon: Icon, label, active, onClick, badge, collapsed }: S
         {!collapsed && <span className="font-medium whitespace-nowrap">{label}</span>}
       </div>
       
-      {!collapsed && badge !== undefined && ( // Verificação ajustada para aceitar 0
+      {!collapsed && badge !== undefined && (
         <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
           active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
         }`}>
@@ -66,7 +65,6 @@ function SidebarItem({ icon: Icon, label, active, onClick, badge, collapsed }: S
     </button>
   )
 
-  // Se estiver colapsado, envolve em Tooltip
   if (collapsed) {
     return (
       <TooltipProvider delayDuration={0}>
@@ -94,12 +92,41 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosCount }: SidebarProps) {
-  // Estado para controlar se está minimizada no Desktop
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const router = useRouter()
+  const pathname = usePathname()
+
+  // Função para gerenciar a navegação entre páginas
+  const handleNavigation = (key: string, route?: string) => {
+    if (route) {
+      if (pathname !== route) {
+        router.push(route)
+      }
+    } else {
+      // Se for navegação interna (abas), mas estivermos em outra página, volta para home
+      if (pathname !== "/") {
+        router.push("/")
+        // Opcional: Você pode usar query params para persistir a aba ativa se necessário
+      } else {
+        onTabChange(key)
+      }
+    }
+    
+    // Fecha sidebar no mobile
+    if (window.innerWidth < 1024) {
+      onClose()
+    }
+  }
+
+  // Verifica se o item está ativo (considerando rota ou aba)
+  const isActive = (key: string, route?: string) => {
+    if (route && pathname === route) return true
+    if (pathname === "/" && activeTab === key) return true
+    return false
+  }
 
   return (
     <>
-      {/* Overlay Mobile (Manteve igual) */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
@@ -107,16 +134,13 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
         />
       )}
 
-      {/* Sidebar Container */}
       <aside 
         className={cn(
           "fixed lg:static inset-y-0 left-0 z-50 bg-card border-r border-border transform transition-all duration-300 ease-in-out flex flex-col",
-          // Lógica de largura e posição
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           isCollapsed ? "w-[80px]" : "w-72"
         )}
       >
-        {/* Botão de Toggle (Aparece apenas no Desktop) */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="hidden lg:flex absolute -right-3 top-9 w-6 h-6 bg-card border border-border rounded-full items-center justify-center text-muted-foreground hover:text-primary transition-colors shadow-sm z-50"
@@ -125,7 +149,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
         </button>
 
         <div className="h-full flex flex-col overflow-hidden">
-          {/* Logo Area */}
           <div className={cn("flex items-center transition-all duration-300", isCollapsed ? "p-4 justify-center" : "p-6 gap-4")}>
             <div className="relative flex-shrink-0">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-primary to-primary/60 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
@@ -134,7 +157,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               <div className="absolute -bottom-1 -right-1 w-3 h-3 lg:w-4 lg:h-4 bg-emerald-500 rounded-full border-2 border-card" />
             </div>
             
-            {/* Texto do Logo (some ao colapsar) */}
             <div className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", 
               isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100 block"
             )}>
@@ -143,7 +165,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             </div>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 py-6 space-y-1 overflow-y-auto overflow-x-hidden px-3">
             {!isCollapsed && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 px-4 whitespace-nowrap">
@@ -151,26 +172,26 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               </div>
             )}
             
-            <SidebarItem 
+            {/* <SidebarItem 
               icon={LayoutDashboard} 
               label="Dashboard" 
-              active={activeTab === "dashboard"} 
-              onClick={() => onTabChange("dashboard")}
+              active={isActive("dashboard", "/")} 
+              onClick={() => handleNavigation("dashboard", "/")} // Força rota raiz
               collapsed={isCollapsed}
-            />
+            /> */}
             <SidebarItem 
               icon={Users} 
               label="Atendimentos" 
-              active={activeTab === "atendimentos"} 
-              onClick={() => onTabChange("atendimentos")}
+              active={isActive("atendimentos") && pathname === "/"} // Ativo apenas na home
+              onClick={() => handleNavigation("atendimentos")}
               badge={atendimentosCount}
               collapsed={isCollapsed}
             />
             <SidebarItem 
               icon={Building2} 
               label="Imóveis" 
-              active={activeTab === "imoveis"} 
-              onClick={() => onTabChange("imoveis")}
+              active={isActive("imoveis", "/imoveis")} 
+              onClick={() => handleNavigation("imoveis", "/imoveis")} // Rota nova
               collapsed={isCollapsed}
             />
             
@@ -179,26 +200,24 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
                 Sistema
               </div>
             )}
-            {/* Separador visual quando colapsado para substituir o título da seção */}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
             <SidebarItem 
               icon={Settings} 
               label="Configurações" 
               active={activeTab === "config"} 
-              onClick={() => onTabChange("config")}
+              onClick={() => handleNavigation("config")}
               collapsed={isCollapsed}
             />
             <SidebarItem 
               icon={HelpCircle} 
               label="Suporte" 
               active={activeTab === "suporte"} 
-              onClick={() => onTabChange("suporte")}
+              onClick={() => handleNavigation("suporte")}
               collapsed={isCollapsed}
             />
           </nav>
 
-          {/* User Profile */}
           <div className="p-3 border-t border-border mt-auto">
             <div className={cn(
               "flex items-center rounded-xl bg-accent/50 mb-2 transition-all",
