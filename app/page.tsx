@@ -247,7 +247,7 @@ export default function Central63App() {
       // ETAPA 2: Busca Imóvel no Carrinho
       // ---------------------------------------------------------
       const loadedCodigos = itemsWithSafeIds.map(a => a.codigo).filter(Boolean)
-      let imovelDetailsMap: Record<string, { url: string, valor: number, address: string }> = {}
+      let imovelDetailsMap: Record<string, { codeImovel: string, url: string, valor: number, address: string }> = {}
 
       if (loadedCodigos.length > 0) {
         const { data: itensCarrinho, error: errCarrinho } = await supabase
@@ -277,7 +277,7 @@ export default function Central63App() {
                .in('codigo', imoveisParaBuscar)
              
              if (!errImovel && imoveisData) {
-               const dadosPorImovel: Record<string, { url: string, valor: number, address: string }> = {}
+               const dadosPorImovel: Record<string, { codeImovel: string, url: string, valor: number, address: string }> = {}
                
                imoveisData.forEach((im: any) => {
                  const valorLimpo = normalizeCurrency(im.valor);
@@ -288,9 +288,10 @@ export default function Central63App() {
                  const enderecoCompleto = partesEndereco.join(" - ") || "Endereço não informado";
 
                  dadosPorImovel[im.codigo] = {
+                   codeImovel: im.codigo,
                    url: im.urlfotoprincipal,
                    valor: valorLimpo,
-                   address: enderecoCompleto 
+                   address: enderecoCompleto
                  }
                })
 
@@ -389,6 +390,7 @@ export default function Central63App() {
         const resolvedImage = details.url || "https://app.imoview.com.br//Front/img/house1.png"
         const resolvedValue = details.valor || 0
         const resolvedAddress = details.address
+        const resolvedCodeImovel = details.codeImovel || "----"
 
         const brokerName = item.corretor || "Corretor Desconhecido";
         const brokerAvatar = brokerAvatarMap[brokerName] 
@@ -414,6 +416,7 @@ export default function Central63App() {
         const rawDate = item.created_at || item.data_cadastro || new Date().toISOString();
         const formattedDate = new Date(rawDate).toLocaleDateString("pt-BR");
 
+
         return {
           id: item.safeId, 
           sourceTable: isPmw ? "atendimento_pmw" : "atendimento_aux",
@@ -435,9 +438,9 @@ export default function Central63App() {
           purpose: item.finalidade || "Indefinido",
           status: item.situacao || "Novo",
           
-          propertyTitle: item.codigo ? `Imóvel #${item.codigo}` : "Imóvel sem código",
+          propertyTitle: item.codigo ? `Atendimento: ${item.codigo}` : "Imóvel sem código",
           propertyAddress: resolvedAddress,
-          propertyLocation: item.codigo || "----", 
+          propertyLocation: resolvedCodeImovel || "----", 
           value: resolvedValue, 
           image: resolvedImage, 
           
@@ -446,7 +449,7 @@ export default function Central63App() {
           
           leadData: {
             email: linkedLead.email || "",
-            phone: linkedLead.telefone || "",
+            phone: linkedLead.telefone1 || "",
             origin: item.midia || "Desconhecido",
             createdAt: formattedDate
           },
@@ -584,6 +587,8 @@ export default function Central63App() {
       toast({ title: "Lead Atualizado", description: "Salvo localmente." })
     }
   }
+
+  console.log("Rederizando leads:", leadsData)
 
   return (
     <Suspense fallback={<Loading />}>
