@@ -201,7 +201,7 @@ export default function ImoveisPage() {
 
             {/* Grid de Resultados */}
             {isLoading ? (
-               <div className="flex justify-center items-center py-20"><Loader2 className="animate-spin h-12 w-12 text-primary"/></div>
+               <div className="flex justify-center items-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>
             ) : filteredProperties.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
                 {paginatedItems.map(prop => (
