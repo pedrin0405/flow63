@@ -16,6 +16,7 @@ import { BrokerList } from "@/components/central63/broker-list"
 import { useToast } from "@/hooks/use-toast"
 import Loading from "./loading"
 import { supabase } from "@/lib/supabase"
+import { BrokerEditModal } from "@/components/central63/broker-edit-modal"
 
 // --- CONSTANTES ---
 const TEAMS = ["Vendas A", "Vendas B", "Locacao Alpha", "Locacao Beta"]
@@ -65,6 +66,8 @@ export default function Central63App() {
     dateStart: "",
     dateEnd: ""
   })
+
+  const [isNewBrokerModalOpen, setIsNewBrokerModalOpen] = useState(false)
 
   // --- HELPER: Normalizar Moeda ---
   const normalizeCurrency = (value: any): number => {
@@ -505,12 +508,41 @@ export default function Central63App() {
           <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
             <div className="flex items-center gap-4">
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">Gestao de Atendimentos</h2>
+              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+                {activeTab === "corretores" ? "Gestao de Corretores" : "Gestao de Atendimentos"}
+              </h2>
             </div>
-            <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition shadow-sm shadow-primary/20">
-              <Plus size={18} /><span className="hidden sm:inline">Novo Atendimento</span>
+            <button 
+              onClick={() => {
+                if (activeTab === "corretores") {
+                  setIsNewBrokerModalOpen(true)
+                }
+              }}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition shadow-sm shadow-primary/20"
+            >
+              <Plus size={18} />
+              <span className="hidden sm:inline">
+                {activeTab === "corretores" ? "Novo Corretor" : "Novo Atendimento"}
+              </span>
             </button>
           </header>
+
+          {isNewBrokerModalOpen && (
+            <BrokerEditModal 
+              broker={{
+                id: "novo",
+                nome: "",
+                departamento: "",
+                cidade_origem: filters.city === "Palmas" ? "Palmas-To" : "Araguaina-To",
+                unidade: "",
+                imagem_url: "",
+                desativado: "false"
+              }}
+              isOpen={isNewBrokerModalOpen}
+              onClose={() => setIsNewBrokerModalOpen(false)}
+              onUpdate={fetchBrokers}
+            />
+          )}
 
           <div className="flex-1 overflow-y-auto bg-background p-4 lg:p-8 space-y-6">
             {activeTab === "atendimentos" && (

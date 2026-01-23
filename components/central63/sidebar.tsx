@@ -11,6 +11,7 @@ import {
   ChevronRight, 
   ChevronLeft,
   PanelLeft,
+  Briefcase,
   type LucideIcon 
 } from "lucide-react"
 import {
@@ -44,7 +45,7 @@ function SidebarItem({ icon: Icon, label, active, onClick, badge, collapsed }: S
       )}
     >
       <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
-        <Icon size={20} />
+        {label === "Atendimentos" ? <Briefcase size={20} /> : <Icon size={20} />}
         {!collapsed && <span className="font-medium whitespace-nowrap">{label}</span>}
       </div>
       

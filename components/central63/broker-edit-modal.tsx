@@ -4,6 +4,7 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,18 +20,19 @@ import {
 } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { Camera } from "lucide-react"
+import { Camera, X } from "lucide-react"
 
-// Interface atualizada para usar data_nascimento
 interface Broker {
   id: string | number
   nome: string
-  imagem_url: string
-  unidade: string
-  cidade: string
-  desativado: boolean
+  apelido?: string
   departamento?: string
-  data_nascimento?: string 
+  cidade_origem: string
+  unidade: string
+  imagem_url: string
+  data_nascimento?: string
+  desativado: string | boolean
+  data_sincronizacao?: string
 }
 
 interface BrokerEditModalProps {
@@ -43,14 +45,39 @@ interface BrokerEditModalProps {
 export function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: BrokerEditModalProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [options, setOptions] = useState({ cities: [] as string[], units: [] as string[], departments: [] as string[] })
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    async function fetchOptions() {
+      if (!supabase) return
+      
+      const [pmwRes, auxRes] = await Promise.all([
+        supabase.from('corretores_pmw').select('cidade_origem, unidade, departamento'),
+        supabase.from('corretores_aux').select('cidade_origem, unidade, departamento')
+      ])
+
+      const allData = [...(pmwRes.data || []), ...(auxRes.data || [])]
+      
+      const cities = Array.from(new Set(allData.map(d => d.cidade_origem).filter(Boolean))) as string[]
+      const units = Array.from(new Set(allData.map(d => d.unidade).filter(Boolean))) as string[]
+      const departments = Array.from(new Set(allData.map(d => d.departamento).filter(Boolean))) as string[]
+
+      setOptions({ cities, units, departments })
+    }
+    
+    if (isOpen) {
+      fetchOptions()
+    }
+  }, [isOpen])
   
   const initialDesativado = (broker.desativado as any) === true || (broker.desativado as any) === "true"
 
   const [formData, setFormData] = useState({
     nome: broker.nome,
-    cidade: broker.cidade,
+    apelido: broker.apelido || "",
     departamento: broker.departamento || "",
+    cidade_origem: broker.cidade_origem,
     unidade: broker.unidade || "",
     data_nascimento: broker.data_nascimento || "",
     desativado: initialDesativado,
@@ -61,8 +88,9 @@ export function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: BrokerEdi
     const isDesativado = (broker.desativado as any) === true || (broker.desativado as any) === "true"
     setFormData({
       nome: broker.nome,
-      cidade: broker.cidade,
+      apelido: broker.apelido || "",
       departamento: broker.departamento || "",
+      cidade_origem: broker.cidade_origem,
       unidade: broker.unidade || "",
       data_nascimento: broker.data_nascimento || "",
       desativado: isDesativado,
@@ -74,31 +102,45 @@ export function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: BrokerEdi
     if (!supabase) return
     setLoading(true)
     try {
-      const isPmw = formData.cidade === "Palmas"
+      const isPmw = formData.cidade_origem.toLowerCase().includes("palmas")
       const table = isPmw ? "corretores_pmw" : "corretores_aux"
       
       const statusValue = formData.desativado ? "true" : "false"
 
-      const { error } = await supabase
-        .from(table)
-        .update({
-          nome: formData.nome,
-          unidade: formData.unidade,
-          departamento: formData.departamento,
-          desativado: statusValue,
-          imagem_url: formData.imagem_url,
-          data_nascimento: formData.data_nascimento
-        } as any)
-        .eq('id', broker.id)
+      const payload: any = {
+        nome: formData.nome,
+        apelido: formData.apelido,
+        departamento: formData.departamento,
+        unidade: formData.unidade || "Não definida",
+        desativado: statusValue,
+        imagem_url: formData.imagem_url || "",
+        data_nascimento: formData.data_nascimento || null,
+        data_sincronizacao: new Date().toISOString()
+      }
 
-      if (error) throw error
+      console.log("Enviando para Supabase:", { table, id: broker.id, payload })
 
-      toast({ title: "Sucesso", description: "Dados do corretor atualizados." })
+      let response
+      if (broker.id === "novo") {
+        response = await supabase.from(table).insert([payload]).select()
+      } else {
+        response = await supabase.from(table).update(payload).eq('id', broker.id).select()
+      }
+
+      if (response.error) {
+        console.error("Erro Supabase:", response.error)
+        throw response.error
+      }
+
+      toast({ 
+        title: "Sucesso", 
+        description: broker.id === "novo" ? "Corretor adicionado com sucesso." : "Dados do corretor atualizados." 
+      })
       onUpdate()
       onClose()
     } catch (err: any) {
-      console.error("Erro ao salvar:", err)
-      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" })
+      console.error("Erro detalhado ao salvar:", err)
+      toast({ title: "Erro ao salvar", description: err.message || "Erro desconhecido", variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -110,11 +152,11 @@ export function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: BrokerEdi
 
     const reader = new FileReader()
     reader.onloadend = () => {
-      setFormData({ ...formData, imagem_url: reader.result as string })
+      const base64String = reader.result as string
+      setFormData({ ...formData, imagem_url: base64String })
+      toast({ title: "Foto Convertida", description: "A imagem foi convertida para Base64 e será salva ao atualizar." })
     }
     reader.readAsDataURL(file)
-    
-    toast({ title: "Foto Selecionada", description: "A foto será salva ao clicar em ATUALIZAR." })
   }
 
   return (
@@ -163,31 +205,41 @@ export function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: BrokerEdi
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Cidade</Label>
-              <Select value={formData.cidade} onValueChange={(v) => setFormData({...formData, cidade: v})}>
+              <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Cidade Origem</Label>
+              <Select value={formData.cidade_origem} onValueChange={(v) => setFormData({...formData, cidade_origem: v})}>
                 <SelectTrigger className="rounded-xl h-12 bg-accent/20 border-none focus-visible:ring-primary/20">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecionar Cidade" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-xl">
-                  <SelectItem value="Palmas">Palmas</SelectItem>
-                  <SelectItem value="Araguaina">Araguaína</SelectItem>
+                  {options.cities.map(city => (
+                    <SelectItem key={city} value={city}>{city}</SelectItem>
+                  ))}
+                  {options.cities.length === 0 && (
+                    <>
+                      <SelectItem value="Palmas-To">Palmas-To</SelectItem>
+                      <SelectItem value="Araguaina-To">Araguaína-To</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
             
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">departamento</Label>
+              <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Departamento</Label>
               <Select value={formData.departamento} onValueChange={(v) => setFormData({...formData, departamento: v})}>
                 <SelectTrigger className="rounded-xl h-12 bg-accent/20 border-none focus-visible:ring-primary/20">
-                  <SelectValue placeholder="Selecionar Equipe" />
+                  <SelectValue placeholder="Selecionar Departamento" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-xl">
-                  <SelectItem value="Vendas A">Maurício</SelectItem>
-                  <SelectItem value="Vendas B">Fernando</SelectItem>
-                  <SelectItem value="Vendas C">Mariana</SelectItem>
-                  <SelectItem value="Vendas D">Martins</SelectItem>
-                  <SelectItem value="Vendas E">Igor</SelectItem>
-                  <SelectItem value="Vendas F">Daniel</SelectItem>
+                  {options.departments.map(dept => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
+                  {options.departments.length === 0 && (
+                    <>
+                      <SelectItem value="Vendas">Vendas</SelectItem>
+                      <SelectItem value="Locação">Locação</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -199,21 +251,36 @@ export function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: BrokerEdi
                   <SelectValue placeholder="Selecionar Unidade" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-xl">
-                  <SelectItem value="Matriz">Matriz</SelectItem>
-                  <SelectItem value="Orla">Orla</SelectItem>
-                  <SelectItem value="Shopping">Shopping</SelectItem>
-                  <SelectItem value="Araguaina">Araguaína</SelectItem>
+                  {options.units.map(unit => (
+                    <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                  ))}
+                  {options.units.length === 0 && (
+                    <>
+                      <SelectItem value="Matriz">Matriz</SelectItem>
+                      <SelectItem value="Orla">Orla</SelectItem>
+                      <SelectItem value="Shopping">Shopping</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Data de Nascimento</Label>
+              <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Apelido</Label>
+              <Input 
+                className="rounded-xl h-12 bg-accent/20 border-none focus-visible:ring-primary/20"
+                value={formData.apelido} 
+                onChange={(e) => setFormData({...formData, apelido: e.target.value})} 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Aniversário</Label>
               <Input 
                 type="date"
                 className="rounded-xl h-12 bg-accent/20 border-none focus-visible:ring-primary/20"
                 value={formData.data_nascimento} 
-                onChange={(e) => setFormData({...formData,  data_nascimento: e.target.value})} 
+                onChange={(e) => setFormData({...formData, data_nascimento: e.target.value})} 
               />
             </div>
           </div>
