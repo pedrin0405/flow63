@@ -10,6 +10,7 @@ import {
   HelpCircle, 
   ChevronRight, 
   ChevronLeft,
+  UserCog,
   type LucideIcon 
 } from "lucide-react"
 import {
@@ -192,6 +193,14 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               label="Imóveis" 
               active={isActive("imoveis", "/imoveis")} 
               onClick={() => handleNavigation("imoveis", "/imoveis")} // Rota nova
+              collapsed={isCollapsed}
+            />
+
+            <SidebarItem 
+              icon={UserCog} 
+              label="Corretores" 
+              active={isActive("corretores", "/corretores")} 
+              onClick={() => handleNavigation("corretores", "/corretores")}
               collapsed={isCollapsed}
             />
             
