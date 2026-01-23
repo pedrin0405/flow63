@@ -96,7 +96,7 @@ export function Filters({
 
   return (
     <div className="w-full space-y-4">
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-card/50 backdrop-blur-sm border border-border/40 p-1.5 rounded-2xl shadow-sm">
+      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-card border border-border p-1.5 rounded-4xl shadow-sm">
         
         {/* Área Principal: Busca + Finalidade */}
         <div className="flex flex-1 items-center gap-2 w-full">
@@ -219,7 +219,7 @@ export function Filters({
 
                 <Separator />
 
-                 <FilterSection title="Fase do Funil">
+                 {/* <FilterSection title="Fase do Funil">
                    <div className="space-y-1">
                       <SelectItemCustom 
                         label="Todas as Fases" 
@@ -237,7 +237,7 @@ export function Filters({
                    </div>
                 </FilterSection>
 
-                <Separator />
+                <Separator /> */}
 
                 <FilterSection title="Corretor">
                    {/* Usando Select nativo aqui apenas para lista longa, ou poderia ser outro SelectItemCustom com scroll */}
