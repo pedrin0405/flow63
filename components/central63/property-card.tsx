@@ -22,11 +22,11 @@ export function PropertyCard({ property, formatCurrency, onClick }: PropertyCard
             alt="Imóvel" 
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
-        <div className="grid grid-cols-2 gap-2 absolute top-3 right-3">
-             <Badge variant={property.status.includes("Desativado") ? "destructive" : "default"} className="shadow-sm">
+        <div>
+             <Badge variant={property.status.includes("Desativado") ? "destructive" : "default"} className="shadow-sm absolute top-3 left-3 z-20 animate-in fade-in zoom-in duration-300">
                 {property.status}
              </Badge>
-             <Badge variant="outline" className="text-[12px] w-full justify-center bg-muted/100">
+             <Badge variant="outline" className="text-[12px] bg-muted/100 absolute top-3 right-3">
                 Cód: {property.code}
             </Badge>
         </div>
