@@ -71,7 +71,7 @@ export default function ImoveisPage() {
         // Selecionando colunas específicas para performance
         let query = supabase
           .from(tableName)
-          .select('id, codigo, urlfotoprincipal, valor, endereco, bairro, cidade, estado, situacao, areaprincipal, valor_m2, descricao, tipo, created_at')
+          .select('codigo, urlfotoprincipal, valor, endereco, bairro, cidade, estado, situacao, areaprincipal, valor_m2, descricao, tipo, created_at')
           .range(from, from + batchSize - 1);
 
         if (filters.status && filters.status !== "Todos") {
@@ -93,7 +93,6 @@ export default function ImoveisPage() {
 
       // Mapeamento
       const mappedProps = allProperties.map((item: any) => ({
-        id: item.id,
         code: item.codigo || "S/C",
         image: item.urlfotoprincipal || "https://app.imoview.com.br//Front/img/house1.png",
         value: normalizeCurrency(item.valor),
@@ -207,7 +206,7 @@ export default function ImoveisPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
                 {paginatedItems.map(prop => (
                   <PropertyCard 
-                    key={`${prop.id}-${prop.code}`}
+                    key={`${prop.code}`}
                     property={prop}
                     formatCurrency={formatCurrency}
                     onClick={() => setSelectedProperty(prop)}
