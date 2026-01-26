@@ -7,9 +7,7 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
-    // Criamos uma resposta inicial para poder anexar os cookies nela
     const response = NextResponse.redirect(`${origin}${next}`)
-
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -26,12 +24,8 @@ export async function GET(request: NextRequest) {
     )
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (!error) {
-      return response
-    }
+    if (!error) return response;
   }
 
-  console.error("Erro na troca do código de autenticação.");
   return NextResponse.redirect(`${origin}/login?error=auth-code-error`)
 }

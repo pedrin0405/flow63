@@ -3,9 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request: { headers: request.headers },
   })
 
   const supabase = createServerClient(
@@ -13,11 +11,14 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
-          // Apenas aplique os cookies na resposta (response)
+          // Atualiza a requisição para que o getUser() abaixo veja os novos cookies
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({
+            request: { headers: request.headers },
+          })
+          // Define na resposta para o navegador salvar
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
@@ -26,23 +27,18 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // IMPORTANTE: getUser() é mais seguro que getSession(), mas pode ser lento.
   const { data: { user } } = await supabase.auth.getUser()
-
-  const isPublicPage = 
-    request.nextUrl.pathname.startsWith('/login') || 
-    request.nextUrl.pathname.startsWith('/auth') || 
-    request.nextUrl.pathname.startsWith('/forgot-password')
-
-  // Regra 1: Se NÃO tem usuário e NÃO está na área pública -> Redireciona para Login
-  if (!user && !isPublicPage) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
-  }
   
-  // Regra 2: Se TEM usuário e tenta acessar Login -> Redireciona para Home
-  // ADICIONAR: Verificação para evitar loop se o cookie ainda estiver presente após logout
+  // DEBUG TERMINAL
+  console.log(`[Middleware] Path: ${request.nextUrl.pathname} | User: ${user ? user.email : 'null'}`)
+
+  const isAuthPage = request.nextUrl.pathname.startsWith('/login') || 
+                     request.nextUrl.pathname.startsWith('/auth')
+
+  if (!user && !isAuthPage) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
   if (user && request.nextUrl.pathname === '/login') {
     return NextResponse.redirect(new URL('/', request.url))
   }
@@ -51,8 +47,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    // Protege tudo exceto arquivos estáticos e imagens
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

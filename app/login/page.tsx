@@ -23,35 +23,38 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [email, setEmail] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState("");
 
   async function onSubmit(event: React.SyntheticEvent) {
     event.preventDefault();
     setIsLoading(true);
+    
+    const form = event.target as HTMLFormElement;
+    const emailVal = (form.elements.namedItem('email') as HTMLInputElement).value;
+    const passwordVal = (form.elements.namedItem('password') as HTMLInputElement).value;
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: (event.target as any).password.value,
+        email: emailVal,
+        password: passwordVal,
       });
 
       if (error) throw error;
       
-      toast.success("Login realizado com sucesso!");
-      
-      // Força a atualização dos dados do servidor antes de mudar de página
+      console.log("[Login] Sucesso. Sincronizando...");
       router.refresh(); 
       
-      // Delay mínimo para garantir que o cookie foi escrito
+      // O router.push deve ser chamado após o refresh para garantir o Middleware
       setTimeout(() => {
         router.push("/");
-      }, 100);
+      }, 200);
 
     } catch (error: any) {
-      toast.error(error.message || "Erro ao realizar login.");
+      console.error("[Login Error]", error.message);
+      toast.error(error.message);
     } finally {
-       setIsLoading(false);
+      setIsLoading(false);
     }
   }
 
