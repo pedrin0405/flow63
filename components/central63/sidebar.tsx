@@ -191,16 +191,16 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <SidebarItem 
               icon={Building2} 
               label="Imóveis" 
-              active={isActive("imoveis", "/imoveis")} 
-              onClick={() => handleNavigation("imoveis", "/imoveis")} // Rota nova
+              active={isActive("imoveis", "/house")} 
+              onClick={() => handleNavigation("imoveis", "/house")} // Rota nova
               collapsed={isCollapsed}
             />
 
             <SidebarItem 
               icon={UserCog} 
               label="Corretores" 
-              active={isActive("corretores", "/corretores")} 
-              onClick={() => handleNavigation("corretores", "/corretores")}
+              active={isActive("corretores", "/brokers")} 
+              onClick={() => handleNavigation("corretores", "/brokers")}
               collapsed={isCollapsed}
             />
             
@@ -211,13 +211,22 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
-            <SidebarItem 
+            {/* <SidebarItem 
               icon={Settings} 
               label="Configurações" 
               active={activeTab === "config"} 
               onClick={() => handleNavigation("config")}
               collapsed={isCollapsed}
+            /> */}
+
+            <SidebarItem 
+              icon={Settings} 
+              label="Configurações" 
+              active={isActive("config", "/settings")} 
+              onClick={() => handleNavigation("config", "/settings")}
+              collapsed={isCollapsed}
             />
+            
             <SidebarItem 
               icon={HelpCircle} 
               label="Suporte" 
