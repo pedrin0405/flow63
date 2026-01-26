@@ -16,12 +16,12 @@ import {
 import { cn } from "@/lib/utils";
 import { Loader2, LockKeyhole, Mail, Wand2 } from "lucide-react";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
+import { createClient } from "@/lib/supabase-client";import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
 
@@ -49,24 +49,21 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: "google") => {
   setIsLoading(true);
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: provider,
-      options: {
-        // Garanta que esta URL esteja no "Redirect URLs" do Dashboard do Supabase
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: {
+          // Esta URL deve ser a mesma cadastrada no Dashboard do Supabase
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
-      },
-    });
-    if (error) throw error;
-  } catch (error: any) {
-    // ... tratamento de erro
-  } finally {
-    setIsLoading(false);
-  }
-};
+      });
+      if (error) throw error;
+      // O navegador será redirecionado automaticamente para o Google aqui
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao conectar com Google");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleMagicLink = async () => {
     if (!email) {
