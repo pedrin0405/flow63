@@ -262,14 +262,20 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 
-                    onClick={async () => await signOut()}
+                    onClick={async () => {
+                      try {
+                        await signOut(); // Chama a função do AuthProvider
+                      } catch (e) {
+                        console.error(e);
+                      }
+                    }}
                     className={cn(
                       "flex items-center text-muted-foreground hover:text-destructive text-sm transition-colors rounded-lg hover:bg-destructive/10",
                       isCollapsed ? "justify-center w-full py-3" : "gap-2 px-3 py-2 w-full"
                     )}
                   >
                     <LogOut size={18} />
-                    {!isCollapsed && <span>Sair do sistema</span>}
+                      {!isCollapsed && <span>Sair do sistema</span>}
                   </button>
                 </TooltipTrigger>
                 {isCollapsed && <TooltipContent side="right">Sair do sistema</TooltipContent>}

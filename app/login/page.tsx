@@ -18,8 +18,10 @@ import { Loader2, LockKeyhole, Mail, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
 
@@ -33,8 +35,10 @@ export default function LoginPage() {
         password: (event.target as any).password.value,
       });
       if (error) throw error;
+      
       toast.success("Login realizado com sucesso!");
-       // Redirecionar aqui
+      router.push("/"); // Adicione o redirecionamento aqui
+      router.refresh(); // Garante que o middleware reconheça o novo cookie
     } catch (error: any) {
       toast.error(error.message || "Erro ao realizar login.");
     } finally {
