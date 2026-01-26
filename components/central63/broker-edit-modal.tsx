@@ -20,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-// Usando caminho relativo para o supabase para maior segurança
-import { supabase } from "../../lib/supabase"
+// Usando alias padrão do Next.js para evitar problemas de caminho relativo
+import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Camera, Plus } from "lucide-react"
 
@@ -48,8 +48,13 @@ interface BrokerEditModalProps {
 export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: BrokerEditModalProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  
+  // Estados para controlar os modais de adição
   const [isAddingDept, setIsAddingDept] = useState(false)
   const [newDeptName, setNewDeptName] = useState("")
+  
+  const [isAddingUnit, setIsAddingUnit] = useState(false)
+  const [newUnitName, setNewUnitName] = useState("")
   
   const [options, setOptions] = useState({ 
     cities: [] as string[], 
@@ -59,6 +64,7 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Função que busca dados do banco para popular os dropdowns
   const fetchOptions = async () => {
     if (!supabase) return
     const [pmwRes, auxRes] = await Promise.all([
@@ -66,9 +72,12 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
       supabase.from('corretores_aux').select('cidade_origem, unidade, departamento')
     ])
     const allData = [...(pmwRes.data || []), ...(auxRes.data || [])]
+    
+    // Cria sets únicos dos dados vindos do banco
     const cities = Array.from(new Set(allData.map(d => d.cidade_origem).filter(Boolean))) as string[]
     const units = Array.from(new Set(allData.map(d => d.unidade).filter(Boolean))) as string[]
     const departments = Array.from(new Set(allData.map(d => d.departamento).filter(Boolean))) as string[]
+    
     setOptions({ cities, units, departments })
   }
 
@@ -101,10 +110,20 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
 
   const handleAddNewDepartment = () => {
     if (!newDeptName.trim()) return
+    // Adiciona localmente. Será salvo no banco quando o usuário salvar o corretor com este depto.
     setOptions(prev => ({ ...prev, departments: [...prev.departments, newDeptName.trim()] }))
     setFormData(prev => ({ ...prev, departamento: newDeptName.trim() }))
     setIsAddingDept(false)
     setNewDeptName("")
+  }
+
+  const handleAddNewUnit = () => {
+    if (!newUnitName.trim()) return
+    // Adiciona localmente.
+    setOptions(prev => ({ ...prev, units: [...prev.units, newUnitName.trim()] }))
+    setFormData(prev => ({ ...prev, unidade: newUnitName.trim() }))
+    setIsAddingUnit(false)
+    setNewUnitName("")
   }
 
   const handleSave = async () => {
@@ -181,6 +200,7 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
               />
             </div>
             
+            {/* Campo Departamento com botão + */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 ml-1 mb-1">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Departamento</Label>
@@ -198,8 +218,18 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
               </Select>
             </div>
 
+            {/* Campo Unidade com botão + */}
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Unidade</Label>
+              <div className="flex items-center gap-2 ml-1 mb-1">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Unidade</Label>
+                <button 
+                  onClick={() => setIsAddingUnit(true)} 
+                  className="bg-primary/10 text-primary hover:bg-primary hover:text-white p-0.5 rounded transition-all"
+                  title="Nova Unidade"
+                >
+                  <Plus size={10} strokeWidth={4} />
+                </button>
+              </div>
               <Select value={formData.unidade} onValueChange={(v) => setFormData({...formData, unidade: v})}>
                 <SelectTrigger className="rounded-2xl h-11 bg-muted/40 border-none font-bold text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-2xl">{options.units.map(u => <SelectItem key={u} value={u} className="font-bold text-xs">{u}</SelectItem>)}</SelectContent>
@@ -257,18 +287,37 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
           </div>
         </div>
 
+        {/* Modal de Adicionar Departamento */}
         {isAddingDept && (
           <Dialog open={isAddingDept} onOpenChange={setIsAddingDept}>
             <DialogContent className="sm:max-w-[350px] rounded-[2.5rem] p-8 border-none shadow-3xl">
               <DialogHeader><DialogTitle className="text-center font-black uppercase text-sm tracking-widest">Novo Depto</DialogTitle></DialogHeader>
               <div className="py-4 space-y-4">
                 <Input 
-                  placeholder="Nome..." 
+                  placeholder="Nome do departamento..." 
                   className="rounded-2xl h-12 bg-muted/50 border-none font-bold text-center" 
                   value={newDeptName} 
                   onChange={(e) => setNewDeptName(e.target.value)} 
                 />
                 <Button className="w-full h-12 rounded-2xl font-black text-xs" onClick={handleAddNewDepartment}>ADICIONAR</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Modal de Adicionar Unidade */}
+        {isAddingUnit && (
+          <Dialog open={isAddingUnit} onOpenChange={setIsAddingUnit}>
+            <DialogContent className="sm:max-w-[350px] rounded-[2.5rem] p-8 border-none shadow-3xl">
+              <DialogHeader><DialogTitle className="text-center font-black uppercase text-sm tracking-widest">Nova Unidade</DialogTitle></DialogHeader>
+              <div className="py-4 space-y-4">
+                <Input 
+                  placeholder="Nome da unidade..." 
+                  className="rounded-2xl h-12 bg-muted/50 border-none font-bold text-center" 
+                  value={newUnitName} 
+                  onChange={(e) => setNewUnitName(e.target.value)} 
+                />
+                <Button className="w-full h-12 rounded-2xl font-black text-xs" onClick={handleAddNewUnit}>ADICIONAR</Button>
               </div>
             </DialogContent>
           </Dialog>
