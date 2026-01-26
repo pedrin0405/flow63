@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
+import { useAuth } from "@/components/auth-provider"
 
 interface SidebarItemProps {
   icon: LucideIcon
@@ -93,6 +94,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosCount }: SidebarProps) {
+  const { signOut, profile } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
@@ -250,8 +252,8 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               
               {!isCollapsed && (
                 <div className="flex-1 min-w-0 overflow-hidden">
-                  <p className="text-sm font-semibold text-foreground truncate">Pedro Augusto</p>
-                  <p className="text-xs text-muted-foreground truncate">Administrador</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{profile?.full_name || "Usuário"}</p>
+                  <p className="text-xs text-muted-foreground truncate">{profile?.role || "Membro"}</p>
                 </div>
               )}
             </div>
@@ -259,10 +261,13 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button className={cn(
-                    "flex items-center text-muted-foreground hover:text-destructive text-sm transition-colors rounded-lg hover:bg-destructive/10",
-                    isCollapsed ? "justify-center w-full py-3" : "gap-2 px-3 py-2 w-full"
-                  )}>
+                  <button 
+                    onClick={signOut} // <--- AQUI: Executa o logout ao clicar
+                    className={cn(
+                      "flex items-center text-muted-foreground hover:text-destructive text-sm transition-colors rounded-lg hover:bg-destructive/10",
+                      isCollapsed ? "justify-center w-full py-3" : "gap-2 px-3 py-2 w-full"
+                    )}
+                  >
                     <LogOut size={18} />
                     {!isCollapsed && <span>Sair do sistema</span>}
                   </button>

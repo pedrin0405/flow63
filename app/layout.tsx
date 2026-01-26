@@ -2,6 +2,7 @@ import React from "react"
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { AuthProvider } from "@/components/auth-provider" // <--- 1. Importe o AuthProvider
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -37,12 +38,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      {/* ADICIONADO: suppressHydrationWarning para ignorar alterações de extensões */}
       <body 
         className={`font-sans antialiased`}
         suppressHydrationWarning={true}
       >
-        {children}
+        {/* 2. Envolva o children com o AuthProvider */}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Analytics />
       </body>
     </html>
