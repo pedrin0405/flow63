@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createContext, SetStateAction, useContext, useEffect, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"; // Importa o cliente unificado
 import { useRouter } from "next/navigation";
 import { Session } from "@supabase/supabase-js";
 
@@ -32,70 +32,105 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const supabase = getSupabaseBrowserClient(); // Usa a instância Singleton para evitar conflitos
 
   useEffect(() => {
-    // 1. Pega sessão inicial
+    // 1. Pega sessão inicial de forma segura
     const getInitialSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setSession(session);
-      if (session) await fetchProfile(session.user.id);
-      setLoading(false);
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        setSession(initialSession);
+        
+        if (initialSession) {
+          await fetchProfile(initialSession.user.id, initialSession.user.email);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar sessão inicial:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     getInitialSession();
 
     // 2. Escuta mudanças (Login, Logout, Auto-refresh)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session) {
-        await fetchProfile(session.user.id);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, currentSession: Session | null) => {
+      setSession(currentSession);
+      
+      if (currentSession) {
+        await fetchProfile(currentSession.user.id, currentSession.user.email);
+      } else {  
         setProfile(null);
       }
+      
+      // Se houver mudança de estado (ex: login/logout), atualiza o servidor para o Middleware agir
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        router.refresh();
+      }
+      
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [router, supabase]);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, email?: string) => {
     try {
+      // Tenta buscar o perfil existente
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .single();
 
-      if (!error && data) {
+      // Se o perfil não existir (código de erro do PostgREST para 'no rows found')
+      if (error && (error.code === 'PGRST116' || error.message.includes("JSON object requested, but 0 rows were returned"))) {
+        console.log("Perfil não encontrado, criando novo registro...");
+        
+        const { data: newProfile, error: createError } = await supabase
+          .from("profiles")
+          .insert([
+            { 
+              id: userId, 
+              email: email || null,
+              full_name: "", // Valores padrão
+              avatar_url: "" 
+            }
+          ])
+          .select()
+          .single();
+
+        if (!createError && newProfile) {
+          setProfile(newProfile);
+        } else {
+          console.error("Erro ao criar perfil automático:", createError);
+        }
+      } else if (!error && data) {
         setProfile(data);
       }
     } catch (error) {
-      console.error("Erro ao buscar perfil:", error);
+      console.error("Erro na gestão de perfil:", error);
     }
   };
 
   const signOut = async () => {
     try {
-        // 1. Limpa a sessão no Supabase
+        setLoading(true);
         await supabase.auth.signOut();
         
-        // 2. Limpa os estados locais explicitamente
         setSession(null);
         setProfile(null);
 
-        // 3. Força o redirecionamento e limpa o cache de rotas do Next.js
+        // Limpa o cache de rotas e redireciona
+        router.refresh();
         router.push("/login");
-        router.refresh(); 
     } catch (error) {
         console.error("Erro ao sair:", error);
-        // Mesmo com erro, mandamos para o login por segurança
-        router.push("/login");
+        window.location.href = "/login"; // Redirecionamento forçado em caso de erro crítico
+    } finally {
+        setLoading(false);
     }
-    };
+  };
 
   return (
     <AuthContext.Provider value={{ session, profile, loading, signOut }}>

@@ -1,4 +1,3 @@
-// app/auth/callback/route.ts
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -8,6 +7,9 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
+    // Criamos uma resposta inicial para poder anexar os cookies nela
+    const response = NextResponse.redirect(`${origin}${next}`)
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -16,7 +18,7 @@ export async function GET(request: NextRequest) {
           getAll() { return request.cookies.getAll() },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) =>
-              request.cookies.set(name, value)
+              response.cookies.set(name, value, options)
             )
           },
         },
@@ -24,13 +26,12 @@ export async function GET(request: NextRequest) {
     )
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      return response
     }
   }
-   console.log("Redirecionando para login devido a erro na autenticação.");
-  // Se chegar aqui com um access_token na fragment (#), o Supabase Client no 
-  // lado do cliente deveria ter capturado. Se caiu no servidor sem 'code', 
-  // algo falhou no handshake PKCE.
+
+  console.error("Erro na troca do código de autenticação.");
   return NextResponse.redirect(`${origin}/login?error=auth-code-error`)
 }

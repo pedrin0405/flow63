@@ -16,12 +16,13 @@ import {
 import { cn } from "@/lib/utils";
 import { Loader2, LockKeyhole, Mail, Wand2 } from "lucide-react";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase-client";import { toast } from "sonner";
+import { getSupabaseBrowserClient } from "@/lib/supabase-client";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = getSupabaseBrowserClient();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
 
@@ -34,11 +35,19 @@ export default function LoginPage() {
         email: email,
         password: (event.target as any).password.value,
       });
+
       if (error) throw error;
       
       toast.success("Login realizado com sucesso!");
-      router.push("/"); // Adicione o redirecionamento aqui
-      router.refresh(); // Garante que o middleware reconheça o novo cookie
+      
+      // Força a atualização dos dados do servidor antes de mudar de página
+      router.refresh(); 
+      
+      // Delay mínimo para garantir que o cookie foi escrito
+      setTimeout(() => {
+        router.push("/");
+      }, 100);
+
     } catch (error: any) {
       toast.error(error.message || "Erro ao realizar login.");
     } finally {
