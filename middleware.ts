@@ -2,7 +2,6 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // Cria uma resposta inicial que permite modificar headers/cookies
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -18,12 +17,10 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          // Define cookies na REQUISIÇÃO (para o server component ler agora)
           cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
           response = NextResponse.next({
             request,
           })
-          // Define cookies na RESPOSTA (para o navegador salvar)
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
@@ -32,18 +29,24 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // IMPORTANTE: Isso atualiza a sessão se o token estiver expirando
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // IMPORTANTE: getUser() é mais seguro que getSession(), mas pode ser lento.
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Regra 1: Se NÃO tem usuário e NÃO está na área pública -> Login
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/auth') && !request.nextUrl.pathname.startsWith('/forgot-password')) {
-     return NextResponse.redirect(new URL('/login', request.url))
+  const isPublicPage = 
+    request.nextUrl.pathname.startsWith('/login') || 
+    request.nextUrl.pathname.startsWith('/auth') || 
+    request.nextUrl.pathname.startsWith('/forgot-password')
+
+  // Regra 1: Se NÃO tem usuário e NÃO está na área pública -> Redireciona para Login
+  if (!user && !isPublicPage) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
   
-  // Regra 2: Se TEM usuário e tenta acessar Login -> Home
-   if (user && request.nextUrl.pathname.startsWith('/login')) {
+  // Regra 2: Se TEM usuário e tenta acessar Login -> Redireciona para Home
+  // ADICIONAR: Verificação para evitar loop se o cookie ainda estiver presente após logout
+  if (user && request.nextUrl.pathname === '/login') {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -52,6 +55,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // Protege tudo exceto arquivos estáticos e imagens
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

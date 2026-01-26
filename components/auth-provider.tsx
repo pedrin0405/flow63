@@ -79,9 +79,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
+    try {
+        // 1. Limpa a sessão no Supabase
+        await supabase.auth.signOut();
+        
+        // 2. Limpa os estados locais explicitamente
+        setSession(null);
+        setProfile(null);
+
+        // 3. Força o redirecionamento e limpa o cache de rotas do Next.js
+        router.push("/login");
+        router.refresh(); 
+    } catch (error) {
+        console.error("Erro ao sair:", error);
+        // Mesmo com erro, mandamos para o login por segurança
+        router.push("/login");
+    }
+    };
 
   return (
     <AuthContext.Provider value={{ session, profile, loading, signOut }}>
