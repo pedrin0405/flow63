@@ -16,14 +16,13 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          response = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
+        // middleware.ts
+            setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+            // Apenas adicione os cookies à resposta existente em vez de criar uma nova NextResponse.next()
+            cookiesToSet.forEach(({ name, value, options }) =>
+                response.cookies.set(name, value, options)
+            );
         },
       },
     }

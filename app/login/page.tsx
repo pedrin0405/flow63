@@ -47,26 +47,26 @@ export default function LoginPage() {
   }
 
   const handleSocialLogin = async (provider: "google") => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+  setIsLoading(true);
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: provider,
+      options: {
+        // Garanta que esta URL esteja no "Redirect URLs" do Dashboard do Supabase
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
         },
-      });
-      if (error) throw error;
-    } catch (error: any) {
-       if (error.status === 429 || error.message?.includes("rate limit")) {
-        toast.warning("Muitas tentativas. Aguarde um momento e tente novamente.");
-        return;
-      }
-      toast.error(`Erro ao logar com ${provider}`);
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      },
+    });
+    if (error) throw error;
+  } catch (error: any) {
+    // ... tratamento de erro
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleMagicLink = async () => {
     if (!email) {
