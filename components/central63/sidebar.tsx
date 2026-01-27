@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 interface SidebarItemProps {
   icon: LucideIcon
@@ -96,6 +97,21 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
   const [isCollapsed, setIsCollapsed] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+
+  // --- NOVA FUNÇÃO DE LOGOUT ---
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      
+      // Redireciona para a página de login após o logout
+      router.push("/login")
+      router.refresh() // Limpa o cache das rotas
+    } catch (error) {
+      console.error("Erro ao sair:", error)
+      alert("Erro ao sair do sistema. Tente novamente.")
+    }
+  }
 
   // Função para gerenciar a navegação entre páginas
   const handleNavigation = (key: string, route?: string) => {
@@ -250,7 +266,9 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button className={cn(
+                  <button
+                  onClick={handleSignOut} 
+                  className={cn(
                     "flex items-center text-muted-foreground hover:text-destructive text-sm transition-colors rounded-lg hover:bg-destructive/10",
                     isCollapsed ? "justify-center w-full py-3" : "gap-2 px-3 py-2 w-full"
                   )}>
