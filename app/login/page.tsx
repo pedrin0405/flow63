@@ -146,7 +146,7 @@ export default function LoginPage() {
                 imóveis. A eficiência e a clareza que ela proporciona são
                 incomparáveis.&rdquo;
               </p>
-              <footer className="text-sm drop-shadow-md opacity-80">Sofia Davis</footer>
+              <footer className="text-sm drop-shadow-md opacity-80">Pedro Augusto</footer>
             </blockquote>
           </div>
         </div>

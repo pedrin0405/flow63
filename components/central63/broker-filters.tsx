@@ -34,7 +34,7 @@ export function BrokerFilters({
   hasActiveFilters
 }: BrokerFiltersProps) {
   return (
-    <div className="bg-card p-4 rounded-2xl border border-border shadow-sm space-y-4 md:space-y-0 md:flex md:items-center md:gap-4">
+    <div className="bg-card p-4 rounded-4xl border border-border shadow-sm space-y-4 md:space-y-0 md:flex md:items-center md:gap-4">
       {/* Área de Busca */}
       <div className="relative flex-1">
         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground bg-card/50 p-0.5 rounded-md">
@@ -42,7 +42,7 @@ export function BrokerFilters({
         </div>
         <Input 
           placeholder="Buscar por nome ou ID..." 
-          className="pl-10 h-12 rounded-xl bg-muted/30 border-muted-foreground/20 focus-visible:bg-background focus-visible:border-primary transition-all font-medium"
+          className="pl-10 h-12 rounded-4xl bg-muted/30 border-muted-foreground/20 focus-visible:bg-background focus-visible:border-primary transition-all font-medium"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
         />
