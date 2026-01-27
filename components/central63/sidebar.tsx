@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { 
-  LayoutDashboard, 
   Users, 
   Building2, 
   LogOut, 
@@ -22,6 +21,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface SidebarItemProps {
   icon: LucideIcon
@@ -95,52 +95,67 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosCount }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [userData, setUserData] = useState<{ name: string; email: string; initial: string } | null>(null)
+  const [userData, setUserData] = useState<{ name: string; email: string; initial: string; avatarUrl?: string } | null>(null)
   const router = useRouter()
   const pathname = usePathname()
 
-  // Busca os dados do usuário ao carregar a Sidebar
+  // Busca os dados atualizados do perfil (incluindo o avatar)
   useEffect(() => {
-    const getUser = async () => {
+    const getUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        // Tenta pegar o nome dos metadados (se houver) ou usa o e-mail como fallback
-        const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Usuário"
+        // Busca os dados da tabela profiles para pegar o avatar_url e nome real
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        const fullName = profileData?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || "Usuário"
         const initial = fullName.charAt(0).toUpperCase()
         
         setUserData({
           name: fullName,
           email: user.email || "",
-          initial: initial
+          initial: initial,
+          avatarUrl: profileData?.avatar_url
         })
       }
     }
-    getUser()
+    getUserData()
+    
+    // Opcional: Escutar mudanças em tempo real na tabela profiles para atualizar o avatar instantaneamente
+    const profileSubscription = supabase
+      .channel('profile_changes')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, payload => {
+        if (userData && payload.new.id === userData.email) { // Ajuste conforme sua lógica de ID
+           getUserData()
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(profileSubscription)
+    }
   }, [])
 
-  // --- NOVA FUNÇÃO DE LOGOUT ---
   const handleSignOut = async () => {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-      
-      // Redireciona para a página de login após o logout
       router.push("/login")
-      router.refresh() // Limpa o cache das rotas
+      router.refresh()
     } catch (error) {
       console.error("Erro ao sair:", error)
-      alert("Erro ao sair do sistema. Tente novamente.")
     }
   }
 
-  // Função para gerenciar a navegação entre páginas
   const handleNavigation = (key: string, route?: string) => {
     if (route) {
       if (pathname !== route) {
         router.push(route)
       }
     } else {
-      // Se for navegação interna (abas), mas estivermos em outra página, volta para home
       if (pathname !== "/") {
         router.push("/")
       } else {
@@ -148,13 +163,11 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
       }
     }
     
-    // Fecha sidebar no mobile
     if (window.innerWidth < 1024) {
       onClose()
     }
   }
 
-  // Verifica se o item está ativo (considerando rota ou aba)
   const isActive = (key: string, route?: string) => {
     if (route && pathname === route) return true
     if (pathname === "/" && activeTab === key) return true
@@ -208,14 +221,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               </div>
             )}
             
-            {/* <SidebarItem 
-              icon={LayoutDashboard} 
-              label="Dashboard" 
-              active={isActive("dashboard", "/")} 
-              onClick={() => handleNavigation("dashboard", "/")} // Força rota raiz
-              collapsed={isCollapsed}
-            /> */}
-
             <SidebarItem 
               icon={Users} 
               label="Atendimentos" 
@@ -231,7 +236,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               onClick={() => handleNavigation("imoveis", "/imoveis")} 
               collapsed={isCollapsed}
             />
-
             <SidebarItem 
               icon={UserCog} 
               label="Corretores" 
@@ -269,9 +273,12 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               isCollapsed ? "justify-center p-2 bg-transparent" : "gap-3 p-3"
             )}>
               <div className="relative flex-shrink-0">
-                <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-sm font-bold">
-                  {userData?.initial || <Users size={18} />}
-                </div>
+                <Avatar className="w-9 h-9 lg:w-10 lg:h-10 border border-border">
+                  <AvatarImage src={userData?.avatarUrl} alt={userData?.name} />
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-sm font-bold">
+                    {userData?.initial || <Users size={18} />}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-card" />
               </div>
               
