@@ -18,8 +18,10 @@ import { Loader2, LockKeyhole, Mail, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter(); // Inicialize o router
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
 
@@ -28,13 +30,22 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      // Dentro da sua função onSubmit no login/page.tsx
       const { error } = await supabase.auth.signInWithPassword({
         email: email,
-        password: (event.target as any).password.value,
-      });
-      if (error) throw error;
-      toast.success("Login realizado com sucesso!");
-       // Redirecionar aqui
+        password: password,
+      })
+
+      if (error) throw error
+
+      toast.success("Login realizado!")
+
+      // Pequeno delay ou refresh forçado para garantir que o cookie foi escrito
+      router.refresh() 
+      setTimeout(() => {
+        router.push("/")
+      }, 100)
+            
     } catch (error: any) {
       toast.error(error.message || "Erro ao realizar login.");
     } finally {
