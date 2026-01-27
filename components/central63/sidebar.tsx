@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { 
-  Users, 
+  Users,
+  LayoutDashboard,
   Building2, 
   LogOut, 
   Settings, 
@@ -222,25 +223,34 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             )}
             
             <SidebarItem 
-              icon={Users} 
-              label="Atendimentos" 
-              active={isActive("atendimentos") && pathname === "/"} 
-              onClick={() => handleNavigation("atendimentos")}
+              icon={LayoutDashboard} 
+              label="Dashboard" 
+              active={isActive("Dashboard") && pathname === "/"} 
+              onClick={() => handleNavigation("dashboard")}
               badge={atendimentosCount}
               collapsed={isCollapsed}
             />
+
+            <SidebarItem 
+              icon={Users} 
+              label="Atendimentos" 
+              active={isActive("atendimentos", "/services")} 
+              onClick={() => handleNavigation("atendimentos", "/services")} 
+              collapsed={isCollapsed}
+            />
+
             <SidebarItem 
               icon={Building2} 
               label="Imóveis" 
-              active={isActive("imoveis", "/imoveis")} 
-              onClick={() => handleNavigation("imoveis", "/imoveis")} 
+              active={isActive("imoveis", "/homes")} 
+              onClick={() => handleNavigation("imoveis", "/homes")} 
               collapsed={isCollapsed}
             />
             <SidebarItem 
               icon={UserCog} 
               label="Corretores" 
-              active={isActive("corretores", "/corretores")} 
-              onClick={() => handleNavigation("corretores", "/corretores")}
+              active={isActive("corretores", "/brokers")} 
+              onClick={() => handleNavigation("corretores", "/brokers")}
               collapsed={isCollapsed}
             />
             
@@ -254,15 +264,15 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <SidebarItem 
               icon={Settings} 
               label="Configurações" 
-              active={isActive("config", "/configuracoes")} 
-              onClick={() => handleNavigation("config", "/configuracoes")}
+              active={isActive("config", "/settings")} 
+              onClick={() => handleNavigation("config", "/settings")}
               collapsed={isCollapsed}
             />
 
             <SidebarItem 
               icon={HelpCircle} 
               label="Suporte" 
-              active={isActive("suport", "/suport")} 
+              active={isActive("suport", "/support")} 
               onClick={() => handleNavigation("suport", "/suport")}
               collapsed={isCollapsed}
             />
