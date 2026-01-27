@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const router = useRouter(); // Inicialize o router
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -31,26 +31,40 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Dentro da sua função onSubmit no login/page.tsx
-      const { error } = await supabase.auth.signInWithPassword({
+      // 1. Tenta o login no Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
-      })
+      });
 
-      if (error) throw error
+      if (error) throw error;
 
-      toast.success("Login realizado!")
+      // 2. Verifica se o usuário existe na tabela 'profiles'
+      if (data?.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", data.user.id)
+          .single();
 
-      // Pequeno delay ou refresh forçado para garantir que o cookie foi escrito
-      router.refresh() 
+        if (profileError || !profile) {
+          // Se não houver perfil, desloga e impede o acesso
+          await supabase.auth.signOut();
+          toast.error("Acesso negado: Seu usuário não possui um perfil ativo no sistema.");
+          return;
+        }
+      }
+
+      toast.success("Login realizado!");
+
+      router.refresh();
       setTimeout(() => {
-        router.push("/")
-      }, 100)
-            
+        router.push("/");
+      }, 100);
     } catch (error: any) {
       toast.error(error.message || "Erro ao realizar login.");
     } finally {
-       setIsLoading(false);
+      setIsLoading(false);
     }
   }
 
@@ -65,7 +79,7 @@ export default function LoginPage() {
       });
       if (error) throw error;
     } catch (error: any) {
-       if (error.status === 429 || error.message?.includes("rate limit")) {
+      if (error.status === 429 || error.message?.includes("rate limit")) {
         toast.warning("Muitas tentativas. Aguarde um momento e tente novamente.");
         return;
       }
@@ -93,7 +107,7 @@ export default function LoginPage() {
       });
 
       if (error) {
-         if (error.status === 429 || error.message?.includes("rate limit")) {
+        if (error.status === 429 || error.message?.includes("rate limit")) {
           toast.warning("Muitas tentativas. Aguarde 60 segundos.");
           return;
         }
@@ -111,31 +125,25 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
-      
       {/* --- IMAGEM DE FUNDO GLOBAL --- */}
       <div className="absolute inset-0 z-0">
-          <Image
-            src="https://www.casa63.com.br/assets/img/home/lamevwg8.png?v=1678987906"
-            alt="Imagem de fundo Casa63"
-            fill
-            className="object-cover"
-            priority
-          />
-          {/* Gradiente adicional na parte inferior */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+        <Image
+          src="https://www.casa63.com.br/assets/img/home/lamevwg8.png?v=1678987906"
+          alt="Imagem de fundo Casa63"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
       </div>
-
 
       {/* --- CONTEÚDO PRINCIPAL --- */}
       <div className="container relative z-10 flex-col items-center justify-center h-full md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-
         {/* Coluna da Esquerda (Branding Desktop) */}
         <div className="relative hidden h-full flex-col p-10 text-white lg:flex justify-between my-auto py-20">
           <div className="relative z-20 flex items-center text-lg font-medium">
             <div className="mr-2 flex size-10 items-center justify-center rounded-xl bg-primary/90 shadow-lg shadow-primary/20 backdrop-blur-sm">
-              <span className="text-xl font-bold text-white">
-                63
-              </span>
+              <span className="text-xl font-bold text-white">63</span>
             </div>
             Central63
           </div>
@@ -152,26 +160,16 @@ export default function LoginPage() {
         </div>
 
         {/* Coluna da Direita (Container do Form) */}
-        {/* ALTERAÇÃO AQUI: Removido o background e o blur deste container */}
         <div className="p-4 lg:p-8 h-full flex items-center justify-center">
           <div className="mx-auto w-full max-w-[400px]">
-            
             {/* Branding Mobile */}
             <div className="flex flex-col items-center space-y-2 text-center lg:hidden mb-6 text-white drop-shadow-md">
               <div className="flex size-12 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
-                <span className="text-xl font-bold text-white">
-                  63
-                </span>
+                <span className="text-xl font-bold text-white">63</span>
               </div>
               <span className="text-xl font-bold">Central63</span>
             </div>
 
-            {/* ALTERAÇÃO AQUI: O Efeito Vidro agora está focado no CARD.
-               - backdrop-blur-xl: Desfoque forte.
-               - bg-white/60: Fundo branco translúcido.
-               - ring-1 ring-white/30: Borda fina e translúcida para definição.
-               - sm:rounded-3xl: Bordas mais arredondadas.
-            */}
             <Card className="border-0 shadow-2xl sm:rounded-3xl bg-white/60 dark:bg-black/60 backdrop-blur-xl ring-1 ring-white/30 dark:ring-white/10">
               <CardHeader className="space-y-1 pb-6 text-center">
                 <CardTitle className="text-xl font-semibold tracking-tight">
@@ -189,7 +187,6 @@ export default function LoginPage() {
                       <Label htmlFor="email">E-mail</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
-                        {/* Inputs ligeiramente transparentes para combinar */}
                         <Input
                           id="email"
                           placeholder="nome@exemplo.com"
@@ -223,6 +220,8 @@ export default function LoginPage() {
                           autoCapitalize="none"
                           autoComplete="current-password"
                           disabled={isLoading}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
                           className="pl-10 bg-white/40 dark:bg-zinc-900/40 border-white/20 focus-visible:ring-primary/50"
                         />
                       </div>
