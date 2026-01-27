@@ -24,6 +24,7 @@ export default function LoginPage() {
   const router = useRouter(); // Inicialize o router
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
 
   async function onSubmit(event: React.SyntheticEvent) {
     event.preventDefault();

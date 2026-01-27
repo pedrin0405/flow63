@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   LayoutDashboard, 
   Users, 
@@ -95,8 +95,28 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosCount }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [userData, setUserData] = useState<{ name: string; email: string; initial: string } | null>(null)
   const router = useRouter()
   const pathname = usePathname()
+
+  // Busca os dados do usuário ao carregar a Sidebar
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Tenta pegar o nome dos metadados (se houver) ou usa o e-mail como fallback
+        const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Usuário"
+        const initial = fullName.charAt(0).toUpperCase()
+        
+        setUserData({
+          name: fullName,
+          email: user.email || "",
+          initial: initial
+        })
+      }
+    }
+    getUser()
+  }, [])
 
   // --- NOVA FUNÇÃO DE LOGOUT ---
   const handleSignOut = async () => {
@@ -250,15 +270,19 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             )}>
               <div className="relative flex-shrink-0">
                 <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-sm font-bold">
-                  PA
+                  {userData?.initial || <Users size={18} />}
                 </div>
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-card" />
               </div>
               
               {!isCollapsed && (
                 <div className="flex-1 min-w-0 overflow-hidden">
-                  <p className="text-sm font-semibold text-foreground truncate">Pedro Augusto</p>
-                  <p className="text-xs text-muted-foreground truncate">Administrador</p>
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {userData?.name || "Carregando..."}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {userData?.email || "Conectado"}
+                  </p>
                 </div>
               )}
             </div>
