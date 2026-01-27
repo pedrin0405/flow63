@@ -143,7 +143,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
       // Se for navegação interna (abas), mas estivermos em outra página, volta para home
       if (pathname !== "/") {
         router.push("/")
-        // Opcional: Você pode usar query params para persistir a aba ativa se necessário
       } else {
         onTabChange(key)
       }
@@ -216,10 +215,11 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               onClick={() => handleNavigation("dashboard", "/")} // Força rota raiz
               collapsed={isCollapsed}
             /> */}
+
             <SidebarItem 
               icon={Users} 
               label="Atendimentos" 
-              active={isActive("atendimentos") && pathname === "/"} // Ativo apenas na home
+              active={isActive("atendimentos") && pathname === "/"} 
               onClick={() => handleNavigation("atendimentos")}
               badge={atendimentosCount}
               collapsed={isCollapsed}
@@ -228,7 +228,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               icon={Building2} 
               label="Imóveis" 
               active={isActive("imoveis", "/imoveis")} 
-              onClick={() => handleNavigation("imoveis", "/imoveis")} // Rota nova
+              onClick={() => handleNavigation("imoveis", "/imoveis")} 
               collapsed={isCollapsed}
             />
 
@@ -250,8 +250,8 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <SidebarItem 
               icon={Settings} 
               label="Configurações" 
-              active={activeTab === "config"} 
-              onClick={() => handleNavigation("config")}
+              active={isActive("config", "/configuracoes")} 
+              onClick={() => handleNavigation("config", "/configuracoes")}
               collapsed={isCollapsed}
             />
             <SidebarItem 
