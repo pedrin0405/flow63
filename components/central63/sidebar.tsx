@@ -258,11 +258,12 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               onClick={() => handleNavigation("config", "/configuracoes")}
               collapsed={isCollapsed}
             />
+
             <SidebarItem 
               icon={HelpCircle} 
               label="Suporte" 
-              active={activeTab === "suporte"} 
-              onClick={() => handleNavigation("suporte")}
+              active={isActive("suport", "/suport")} 
+              onClick={() => handleNavigation("suport", "/suport")}
               collapsed={isCollapsed}
             />
           </nav>
