@@ -138,7 +138,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className={`font-bold text-lg ${isActive ? "text-emerald-700" : "text-foreground"}`}>
-            {formatCurrency(lead.value)}
+            {formatCurrency(lead.valueLaunched > 0 ? lead.valueLaunched : lead.value)}
           </span>
         </div>
 

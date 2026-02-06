@@ -44,13 +44,25 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
     lista_imoveis: [],
     valor_venda: 0,
     comissao: 5,
-    data_venda: new Date().toISOString().split('T')[0],
+    data_venda: new Date().toISOString().slice(0, 16), // Captura YYYY-MM-DDTHH:mm,
     obs_venda: "",
     status_dashboard: true
   })
 
   const [loadingImoveis, setLoadingImoveis] = useState(false)
   const [novoImovel, setNovoImovel] = useState<ImovelVendido>({ codigo: "", valor: 0 })
+  const [valorVisual, setValorVisual] = useState("");
+
+  const formatToBRL = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const parseBRLToNumber = (value: string) => {
+    return Number(value.replace(/\D/g, "")) / 100;
+  };
 
   useEffect(() => {
     async function initModal() {
@@ -92,7 +104,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
           } else if (lead.propertyLocation && lead.propertyLocation !== "----") {
             imoveisFormatados = [{ 
               codigo: lead.propertyLocation, 
-              valor: lead.value || 0,
+              valor: lead.valueLaunched || lead.value || 0,
               imagem: lead.image 
             }]
           }
@@ -102,7 +114,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
             lista_imoveis: imoveisFormatados,
             valor_venda: imoveisFormatados.reduce((acc, curr) => acc + curr.valor, 0),
             comissao: 5,
-            data_venda: new Date().toISOString().split('T')[0],
+            data_venda: new Date().toISOString().slice(0, 16), // Captura YYYY-MM-DDTHH:mm
             obs_venda: "",
             status_dashboard: true
           })
@@ -143,6 +155,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
       lista_imoveis: [...(prev.lista_imoveis || []), itemComImg]
     }))
     setNovoImovel({ codigo: "", valor: 0 })
+    setValorVisual("") 
   }
 
   const removeImovel = (index: number) => {
@@ -167,28 +180,24 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
   }
 
   if (!lead) return null
-  const formatCurrency = (value: any) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  const formatCurrency = (valueLaunched: any) => `R$ ${Number(valueLaunched || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
 
-  // Largura dinâmica
   const dialogMaxWidth = mode === "sale" ? "sm:max-w-[950px]" : "sm:max-w-[550px]"
+
+  console.log("Dados", lead)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
         className={`${dialogMaxWidth} max-h-[90vh] h-[90vh] overflow-hidden p-0 gap-0 transition-all duration-300 flex flex-col`}
       >
-        
-        {/* Layout Grid Principal - h-full garante que o grid ocupe toda a altura do dialog */}
         <div className={`grid h-full overflow-hidden ${mode === "sale" ? "grid-cols-1 md:grid-cols-12" : "grid-cols-1"}`}>
-          
-          {/* COLUNA ESQUERDA - FORMULÁRIO */}
-          {/* overflow-y-auto aqui permite que APENAS esta coluna role se o form for longo */}
           <div className={`flex flex-col h-full overflow-y-auto ${mode === "sale" ? "md:col-span-7 border-r bg-white" : "p-1"}`}>
             
             <div className="p-6 pb-2 sticky top-0 bg-white z-10">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-xl">
-                  {mode === "sale" ? <><DollarSign className="text-emerald-500 w-6 h-6" /> Lançar Venda</> : <><User className="text-primary" /> Editar Lead</>}
+                  {mode === "sale" ? <><div className="text-emerald-500 font-bold text-lg">R$</div> Lançar Venda</> : <><User className="text-primary" /> Editar Lead</>}
                 </DialogTitle>
                 <DialogDescription>
                   {mode === "sale" ? "Preencha os dados da negociação e confirme os imóveis." : "Atualize as informações de contato deste lead."}
@@ -223,13 +232,18 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                         />
                       </div>
                       <div className="flex-1 relative">
-                        <DollarSign size={14} className="absolute left-3 top-3 text-muted-foreground z-10" />
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-muted-foreground z-10">R$</span>
                         <Input 
-                          type="number" 
-                          className="pl-8 bg-white" 
-                          placeholder="Valor" 
-                          value={novoImovel.valor || ""} 
-                          onChange={(e) => setNovoImovel({...novoImovel, valor: parseFloat(e.target.value) || 0})} 
+                          type="text" 
+                          className="pl-9 bg-white" 
+                          placeholder="0,00" 
+                          value={valorVisual} 
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const numericValue = parseBRLToNumber(value);
+                            setNovoImovel({...novoImovel, valor: numericValue});
+                            setValorVisual(formatToBRL(numericValue));
+                          }} 
                         />
                       </div>
                       <Button type="button" onClick={addImovel} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm px-3">
@@ -242,43 +256,44 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                     <div className="grid gap-2">
                       <Label className="text-emerald-700 font-semibold">VGV Total</Label>
                       <div className="relative">
-                        <DollarSign size={14} className="absolute left-3 top-3 text-emerald-600" />
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-emerald-600">R$</span>
                         <Input 
                           readOnly 
-                          className="pl-8 border-emerald-200 bg-emerald-50 text-emerald-700 font-bold" 
-                          value={formData.valor_venda || 0} 
+                          className="pl-9 border-emerald-200 bg-emerald-50 text-emerald-700 font-bold" 
+                          value={formatCurrency(formData.valor_venda).replace("R$", "").trim()} 
                         />
                       </div>
                     </div>
                     
                     <div className="grid gap-2">
-                      <Label>Data da Venda</Label>
+                      <Label>Data e Hora da Venda</Label>
                       <div className="relative">
                         <Calendar size={14} className="absolute left-3 top-3 text-muted-foreground" />
                         <Input 
-                          type="date" 
+                          type="datetime-local" // Permite selecionar data e hora
                           className="pl-9"
                           value={formData.data_venda || ""} 
                           onChange={(e) => setFormData({ ...formData, data_venda: e.target.value })} 
                         />
                       </div>
                     </div>
+                  </div>  
+
+                  <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
+                    lead.visibleOnDashboard && lead.valueLaunched > 0 
+                      ? "bg-emerald-50 border-emerald-200" 
+                      : "bg-slate-50 border-slate-200"
+                  }`}>
+                    <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600" : "text-slate-500"} font-medium`}>
+                      No Dashboard:
+                    </span>
+                    <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-800" : "text-slate-400"} font-semibold`}>
+                      {lead.visibleOnDashboard && lead.valueLaunched > 0 
+                        ? formatCurrency(lead.valueLaunched) 
+                        : "Valor pendente"}
+                    </span>
                   </div>
-                  {/* Valor Lançado no Dashboard */}
-        <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
-          lead.visibleOnDashboard && lead.valueLaunched > 0 
-            ? "bg-emerald-50 border-emerald-200" 
-            : "bg-slate-50 border-slate-200"
-        }`}>
-          <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600" : "text-slate-500"} font-medium`}>
-            No Dashboard:
-          </span>
-          <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-800" : "text-slate-400"} font-semibold`}>
-            {lead.visibleOnDashboard && lead.valueLaunched > 0 
-              ? formatCurrency(lead.valueLaunched) 
-              : "Valor pendente"}
-          </span>
-        </div>
+
                   <div className="grid gap-2">
                     <div className="flex items-center justify-between">
                       <Label>Comissão (%)</Label>
@@ -307,34 +322,31 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                     />
                   </div>
 
-                   {/* --- CHECKBOX DE VISIBILIDADE --- */}
-              <div className={`flex items-center space-x-2 border p-3 rounded-md transition-colors ${formData.status_dashboard ? 'bg-emerald-50/50 border-emerald-100' : 'bg-muted/50'}`}>
-                <Checkbox 
-                  id="status_dashboard" 
-                  checked={formData.status_dashboard}
-                  onCheckedChange={(checked) => 
-                    setFormData({ ...formData, status_dashboard: checked as boolean })
-                  }
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <Label 
-                    htmlFor="status_dashboard" 
-                    className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
-                  >
-                    {formData.status_dashboard ? <Eye size={14} className="text-emerald-600"/> : <EyeOff size={14} className="text-muted-foreground"/>}
-                    {formData.status_dashboard ? "Visível no Dashboard" : "Oculto no Dashboard"}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {formData.status_dashboard 
-                      ? "Esta venda aparecerá nos gráficos e somatórios." 
-                      : "Esta venda ficará salva no banco, mas não aparecerá nos gráficos."}
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
-
-              
+                  <div className={`flex items-center space-x-2 border p-3 rounded-md transition-colors ${formData.status_dashboard ? 'bg-emerald-50/50 border-emerald-100' : 'bg-muted/50'}`}>
+                    <Checkbox 
+                      id="status_dashboard" 
+                      checked={formData.status_dashboard}
+                      onCheckedChange={(checked) => 
+                        setFormData({ ...formData, status_dashboard: checked as boolean })
+                      }
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <Label 
+                        htmlFor="status_dashboard" 
+                        className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
+                      >
+                        {formData.status_dashboard ? <Eye size={14} className="text-emerald-600"/> : <EyeOff size={14} className="text-muted-foreground"/>}
+                        {formData.status_dashboard ? "Visível no Dashboard" : "Oculto no Dashboard"}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {formData.status_dashboard 
+                          ? "Esta venda aparecerá nos gráficos e somatórios." 
+                          : "Esta venda ficará salva no banco, mas não aparecerá nos gráficos."}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {mode === "edit" && (
                 <div className="space-y-4">
@@ -352,7 +364,6 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
             </DialogFooter>
           </div>
 
-          {/* COLUNA DIREITA - PREVIEW DOS IMÓVEIS */}
           {mode === "sale" && (
             <div className="md:col-span-5 bg-slate-100/80 flex flex-col h-full border-l overflow-hidden">
               <div className="p-6 pb-2 shrink-0">
@@ -368,7 +379,6 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                 </div>
               </div>
 
-              {/* Área de rolagem independente para a lista de imóveis */}
               <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-3 custom-scrollbar">
                 {formData.lista_imoveis?.length === 0 ? (
                   <div className="h-40 flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-slate-300 rounded-lg opacity-60">
