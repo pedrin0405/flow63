@@ -48,11 +48,11 @@ interface LeadCardProps {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    "Negócio Realizado": "bg-emerald-100 text-emerald-700 border-emerald-200",
-    "Em Atendimento": "bg-blue-100 text-blue-700 border-blue-200",
-    "Visita Agendada": "bg-amber-100 text-amber-700 border-amber-200",
-    "Proposta Enviada": "bg-violet-100 text-violet-700 border-violet-200",
-    "Descartado": "bg-red-100 text-red-700 border-red-200",
+    "Negócio realizado": "bg-emerald-300/70 text-emerald-900 border-transparent",
+    "Em atendimento": "bg-blue-300/80 text-blue-700 border-transparent",
+    "Visita agendada": "bg-amber-300/80 text-amber-700 border-transparent",
+    "Proposta enviada": "bg-violet-300/80 text-violet-700 border-transparent",
+    "Descartado": "bg-red-300/80 text-red-700 border-transparent",
   }
   return ( 
     <span className={`px-2 py-1 rounded-full text-[10px] uppercase font-bold border tracking-wide ${colors[status] || "bg-muted text-muted-foreground"}`}>
