@@ -20,12 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-// Usando alias padrão do Next.js para evitar problemas de caminho relativo
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Camera, Plus } from "lucide-react"
 
-// Interface exportada para ser usada na lista
 export interface Broker {
   id: string | number
   nome: string
@@ -49,7 +47,6 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   
-  // Estados para controlar os modais de adição
   const [isAddingDept, setIsAddingDept] = useState(false)
   const [newDeptName, setNewDeptName] = useState("")
   
@@ -64,7 +61,6 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Função que busca dados do banco para popular os dropdowns
   const fetchOptions = async () => {
     if (!supabase) return
     const [pmwRes, auxRes] = await Promise.all([
@@ -73,7 +69,6 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
     ])
     const allData = [...(pmwRes.data || []), ...(auxRes.data || [])]
     
-    // Cria sets únicos dos dados vindos do banco
     const cities = Array.from(new Set(allData.map(d => d.cidade_origem).filter(Boolean))) as string[]
     const units = Array.from(new Set(allData.map(d => d.unidade).filter(Boolean))) as string[]
     const departments = Array.from(new Set(allData.map(d => d.departamento).filter(Boolean))) as string[]
@@ -90,40 +85,45 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
     departamento: broker.departamento || "",
     cidade_origem: broker.cidade_origem,
     unidade: broker.unidade || "",
-    data_nascimento: broker.data_nascimento || "",
+    data_nascimento: "", 
     desativado: (broker.desativado as any) === true || (broker.desativado as any) === "true",
     imagem_url: broker.imagem_url
   })
 
   useEffect(() => {
     const isDes = (broker.desativado as any) === true || (broker.desativado as any) === "true"
+    
+    // Formata o que vem do banco (YYYY-MM-DD ou DD/MM/YYYY) para apenas DD/MM
+    let dateView = ""
+    if (broker.data_nascimento) {
+      const parts = broker.data_nascimento.includes('-') 
+        ? broker.data_nascimento.split('-').reverse() // YYYY-MM-DD -> [DD, MM, YYYY]
+        : broker.data_nascimento.split('/') // DD/MM/YYYY -> [DD, MM, YYYY]
+      
+      if (parts.length >= 2) {
+        dateView = `${parts[0]}/${parts[1]}`
+      }
+    }
+
     setFormData({
       nome: broker.nome,
       departamento: broker.departamento || "",
       cidade_origem: broker.cidade_origem,
       unidade: broker.unidade || "",
-      data_nascimento: broker.data_nascimento || "",
+      data_nascimento: dateView,
       desativado: isDes,
       imagem_url: broker.imagem_url
     })
   }, [broker])
 
-  const handleAddNewDepartment = () => {
-    if (!newDeptName.trim()) return
-    // Adiciona localmente. Será salvo no banco quando o usuário salvar o corretor com este depto.
-    setOptions(prev => ({ ...prev, departments: [...prev.departments, newDeptName.trim()] }))
-    setFormData(prev => ({ ...prev, departamento: newDeptName.trim() }))
-    setIsAddingDept(false)
-    setNewDeptName("")
-  }
-
-  const handleAddNewUnit = () => {
-    if (!newUnitName.trim()) return
-    // Adiciona localmente.
-    setOptions(prev => ({ ...prev, units: [...prev.units, newUnitName.trim()] }))
-    setFormData(prev => ({ ...prev, unidade: newUnitName.trim() }))
-    setIsAddingUnit(false)
-    setNewUnitName("")
+  // Função para aplicar máscara DD/MM enquanto o usuário digita
+  const handleDateChange = (value: string) => {
+    const cleanValue = value.replace(/\D/g, "").slice(0, 4)
+    let formatted = cleanValue
+    if (cleanValue.length >= 3) {
+      formatted = `${cleanValue.slice(0, 2)}/${cleanValue.slice(2, 4)}`
+    }
+    setFormData({ ...formData, data_nascimento: formatted })
   }
 
   const handleSave = async () => {
@@ -139,7 +139,7 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
         unidade: formData.unidade || "Não definida",
         desativado: formData.desativado ? "true" : "false",
         imagem_url: formData.imagem_url || "",
-        data_nascimento: formData.data_nascimento || null,
+        data_nascimento: formData.data_nascimento, // Salva como "DD/MM"
         data_sincronizacao: new Date().toISOString()
       }
       
@@ -152,6 +152,22 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" })
     } finally { setLoading(false) }
+  }
+
+  const handleAddNewDepartment = () => {
+    if (!newDeptName.trim()) return
+    setOptions(prev => ({ ...prev, departments: [...prev.departments, newDeptName.trim()] }))
+    setFormData(prev => ({ ...prev, departamento: newDeptName.trim() }))
+    setIsAddingDept(false)
+    setNewDeptName("")
+  }
+
+  const handleAddNewUnit = () => {
+    if (!newUnitName.trim()) return
+    setOptions(prev => ({ ...prev, units: [...prev.units, newUnitName.trim()] }))
+    setFormData(prev => ({ ...prev, unidade: newUnitName.trim() }))
+    setIsAddingUnit(false)
+    setNewUnitName("")
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,15 +216,10 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
               />
             </div>
             
-            {/* Campo Departamento com botão + */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 ml-1 mb-1">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Departamento</Label>
-                <button 
-                  onClick={() => setIsAddingDept(true)} 
-                  className="bg-primary/10 text-primary hover:bg-primary hover:text-white p-0.5 rounded transition-all"
-                  title="Novo Departamento"
-                >
+                <button onClick={() => setIsAddingDept(true)} className="bg-primary/10 text-primary hover:bg-primary hover:text-white p-0.5 rounded transition-all">
                   <Plus size={10} strokeWidth={4} />
                 </button>
               </div>
@@ -218,15 +229,10 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
               </Select>
             </div>
 
-            {/* Campo Unidade com botão + */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 ml-1 mb-1">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Unidade</Label>
-                <button 
-                  onClick={() => setIsAddingUnit(true)} 
-                  className="bg-primary/10 text-primary hover:bg-primary hover:text-white p-0.5 rounded transition-all"
-                  title="Nova Unidade"
-                >
+                <button onClick={() => setIsAddingUnit(true)} className="bg-primary/10 text-primary hover:bg-primary hover:text-white p-0.5 rounded transition-all">
                   <Plus size={10} strokeWidth={4} />
                 </button>
               </div>
@@ -245,12 +251,13 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Aniversário</Label>
+              <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Aniversário (Dia/Mês)</Label>
               <Input 
-                type="date" 
+                type="text" 
+                placeholder="Ex: 02/06"
                 className="rounded-2xl h-11 bg-muted/40 border-none text-xs font-bold" 
                 value={formData.data_nascimento} 
-                onChange={(e) => setFormData({...formData, data_nascimento: e.target.value})} 
+                onChange={(e) => handleDateChange(e.target.value)} 
               />
             </div>
           </div>
@@ -270,53 +277,29 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button 
-              className="flex-1 h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-xs shadow-xl shadow-primary/20 transition-all active:scale-95" 
-              onClick={handleSave} 
-              disabled={loading}
-            >
-              SALVAR
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="h-12 rounded-2xl font-bold text-xs text-muted-foreground" 
-              onClick={onClose}
-            >
-              CANCELAR
-            </Button>
+            <Button className="flex-1 h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-xs shadow-xl shadow-primary/20 transition-all active:scale-95" onClick={handleSave} disabled={loading}>SALVAR</Button>
+            <Button variant="ghost" className="h-12 rounded-2xl font-bold text-xs text-muted-foreground" onClick={onClose}>CANCELAR</Button>
           </div>
         </div>
 
-        {/* Modal de Adicionar Departamento */}
         {isAddingDept && (
           <Dialog open={isAddingDept} onOpenChange={setIsAddingDept}>
             <DialogContent className="sm:max-w-[350px] rounded-[2.5rem] p-8 border-none shadow-3xl">
               <DialogHeader><DialogTitle className="text-center font-black uppercase text-sm tracking-widest">Novo Depto</DialogTitle></DialogHeader>
               <div className="py-4 space-y-4">
-                <Input 
-                  placeholder="Nome do departamento..." 
-                  className="rounded-2xl h-12 bg-muted/50 border-none font-bold text-center" 
-                  value={newDeptName} 
-                  onChange={(e) => setNewDeptName(e.target.value)} 
-                />
+                <Input placeholder="Nome do departamento..." className="rounded-2xl h-12 bg-muted/50 border-none font-bold text-center" value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} />
                 <Button className="w-full h-12 rounded-2xl font-black text-xs" onClick={handleAddNewDepartment}>ADICIONAR</Button>
               </div>
             </DialogContent>
           </Dialog>
         )}
 
-        {/* Modal de Adicionar Unidade */}
         {isAddingUnit && (
           <Dialog open={isAddingUnit} onOpenChange={setIsAddingUnit}>
             <DialogContent className="sm:max-w-[350px] rounded-[2.5rem] p-8 border-none shadow-3xl">
               <DialogHeader><DialogTitle className="text-center font-black uppercase text-sm tracking-widest">Nova Unidade</DialogTitle></DialogHeader>
               <div className="py-4 space-y-4">
-                <Input 
-                  placeholder="Nome da unidade..." 
-                  className="rounded-2xl h-12 bg-muted/50 border-none font-bold text-center" 
-                  value={newUnitName} 
-                  onChange={(e) => setNewUnitName(e.target.value)} 
-                />
+                <Input placeholder="Nome da unidade..." className="rounded-2xl h-12 bg-muted/50 border-none font-bold text-center" value={newUnitName} onChange={(e) => setNewUnitName(e.target.value)} />
                 <Button className="w-full h-12 rounded-2xl font-black text-xs" onClick={handleAddNewUnit}>ADICIONAR</Button>
               </div>
             </DialogContent>
