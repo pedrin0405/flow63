@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { 
   Users,
   LayoutDashboard,
@@ -202,7 +203,13 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
           <div className={cn("flex items-center transition-all duration-300", isCollapsed ? "p-4 justify-center" : "p-6 gap-4")}>
             <div className="relative flex-shrink-0">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-primary to-primary/60 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
-                <Building2 className="text-primary-foreground" size={isCollapsed ? 20 : 24} />
+                <Image 
+                                    src="/icon.svg" 
+                                    alt="Logo Central63" 
+                                    width={30} 
+                                    height={30} 
+                                    className="priority"
+                                  />
               </div>
               <div className="absolute -bottom-1 -right-1 w-3 h-3 lg:w-4 lg:h-4 bg-emerald-500 rounded-full border-2 border-card" />
             </div>
@@ -272,8 +279,8 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <SidebarItem 
               icon={HelpCircle} 
               label="Suporte" 
-              active={isActive("suport", "/support")} 
-              onClick={() => handleNavigation("suport", "/suport")}
+              active={isActive("support", "/support")} 
+              onClick={() => handleNavigation("support", "/support")}
               collapsed={isCollapsed}
             />
           </nav>

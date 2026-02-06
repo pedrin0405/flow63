@@ -142,13 +142,22 @@ export default function LoginPage() {
         {/* Coluna da Esquerda (Branding Desktop) */}
         <div className="relative hidden h-full flex-col p-10 text-white lg:flex justify-between my-auto py-20">
           <div className="relative z-20 flex items-center text-lg font-medium">
-            <div className="mr-2 flex size-10 items-center justify-center rounded-xl bg-primary/90 shadow-lg shadow-primary/20 backdrop-blur-sm">
-              <span className="text-xl font-bold text-white">63</span>
-            </div>
-            Central63
           </div>
           <div className="relative z-20">
             <blockquote className="space-y-2">
+              <div className="relative z-20 flex items-center text-lg font-medium">
+                <div className="mr-2 flex size-10 items-center justify-center rounded-xl border shadow-lg shadow-primary/20 backdrop-blur-sm overflow-hidden">
+                  {/* Substituído o <span> pelo componente Image */}
+                  <Image 
+                    src="/icon.svg" 
+                    alt="Logo Central63" 
+                    width={24} 
+                    height={24} 
+                    className="priority"
+                  />
+                </div>
+                Central63
+              </div>
               <p className="text-lg drop-shadow-md font-medium">
                 &ldquo;Esta plataforma transformou a maneira como gerenciamos nossos
                 imóveis. A eficiência e a clareza que ela proporciona são
