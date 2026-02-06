@@ -87,6 +87,7 @@ export default function DashboardPage() {
       })
       setBrokerRanking(Object.entries(brokerMap).map(([name, sales]) => ({ name, sales })).sort((a, b) => b.sales - a.sales).slice(0, 5))
 
+
       // 5. Atividades (Mantido)
       setRecentActivities((resInteracoes.data || []).map(int => ({
         id: int.id,

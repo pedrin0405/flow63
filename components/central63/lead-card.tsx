@@ -48,7 +48,7 @@ interface LeadCardProps {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    "Negócio realizado": "bg-emerald-300/70 text-emerald-900 border-transparent",
+    "Negócio realizado": "bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[10px] font-medium border border-white/10",
     "Em atendimento": "bg-blue-300/80 text-blue-700 border-transparent",
     "Visita agendada": "bg-amber-300/80 text-amber-700 border-transparent",
     "Proposta enviada": "bg-violet-300/80 text-violet-700 border-transparent",
@@ -71,7 +71,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
       className={`
         bg-card rounded-2xl border transition-all duration-300 overflow-hidden group relative
         ${isActive 
-            ? "border-emerald-500 ring-1 ring-emerald-500/50 shadow-lg shadow-emerald-500/10" // Estilo quando está no Dashboard
+            ? "border-emerald-500 ring-1 ring-emerald-400/50 shadow-lg shadow-black-200/10" // Estilo quando está no Dashboard
             : "border-border shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30" // Estilo padrão
         }
       `}
@@ -118,19 +118,20 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
         {/* BADGE "NO DASHBOARD" */}
         {isActive && (
           <div className="absolute top-3 left-3 z-20 animate-in fade-in zoom-in duration-300">
+
              <span className="flex items-center gap-1.5 bg-emerald-600/90 text-white text-[10px] uppercase font-bold px-2.5 py-1 rounded-full shadow-lg backdrop-blur-sm border border-emerald-400/30">
                <LayoutDashboard size={12} className="text-white" />
                No Dashboard
              </span>
           </div>
         )}
-
+      
         {/* Rodapé da Imagem (Data) */}
         <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
+          <StatusBadge status={lead.status} />
           <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[10px] font-medium border border-white/10">
             {lead.history[0]?.date || lead.updatedAt}
           </span>
-          <StatusBadge status={lead.status} />
         </div>
       </div>
 
@@ -144,9 +145,10 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
 
         {/* Valor Lançado no Dashboard */}
         <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
+
           lead.visibleOnDashboard && lead.valueLaunched > 0 
-            ? "bg-emerald-50 border-emerald-200" 
-            : "bg-slate-50 border-slate-200"
+            ? "bg-slate-50 shadow-sm" 
+            : "bg-slate-50 shadow-sm"
         }`}>
           <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600" : "text-slate-500"} font-medium`}>
             No Dashboard:

@@ -180,7 +180,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
   }
 
   if (!lead) return null
-  const formatCurrency = (valueLaunched: any) => `R$ ${Number(valueLaunched || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  const formatCurrency = (valueLaunched: any) => `${Number(valueLaunched || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
 
   const dialogMaxWidth = mode === "sale" ? "sm:max-w-[950px]" : "sm:max-w-[550px]"
 
@@ -232,10 +232,10 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                         />
                       </div>
                       <div className="flex-1 relative">
-                        <span className="absolute left-3 top-2.5 text-xs font-bold text-muted-foreground z-10">R$</span>
+                        
                         <Input 
                           type="text" 
-                          className="pl-9 bg-white" 
+                          className="pl-3 bg-white" 
                           placeholder="0,00" 
                           value={valorVisual} 
                           onChange={(e) => {
@@ -260,7 +260,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                         <Input 
                           readOnly 
                           className="pl-9 border-emerald-200 bg-emerald-50 text-emerald-700 font-bold" 
-                          value={formatCurrency(formData.valor_venda).replace("R$", "").trim()} 
+                          value={formatCurrency(formData.valor_venda).replace("", "").trim()} 
                         />
                       </div>
                     </div>
