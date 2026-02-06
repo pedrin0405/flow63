@@ -23,6 +23,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("dashboard");
   
   const [stats, setStats] = useState({
     totalImoveis: 0,
@@ -103,17 +104,25 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab="dashboard" />
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+        activeTab={activeTab} // Use a variável de estado aqui
+        onTabChange={(tab: string) => {
+          setActiveTab(tab); // Atualiza a aba ativa quando clicar
+          setSidebarOpen(false); // Fecha a sidebar no mobile após o clique
+        }} 
+      />
       
       <main className="flex-1 flex flex-col h-full overflow-y-auto p-4 lg:p-8 space-y-8">
         <header><h2 className="text-3xl font-bold tracking-tight flex items-center gap-2"><Layers className="text-primary" /> Dashboard Operacional</h2></header>
 
         {/* KPIs (IGUAIS) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="VGV Realizado" value={formatCurrency(stats.vgvRealizado)} icon={DollarSign} color="bg-emerald-500" />
-          <StatCard title="Leads Ativos" value={stats.leadsAtivos} icon={Users} color="bg-purple-500" />
-          <StatCard title="Imóveis" value={stats.totalImoveis} icon={Building2} color="bg-gray-500" />
-          <StatCard title="Vendas no Dash" value={stats.vendasTotais} icon={CheckCircle2} color="bg-blue-500" />
+          <StatCard title="VGV Realizado" value={formatCurrency(stats.vgvRealizado)} icon={DollarSign} color="bg-emerald-500" trend={""} />
+          <StatCard title="Leads Ativos" value={stats.leadsAtivos} icon={Users} color="bg-purple-500" trend={""} />
+          <StatCard title="Imóveis" value={stats.totalImoveis} icon={Building2} color="bg-gray-500" trend={""} />
+          <StatCard title="Vendas no Dash" value={stats.vendasTotais} icon={CheckCircle2} color="bg-blue-500" trend={""} />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

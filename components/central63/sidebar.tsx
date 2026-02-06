@@ -96,7 +96,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosCount }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true)
   const [userData, setUserData] = useState<{ name: string; email: string; initial: string; avatarUrl?: string } | null>(null)
   const router = useRouter()
   const pathname = usePathname()
@@ -161,7 +161,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
       if (pathname !== "/") {
         router.push("/")
       } else {
-        onTabChange(key)
+        onTabChange?.(key)
       }
     }
     
@@ -230,9 +230,11 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             )}
             
             <SidebarItem 
-              icon={LayoutDashboard} 
+              icon={LayoutDashboard}
               label="Dashboard" 
-              active={isActive("Dashboard") && pathname === "/"} 
+              // Alterado de "Dashboard" para "dashboard" para bater com o estado
+              active={isActive("dashboard") && pathname === "/"} 
+              // Alterado para garantir consistência
               onClick={() => handleNavigation("dashboard")}
               badge={atendimentosCount}
               collapsed={isCollapsed}
