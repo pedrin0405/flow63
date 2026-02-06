@@ -44,7 +44,7 @@ export default function Central63App() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [isUpdating, setIsUpdating] = useState(false)
-  const itemsPerPage = 8
+  const itemsPerPage = 16
 
   // Estado para Equipes Dinâmicas (Departamentos dos Corretores)
   const [teams, setTeams] = useState<string[]>([])

@@ -64,6 +64,10 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
 
   if (!lead) return null
 
+  function formatCurrency(value: any) {
+    const num = Number(value) || 0;
+    return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  }
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
@@ -114,7 +118,9 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                       onChange={(e) => setFormData({ ...formData, valor_venda: parseFloat(e.target.value) })}
                     />
                   </div>
+                  
                 </div>
+                
 
                 <div className="grid gap-2">
                   <Label htmlFor="data">Data Fechamento</Label>
@@ -130,7 +136,23 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                   </div>
                 </div>
               </div>
-
+              {/* NOVO CAMPO: Valor Lançado no Dashboard */}
+              <div className="mt-0 space-y-4"> 
+                <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
+                  lead.visibleOnDashboard && lead.valueLaunched > 0 
+                    ? "bg-emerald-50 border-emerald-200" 
+                    : "bg-slate-50 border-slate-200"
+                }`}>
+                  <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600" : "text-slate-500"} font-medium`}>
+                    No Dashboard:
+                  </span>
+                  <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-800" : "text-slate-400"} font-semibold`}>
+                    {lead.visibleOnDashboard && lead.valueLaunched > 0 
+                      ? formatCurrency(lead.valueLaunched) 
+                      : "Valor pendente"}
+                  </span>
+                </div>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="comissao">Comissão (%)</Label>
                 <div className="relative">

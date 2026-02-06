@@ -92,10 +92,26 @@ export function DetailsDrawer({ lead, onClose, formatCurrency, onEditClick }: De
                       </div>
                   )}
                 </div>
+                {/* NOVO CAMPO: Valor Lançado no Dashboard */}
+                <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
+                  lead.visibleOnDashboard && lead.valueLaunched > 0 
+                    ? "bg-emerald-50 border-emerald-200" 
+                    : "bg-slate-50 border-slate-200"
+                }`}>
+                  <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600" : "text-slate-500"} font-medium`}>
+                    No Dashboard:
+                  </span>
+                  <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-800" : "text-slate-400"} font-semibold`}>
+                    {lead.visibleOnDashboard && lead.valueLaunched > 0 
+                      ? formatCurrency(lead.valueLaunched) 
+                      : "Valor pendente"}
+                  </span>
+                </div>
               </div>
+              
 
               <Separator />
-
+              
               {/* 3. CONTATO */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">

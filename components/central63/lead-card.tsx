@@ -98,7 +98,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
       </div>
 
       {/* --- IMAGEM DO IMÓVEL --- */}
-      <div className="relative aspect-square bg-accent group-hover:opacity-95 transition-opacity">
+      <div className="relative aspect-3/2 bg-accent group-hover:opacity-95 transition-opacity">
         <img src={lead.image || "/placeholder.svg"} alt="Imóvel" className="w-full h-full object-cover" />
         
         {/* BADGE "NO DASHBOARD" (REDESENHADO) */}
@@ -137,7 +137,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
         </div>
 
         {/* NOVO CAMPO: Valor Lançado no Dashboard */}
-        <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-full border ${
+        <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
           lead.visibleOnDashboard && lead.valueLaunched > 0 
             ? "bg-emerald-50 border-emerald-200" 
             : "bg-slate-50 border-slate-200"
