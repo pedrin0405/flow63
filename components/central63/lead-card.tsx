@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { MapPin, LayoutDashboard, PlusCircle, RefreshCw, UserCheck, CheckCircle2 } from "lucide-react"
+import { MapPin, LayoutDashboard, PlusCircle, RefreshCw, UserCheck, CheckCircle2, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Lead {
@@ -42,7 +42,7 @@ interface Lead {
 interface LeadCardProps {
   lead: Lead
   formatCurrency: (val: number) => string
-  onClick: () => void
+  onClick: () => void // Agora usada apenas pelo ícone de olho
   onAddToDashboard: (e: React.MouseEvent) => void
 }
 
@@ -69,16 +69,16 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
   return (
     <div 
       className={`
-        bg-card rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden group relative
+        bg-card rounded-2xl border transition-all duration-300 overflow-hidden group relative
         ${isActive 
             ? "border-emerald-500 ring-1 ring-emerald-500/50 shadow-lg shadow-emerald-500/10" // Estilo quando está no Dashboard
             : "border-border shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30" // Estilo padrão
         }
       `}
-      onClick={onClick}
+      // REMOVIDO: onClick={onClick} do elemento pai para evitar cliques acidentais
     >
       
-      {/* --- CABEÇALHO: DADOS DO CORRETOR --- */}
+      {/* --- CABEÇALHO: DADOS DO CORRETOR E BOTÃO DE DETALHES À DIREITA --- */}
       <div className="p-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -95,13 +95,27 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
             </p>
           </div>
         </div>
+
+        {/* Botão de Ver Detalhes (Posicionado à Direita) */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick(); // Chama a função de ver detalhes
+          }}
+          title="Ver Detalhes do Lead"
+        >
+          <Eye size={18} />
+        </Button>
       </div>
 
       {/* --- IMAGEM DO IMÓVEL --- */}
       <div className="relative aspect-3/2 bg-accent group-hover:opacity-95 transition-opacity">
         <img src={lead.image || "/placeholder.svg"} alt="Imóvel" className="w-full h-full object-cover" />
         
-        {/* BADGE "NO DASHBOARD" (REDESENHADO) */}
+        {/* BADGE "NO DASHBOARD" */}
         {isActive && (
           <div className="absolute top-3 left-3 z-20 animate-in fade-in zoom-in duration-300">
              <span className="flex items-center gap-1.5 bg-emerald-600/90 text-white text-[10px] uppercase font-bold px-2.5 py-1 rounded-full shadow-lg backdrop-blur-sm border border-emerald-400/30">
@@ -110,14 +124,6 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
              </span>
           </div>
         )}
-
-        {/* Badge de Propósito (Venda/Locação) */}
-        {/* <div className="absolute top-3 right-3">
-          <span className={`px-2 py-1 rounded-md text-xs font-bold shadow-sm backdrop-blur-md border border-white/20 
-            ${lead.purpose === "Venda" ? "bg-card/90 text-primary" : "bg-card/90 text-amber-600"}`}>
-            {lead.purpose}
-          </span>
-        </div> */}
 
         {/* Rodapé da Imagem (Data) */}
         <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
@@ -136,7 +142,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
           </span>
         </div>
 
-        {/* NOVO CAMPO: Valor Lançado no Dashboard */}
+        {/* Valor Lançado no Dashboard */}
         <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
           lead.visibleOnDashboard && lead.valueLaunched > 0 
             ? "bg-emerald-50 border-emerald-200" 
@@ -158,10 +164,10 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
           <div className="flex items-center gap-2 min-w-0">
             <div className="relative shrink-0">
                <div className={`absolute -inset-0.5 rounded-full bg-gradient-to-tr ${
-                  lead.status === "Negócio Realizado" 
-                    ? "from-emerald-400 to-emerald-600" 
-                    : "from-primary to-violet-500"
-                } p-[1px]`} />
+                 lead.status === "Negócio Realizado" 
+                   ? "from-emerald-400 to-emerald-600" 
+                   : "from-primary to-violet-500"
+               } p-[1px]`} />
                <img src={lead.clientAvatar || "/placeholder.svg"} className="relative w-6 h-6 rounded-full border border-card object-cover" alt="Cliente" />
             </div>
             
@@ -176,29 +182,44 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
           </div>
 
           {/* Botão de Ação */}
-          <Button 
-            size="sm" 
-            variant={isActive ? "outline" : "default"}
-            className={`h-7 text-xs px-3 gap-1.5 transition-all shadow-sm ${
-              isActive 
-                ? "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300" 
-                : "bg-primary hover:bg-primary/90"
-            }`}
+          <div 
+            className="relative z-10"
             onClick={(e) => {
-              e.stopPropagation(); 
-              onAddToDashboard(e); 
+              // Bloqueia a propagação na div container para garantir
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              // Previne comportamentos de arrastar/seleção que podem disparar eventos indesejados
+              e.stopPropagation();
             }}
           >
-            {isActive ? (
-              <>
-                <RefreshCw size={12} /> Atualizar
-              </>
-            ) : (
-              <>
-                <PlusCircle size={12} /> Add ao Dashboard
-              </>
-            )}
-          </Button>
+            <Button 
+              type="button"
+              size="sm" 
+              variant={isActive ? "outline" : "default"}
+              className={`h-7 text-xs px-3 gap-1.5 transition-all shadow-sm ${
+                isActive 
+                  ? "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300" 
+                  : "bg-primary hover:bg-primary/90"
+              }`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation(); 
+                onAddToDashboard(e); 
+              }}
+            >
+              {isActive ? (
+                <>
+                  <RefreshCw size={12} /> Atualizar
+                </>
+              ) : (
+                <>
+                  <PlusCircle size={12} /> Add ao Dashboard
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

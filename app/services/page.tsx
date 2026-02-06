@@ -705,8 +705,30 @@ export default function Central63App() {
           </div>
         </main>
 
-        <DetailsDrawer lead={selectedLead} onClose={() => setSelectedLead(null)} formatCurrency={formatCurrency} onEditClick={() => { setModalMode("edit"); setEditModalOpen(true) }} />
-        <EditLeadModal lead={selectedLead} isOpen={editModalOpen} onClose={() => { setEditModalOpen(false); setModalMode("edit") }} onSave={handleSaveData} mode={modalMode} />
+        <DetailsDrawer 
+          // Exibe o lead apenas se o modal de edição estiver fechado
+          lead={!editModalOpen ? selectedLead : null} 
+          onClose={() => setSelectedLead(null)} 
+          // Use a função formatCurrency que já está definida no seu componente (linha 548)
+          formatCurrency={formatCurrency} 
+          // Use a lógica para abrir o modal de edição corretamente
+          onEditClick={() => { 
+            setModalMode("edit"); 
+            setEditModalOpen(true); 
+          }} 
+        />
+
+        <EditLeadModal 
+          lead={selectedLead} 
+          isOpen={editModalOpen} 
+          onClose={() => { 
+            setEditModalOpen(false); 
+            setModalMode("edit");
+            setSelectedLead(null); // Limpa o lead ao fechar para garantir que o Drawer não "brote" depois
+          }} 
+          onSave={handleSaveData} 
+          mode={modalMode} 
+        />
       </div>
     </Suspense>
   )
