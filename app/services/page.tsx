@@ -602,6 +602,7 @@ export default function Central63App() {
           obs_venda: data.obs_venda,
           status_dashboard: data.status_dashboard ? "Visível" : "Oculto",
           imagem_corretor: lead.broker.avatar,
+          lista_imoveis: data.lista_imoveis,
           created_at: new Date().toISOString()
         }
         
@@ -620,7 +621,7 @@ export default function Central63App() {
     }
   }
 
-  console.log("Rederizando leads:", leadsData)
+  // console.log("Rederizando leads:", leadsData)
 
   return (
     <Suspense fallback={<Loading />}>

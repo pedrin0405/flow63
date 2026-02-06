@@ -156,7 +156,17 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
   // CORREÇÃO: Função unificada que chama a prop onSave passada pelo pai
   const handleConfirmSave = () => {
     if (lead) {
-      onSave(lead.id, formData)
+      // Garantir que estamos enviando a lista atualizada e o valor total calculado
+      const dataToSave: EditableLeadData = {
+        ...formData,
+        // Se for modo venda, garantir que o valor_venda reflete a soma da lista
+        valor_venda: mode === "sale" 
+          ? formData.lista_imoveis?.reduce((acc, curr) => acc + curr.valor, 0) 
+          : formData.valor_venda
+      }
+      
+      console.log("Dados a serem salvos:", dataToSave)
+      onSave(lead.id, dataToSave)
       onClose()
     }
   }
