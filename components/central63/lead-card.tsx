@@ -36,6 +36,7 @@ interface Lead {
     type: "action" | "visit" | "system"
   }>
   visibleOnDashboard?: boolean
+  valueLaunched: number
 }
 
 interface LeadCardProps {
@@ -53,8 +54,8 @@ function StatusBadge({ status }: { status: string }) {
     "Proposta Enviada": "bg-violet-100 text-violet-700 border-violet-200",
     "Descartado": "bg-red-100 text-red-700 border-red-200",
   }
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold border tracking-wide ${colors[status] || "bg-muted text-muted-foreground"}`}>
+  return ( 
+    <span className={`px-2 py-1 rounded-full text-[10px] uppercase font-bold border tracking-wide ${colors[status] || "bg-muted text-muted-foreground"}`}>
       {status}
     </span>
   )
@@ -111,18 +112,19 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
         )}
 
         {/* Badge de Propósito (Venda/Locação) */}
-        <div className="absolute top-3 right-3">
+        {/* <div className="absolute top-3 right-3">
           <span className={`px-2 py-1 rounded-md text-xs font-bold shadow-sm backdrop-blur-md border border-white/20 
             ${lead.purpose === "Venda" ? "bg-card/90 text-primary" : "bg-card/90 text-amber-600"}`}>
             {lead.purpose}
           </span>
-        </div>
+        </div> */}
 
         {/* Rodapé da Imagem (Data) */}
         <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
           <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[10px] font-medium border border-white/10">
             {lead.history[0]?.date || lead.updatedAt}
           </span>
+          <StatusBadge status={lead.status} />
         </div>
       </div>
 
@@ -132,7 +134,22 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
           <span className={`font-bold text-lg ${isActive ? "text-emerald-700" : "text-foreground"}`}>
             {formatCurrency(lead.value)}
           </span>
-          <StatusBadge status={lead.status} />
+        </div>
+
+        {/* NOVO CAMPO: Valor Lançado no Dashboard */}
+        <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-full border ${
+          lead.visibleOnDashboard && lead.valueLaunched > 0 
+            ? "bg-emerald-50 border-emerald-200" 
+            : "bg-slate-50 border-slate-200"
+        }`}>
+          <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600" : "text-slate-500"} font-medium`}>
+            No Dashboard:
+          </span>
+          <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-800" : "text-slate-400"} font-semibold`}>
+            {lead.visibleOnDashboard && lead.valueLaunched > 0 
+              ? formatCurrency(lead.valueLaunched) 
+              : "Valor pendente"}
+          </span>
         </div>
 
         <div className="pt-3 border-t border-border flex items-center justify-between gap-2">

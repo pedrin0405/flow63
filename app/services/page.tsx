@@ -335,8 +335,8 @@ export default function Central63App() {
       // ---------------------------------------------------------
       // ETAPA 3: Verificação de Dashboard
       // ---------------------------------------------------------
-      let leadsInDashboard = new Set<string>();
-      
+      let salesDataMap = new Map<string, { visible: boolean, valorVenda: number }>();
+
       if (itemsWithSafeIds.length > 0) {
         const idsToVerify = itemsWithSafeIds.map(item => `${currentPrefix}_${item.safeId}`)
 
@@ -345,12 +345,15 @@ export default function Central63App() {
             const chunk = idsToVerify.slice(i, i + verifyBatchSize);
             const { data: vendasMatches, error: errVendas } = await supabase
                 .from('vendas')
-                .select('id')
+                .select('id, valor_venda') // Buscamos o valor lançado
                 .in('id', chunk)
             
             if (!errVendas && vendasMatches) {
                 vendasMatches.forEach((match: any) => {
-                    leadsInDashboard.add(match.id);
+                    salesDataMap.set(match.id, {
+                      visible: true,
+                      valorVenda: match.valor_venda || 0
+                    });
                 })
             }
         }
@@ -410,7 +413,8 @@ export default function Central63App() {
         
         const clientName = linkedLead.nome || "Cliente";
         const fullIdToCheck = `${currentPrefix}_${item.safeId}`;
-        const isOnDash = leadsInDashboard.has(fullIdToCheck);
+        const saleInfo = salesDataMap.get(fullIdToCheck); // Obtém os dados da venda
+        const isOnDash = salesDataMap.has(fullIdToCheck);
         
         const details = imovelDetailsMap[item.codigo] || { url: null, valor: 0, address: "Endereço Pendente" }
         const resolvedImage = details.url || "https://app.imoview.com.br//Front/img/house1.png"
@@ -483,7 +487,8 @@ export default function Central63App() {
           raw_codigo: item.codigo,
           raw_midia: item.midia,
           
-          visibleOnDashboard: isOnDash 
+          visibleOnDashboard: !!saleInfo, 
+          valueLaunched: saleInfo?.valorVenda || 0, // Novo campo com o valor do dash
         }
       })
 
@@ -678,6 +683,8 @@ export default function Central63App() {
                     formatCurrency={formatCurrency}
                     onClick={() => setSelectedLead(lead)}
                     onAddToDashboard={(e) => handleAddToDashboard(lead)}
+                    // Se o LeadCard for um componente customizado que você criou,
+                    // ele agora terá acesso a lead.valueLaunched
                   />
                 ))}
               </div>
