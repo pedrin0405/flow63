@@ -5,7 +5,8 @@ import Image from "next/image"
 import { 
   Users,
   LayoutDashboard,
-  Building2, 
+  Building,
+  Building2,
   LogOut, 
   Settings, 
   HelpCircle, 
@@ -263,6 +264,14 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               collapsed={isCollapsed}
             />
             
+            <SidebarItem 
+              icon={Building} 
+              label="Unidades" 
+              active={isActive("unidades", "/units")} 
+              onClick={() => handleNavigation("unidades", "/units")}
+              collapsed={isCollapsed}
+            />
+
             {!isCollapsed && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
                 Sistema
