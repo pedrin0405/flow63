@@ -7,7 +7,8 @@ import {
   LayoutDashboard,
   Building,
   Building2,
-  LogOut, 
+  LogOut,
+  FileText,
   Settings, 
   HelpCircle, 
   ChevronRight, 
@@ -269,6 +270,14 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               label="Unidades" 
               active={isActive("unidades", "/units")} 
               onClick={() => handleNavigation("unidades", "/units")}
+              collapsed={isCollapsed}
+            />
+
+            <SidebarItem 
+              icon={FileText} 
+              label="Formulários" 
+              active={isActive("formularios", "/forms")} 
+              onClick={() => handleNavigation("formularios", "/forms")}
               collapsed={isCollapsed}
             />
 

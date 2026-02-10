@@ -44,9 +44,9 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // 1. Se NÃO houver utilizador e tentar aceder a páginas protegidas (que não sejam o login)
-  if (!user && pathname !== '/login') {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
+  // if (!user && pathname !== '/login') {
+  //   return NextResponse.redirect(new URL('/login', request.url))
+  // }
 
   // 2. Se HOUVER utilizador e tentar aceder à página de login
   if (user && pathname === '/login') {
