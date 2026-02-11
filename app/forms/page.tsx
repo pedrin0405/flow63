@@ -7,10 +7,11 @@ import {
   FileText, 
   Clock, 
   CheckCircle2, 
-  MoreVertical, 
+  MoreVertical,
   Menu, 
   Trash2, 
   Calendar,
+  Download,
   Link as LinkIcon,
   Eye,
   BarChart3,
@@ -20,7 +21,8 @@ import {
   LayoutGrid,
   List as ListIcon,
   Copy,
-  MoreHorizontal
+  MoreHorizontal,
+  Check
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,6 +53,9 @@ import { FormPreviewModal } from "@/components/central63/forms/form-preview-moda
 import { Sidebar } from "@/components/central63/sidebar"
 import { useToast } from "@/hooks/use-toast"
 
+import { jsPDF } from "jspdf";
+import autoTable from 'jspdf-autotable';
+
 export default function FormList() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all")
@@ -66,6 +71,150 @@ export default function FormList() {
   const [activeTab, setActiveTab] = useState("forms")
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+
+  // Mude de false para null (ou undefined)
+const [copiedId, setCopiedId] = useState(null);
+
+const handleCopyAction = (id, e) => {
+  handleCopyLink(id, e);
+  setCopiedId(id); // Armazena o ID do item clicado
+  setTimeout(() => setCopiedId(null), 2000); // Limpa após 2 segundos
+};
+
+  console.log(forms)
+
+  const fetchDetails = async (id: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('forms') // Busca na tabela de detalhes
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error: any) {
+    toast({ 
+      title: "Erro ao buscar detalhes", 
+      description: "Não foi possível encontrar os dados complementares deste formulário.", 
+      variant: "destructive" 
+    });
+    return null;
+  }
+};
+
+const generatePDF = async (form: any) => {
+  setLoading(true);
+  
+  // Busca os dados detalhados antes de gerar o PDF
+  const detailData = await fetchDetails(form.id);
+  
+  const doc = new jsPDF();
+  const margin = 20;
+  let currentY = 20;
+
+  // 1. Adicionar Logo (public/logo-horizontal.png)
+      try {
+        // Next.js serve arquivos da pasta public na raiz /
+        doc.addImage('/logo-horizontal.png', 'PNG', 75, currentY, 60, 30)
+        currentY += 45
+      } catch (e) {
+        console.warn("Logo não encontrada no caminho /logo-horizontal.png")
+        currentY += 10
+      }
+
+  // Cabeçalho Principal (Negrito)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text("AUTORIZAÇÃO DE DIVULGAÇÃO DE IMÓVEL", 105, currentY, { align: "center" });
+  
+  doc.setFontSize(11);
+  currentY += 15;
+
+  // Função auxiliar para campos simples (Label em Negrito, Valor Normal)
+  const drawField = (label: string, value: string) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(label, margin, currentY);
+    const labelWidth = doc.getTextWidth(label);
+    doc.setFont("helvetica", "normal");
+    doc.text(value || "", margin + labelWidth + 2, currentY);
+    currentY += 10;
+  };
+
+  // --- PREENCHIMENTO DOS CAMPOS ---
+  drawField("NOME: ", detailData?.nome || form.cliente_nome);
+  
+  doc.setFont("helvetica", "bold");
+  doc.text("ENDEREÇO DO IMÓVEL (COM N° DE MATRÍCULA):", margin, currentY);
+  currentY += 7;
+  doc.setFont("helvetica", "normal");
+  doc.text(detailData?.endereco || "_________________________________________________", margin, currentY);
+  currentY += 10;
+
+  drawField("QUAL TIPO DE INTERMEDIAÇÃO?: ", detailData?.tipo || "SEM EXCLUSIVIDADE");
+  drawField("AUTORIZAÇÃO COM PRAZO DE VIGÊNCIA DE: ", detailData?.prazo || "31 12 2024");
+  currentY += 5;
+
+  // Função para desenhar parágrafos (Texto Fixo Normal + Variável em Negrito no final)
+  const drawMixedParagraph = (title: string, fixedText: string, variableText: string) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(title, margin, currentY);
+    currentY += 5;
+    
+    let cursorX = margin;
+    let cursorY = currentY;
+    const maxWidth = 170;
+
+    const drawPart = (text: string, isBold: boolean) => {
+      doc.setFont("helvetica", isBold ? "bold" : "normal");
+      const words = text.split(" ");
+      words.forEach(word => {
+        const w = word + " ";
+        const width = doc.getTextWidth(w);
+        if (cursorX + width > margin + maxWidth) {
+          cursorX = margin;
+          cursorY += 6;
+        }
+        doc.text(w, cursorX, cursorY);
+        cursorX += width;
+      });
+    };
+
+    drawPart(fixedText, false); // Texto estático em Normal
+    drawPart(variableText, true);  // Valor variável em Negrito
+    
+    currentY = cursorY + 12;
+  };
+  console.log(detailData)
+
+  // --- TERMO 1 (Dos Honorários) ---
+  // A porcentagem de 5% agora é fixa (Normal), o variável é o final (ex: CIENTE)
+  drawMixedParagraph(
+    "Dos HONORÁRIOS - ",
+    "O (a) CONTRATANTE  pagará para a CONTRATADA  pelos serviços profissionais prestados de intermediação imobiliária o percentual de 5% do total da transação. Devendo tal comissão ser paga no ato da assinatura do contrato de promessa de compra e venda ou da assinatura da escritura definitiva no respectivo cartório de registro de imóveis, o que acontecer primeiro: ",
+    detailData?.termo_1 === true ? "CIENTE." : "NÃO INFORMADO."
+  );
+
+  // --- TERMO 2 (Da Publicidade) ---
+  drawMixedParagraph(
+    "Da publicidade e das ferramentas para a realização de objeto - ",
+    "É reservado para a contratada, como forma de promover a divulgação do imóvel objeto desta AUTORIZAÇÃO DE INTERMEDIAÇÃO IMOBILIÁRIA, o direito de, as suas expensas, utilizar-se das ferramentas e técnicas permitidas em lei, entre elas: a colocação de placas; veiculação de anúncios, inclusive com a utilização de fotografias, na internet e demais meios de comunicação; promover, com o prévio consentimento do CONTRATANTE, visitas ao imóvel para mostrá-lo as pessoas interessadas: ",
+    detailData?.termo_2 === true ? "CIENTE." : "NÃO INFORMADO."
+  );
+
+  // DATA
+  const dataVal = detailData?.data || form.created_at;
+  const dataStr = dataVal ? new Date(dataVal).toLocaleDateString('pt-BR') : "";
+  drawField("DATA DA AUTORIZAÇÃO: ", dataStr);
+
+  // Rodapé Institucional
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("CASA 63 IMOBILIÁRIA L TDA- CNPJ 29.541.965/0001-73-CRECI 3638", 105, 285, { align: "center" });
+
+  doc.save(`Autorização - ${form.cliente_nome}.pdf`);
+  setLoading(false);
+};
 
   const fetchForms = useCallback(async () => {
     try {
@@ -392,29 +541,58 @@ export default function FormList() {
                             </div>
 
                             {/* Rodapé de Ações */}
-                            <div className="mt-auto px-6 pb-6 pt-0 flex gap-3">
-                               <Button 
-                                 variant="outline" 
-                                 className="flex-1 h-10 rounded-xl border-slate-200 text-slate-600 font-bold text-xs hover:border-primary hover:text-primary hover:bg-primary/5 transition-all group/btn"
-                                 onClick={(e) => handleCopyLink(form.id, e)}
-                               >
-                                 <LinkIcon size={14} className="mr-2 text-slate-400 group-hover/btn:text-primary transition-colors" />
-                                 Copiar Link
-                               </Button>
-                               
-                               <Button 
-                                 className={`flex-1 h-10 rounded-xl font-bold text-xs shadow-md transition-all ${
-                                  isCompleted 
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200' 
-                                    : 'bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm'
-                                 }`}
-                                 onClick={() => handleOpenPreview(form)}
-                               >
-                                 {isCompleted ? <Eye size={14} className="mr-2"/> : <Clock size={14} className="mr-2"/>}
-                                 {isCompleted ? 'Ver Dados' : 'Aguardando'}
-                               </Button>
+                            <div className="mt-auto px-6 pb-6 pt-0 flex flex-col gap-3">
+                            {/* Primeira Linha: Link e PDF */}
+                            <div className="flex gap-3 w-full">
+                              <Button
+                                variant="outline"
+                                // A classe muda apenas se este ID for o que foi copiado
+                                className={`flex-1 h-10 rounded-xl border-slate-200 font-bold text-xs transition-all group/btn active:scale-95 ${
+                                  copiedId === form.id 
+                                    ? 'text-emerald-600 border-emerald-200 bg-emerald-50' 
+                                    : 'text-slate-600 hover:border-primary hover:text-primary hover:bg-primary/5'
+                                }`}
+                                onClick={(e) => handleCopyAction(form.id, e)}
+                              >
+                                {copiedId === form.id ? (
+                                  <>
+                                    <Check size={14} className="mr-2 animate-in zoom-in duration-300" />
+                                    Copiado!
+                                  </>
+                                ) : (
+                                  <>
+                                    <LinkIcon size={14} className="mr-2 text-slate-400 group-hover/btn:text-primary transition-colors" />
+                                    Link
+                                  </>
+                                )}
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                className="flex-1 h-10 rounded-xl border-slate-200 text-slate-600 font-bold text-xs hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  generatePDF(form);
+                                }}
+                              >
+                                <Download size={14} className="mr-2" />
+                                PDF
+                              </Button>
                             </div>
 
+                            {/* Segunda Linha: Ver Dados / Aguardando */}
+                            <Button
+                              className={`w-full h-10 rounded-xl font-bold text-xs shadow-md transition-all ${
+                                isCompleted
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
+                                  : 'bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm'
+                              }`}
+                              onClick={() => handleOpenPreview(form)}
+                            >
+                              {isCompleted ? <Eye size={14} className="mr-2" /> : <Clock size={14} className="mr-2" />}
+                              {isCompleted ? 'Ver Dados' : 'Aguardando'}
+                            </Button>
+                          </div>
                           </CardContent>
                         </Card>
                       )
