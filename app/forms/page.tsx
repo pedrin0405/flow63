@@ -73,9 +73,9 @@ export default function FormList() {
   const { toast } = useToast()
 
   // Mude de false para null (ou undefined)
-const [copiedId, setCopiedId] = useState(null);
+const [copiedId, setCopiedId] = useState<string | null>(null);
 
-const handleCopyAction = (id, e) => {
+const handleCopyAction = (id: string, e: React.MouseEvent) => {
   handleCopyLink(id, e);
   setCopiedId(id); // Armazena o ID do item clicado
   setTimeout(() => setCopiedId(null), 2000); // Limpa após 2 segundos
@@ -152,7 +152,7 @@ const generatePDF = async (form: any) => {
   currentY += 10;
 
   drawField("QUAL TIPO DE INTERMEDIAÇÃO?: ", detailData?.tipo || "SEM EXCLUSIVIDADE");
-  drawField("AUTORIZAÇÃO COM PRAZO DE VIGÊNCIA DE: ", detailData?.prazo || "31 12 2024");
+  drawField("AUTORIZAÇÃO COM PRAZO DE VIGÊNCIA DE: ", detailData?.prazo || "NÃO INFORMADO");
   currentY += 5;
 
   // Função para desenhar parágrafos (Texto Fixo Normal + Variável em Negrito no final)
@@ -204,7 +204,11 @@ const generatePDF = async (form: any) => {
 
   // DATA
   const dataVal = detailData?.data || form.created_at;
-  const dataStr = dataVal ? new Date(dataVal).toLocaleDateString('pt-BR') : "";
+  const dataStr = dataVal 
+  ? new Date(dataVal).toLocaleDateString('pt-BR', {
+      timeZone: 'America/Araguaina' // Garante a subtração das 3h do UTC
+    }) 
+  : "";
   drawField("DATA DA AUTORIZAÇÃO: ", dataStr);
 
   // Rodapé Institucional
@@ -371,7 +375,9 @@ const generatePDF = async (form: any) => {
             <div className="flex flex-col md:flex-row gap-4 justify-between items-center w-full">
               
               {/* Grupo de Busca e Filtro (Agora com flex-1 para esticar) */}
-              <div className="flex items-center gap-2 w-full md:flex-1 bg-white dark:bg-card p-1 rounded-xl border shadow-sm">
+              <div className="flex items-center gap-2 w-full md:flex-1 bg-white dark:bg-card p-1 rounded-xl border shadow-sm"
+              suppressHydrationWarning
+              >
                  <div className="relative flex-1"> {/* flex-1 aqui garante que o input estique dentro do grupo */}
                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                    <Input 
@@ -459,7 +465,7 @@ const generatePDF = async (form: any) => {
                         >
                           {/* Efeito de Topo Colorido (Gradiente sutil) */}
                           <div className={`absolute top-0 left-0 right-0 h-24 opacity-30 bg-gradient-to-b ${
-                            isCompleted ? 'from-emerald-100 to-transparent' : 'from-amber-100 to-transparent'
+                            isCompleted ? 'from-blue-100 to-transparent' : 'from-amber-100 to-transparent'
                           }`} />
 
                           <CardContent className="p-0 flex flex-col h-full relative z-10">
@@ -467,7 +473,7 @@ const generatePDF = async (form: any) => {
                             {/* Cabeçalho do Card */}
                             <div className="p-6 pb-2 flex justify-between items-start">
                               <div className="flex gap-4">
-                                <Avatar className={`h-14 w-14 ring-4 ring-white dark:ring-card shadow-sm ${isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                <Avatar className={`h-14 w-14 ring-4 ring-white dark:ring-card shadow-sm ${isCompleted ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
                                   <AvatarFallback className="font-bold text-lg">
                                     {form.cliente_nome?.substring(0, 2).toUpperCase()}
                                   </AvatarFallback>
@@ -477,8 +483,8 @@ const generatePDF = async (form: any) => {
                                     <Badge variant="secondary" className="font-mono text-[10px] px-1.5 h-5 bg-white/80 backdrop-blur border border-slate-200 text-slate-500 rounded-md shadow-sm">
                                       {form.id}
                                     </Badge>
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isCompleted ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isCompleted ? 'text-blue-600' : 'text-amber-600'}`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${isCompleted ? 'bg-blue-500' : 'bg-amber-500'}`} />
                                       {isCompleted ? 'Concluído' : 'Pendente'}
                                     </span>
                                   </div>
@@ -531,10 +537,10 @@ const generatePDF = async (form: any) => {
                                 <div className="col-span-2 pt-2 border-t border-slate-200/50 flex items-center justify-between">
                                   <p className="text-[10px] font-medium text-slate-400 flex items-center gap-1.5">
                                     <Calendar size={10} /> 
-                                    {new Date(form.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    {new Date(form.created_at).toLocaleDateString('pt-BR', {timeZone: 'America/Araguaina', day: '2-digit', month: 'short', year: 'numeric' })}
                                   </p>
                                   <p className="text-[10px] font-medium text-slate-400">
-                                    {new Date(form.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                    {new Date(form.created_at).toLocaleTimeString([], {timeZone: 'America/Araguaina', hour: '2-digit', minute:'2-digit'})}
                                   </p>
                                 </div>
                               </div>
@@ -549,7 +555,7 @@ const generatePDF = async (form: any) => {
                                 // A classe muda apenas se este ID for o que foi copiado
                                 className={`flex-1 h-10 rounded-xl border-slate-200 font-bold text-xs transition-all group/btn active:scale-95 ${
                                   copiedId === form.id 
-                                    ? 'text-emerald-600 border-emerald-200 bg-emerald-50' 
+                                    ? 'text-blue-600 border-blue-200 bg-blue-50' 
                                     : 'text-slate-600 hover:border-primary hover:text-primary hover:bg-primary/5'
                                 }`}
                                 onClick={(e) => handleCopyAction(form.id, e)}
@@ -584,7 +590,7 @@ const generatePDF = async (form: any) => {
                             <Button
                               className={`w-full h-10 rounded-xl font-bold text-xs shadow-md transition-all ${
                                 isCompleted
-                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'
                                   : 'bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm'
                               }`}
                               onClick={() => handleOpenPreview(form)}
@@ -630,12 +636,12 @@ const generatePDF = async (form: any) => {
                             <TableCell className="text-sm">{form.corretor_nome}</TableCell>
                             <TableCell className="text-sm text-muted-foreground hidden md:table-cell">{form.secretaria || '-'}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" className={`font-bold border-0 ${form.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              <Badge variant="outline" className={`font-bold border-0 ${form.status === 'completed' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                                 {form.status === 'completed' ? 'Concluído' : 'Pendente'}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
-                              {new Date(form.created_at).toLocaleDateString()}
+                              {new Date(form.created_at).toLocaleDateString('pt-BR',{timeZone: 'America/Araguaina'})}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">

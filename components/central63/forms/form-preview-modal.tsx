@@ -72,11 +72,11 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
       >
         
         {/* --- CABEÇALHO (FIXO) --- */}
-        <div className={`p-6 border-b flex-shrink-0 z-10 ${isCompleted ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : 'bg-amber-50/60 dark:bg-amber-950/20'}`}>
+        <div className={`p-6 border-b flex-shrink-0 z-10 ${isCompleted ? 'bg-blue-50/60 dark:bg-blue-950/20' : 'bg-amber-50/60 dark:bg-amber-950/20'}`}>
           <DialogHeader className="space-y-0">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl shadow-sm border border-white/50 ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                <div className={`p-3 rounded-xl shadow-sm border border-white/50 ${isCompleted ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
                   <FileText size={24} />
                 </div>
                 <div>
@@ -88,7 +88,7 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                       ID: {formId}
                     </Badge>
                     {isCompleted ? (
-                      <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px] h-5 px-1.5 border-0">Concluído</Badge>
+                      <Badge className="bg-blue-500 hover:bg-emerald-600 text-[10px] h-5 px-1.5 border-0">Concluído</Badge>
                     ) : (
                       <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] h-5 px-1.5">Pendente</Badge>
                     )}

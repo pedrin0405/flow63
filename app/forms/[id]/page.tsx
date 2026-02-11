@@ -75,10 +75,14 @@ export default function PublicFormPage() {
     }
   }, [formId, verifyFormId])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-  }
+  // No seu componente:
+const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const { name, value } = e.target;
+  setFormData(prev => ({
+    ...prev,
+    [name]: value
+  }));
+};
 
   const handleCheckboxChange = (checked: boolean, name: string) => {
     setFormData(prev => ({ ...prev, [name]: checked }))
@@ -266,26 +270,45 @@ export default function PublicFormPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="tipo" className="font-bold text-gray-700">Tipo de Imóvel/Serviço</Label>
-                  <Input 
-                    id="tipo" 
-                    name="tipo"
-                    placeholder="Ex: Apartamento, Consultoria..." 
-                    className="h-12 rounded-xl bg-gray-50 border-gray-200 focus:bg-white transition-all"
-                    value={formData.tipo}
-                    onChange={handleInputChange}
-                    required
-                  />
+                {/* Campo Exclusividade */}
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="tipo" className="text-sm font-bold text-gray-700 ml-1">
+                    Exclusividade
+                  </label>
+                  
+                  <div className="relative group">
+                    <select
+                      id="tipo"
+                      name="tipo"
+                      className="block w-full h-12 px-4 py-3 text-base text-gray-700 bg-gray-50 border border-gray-200 rounded-2xl appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all duration-200 cursor-pointer"
+                      value={formData.tipo}
+                      onChange={handleInputChange}
+                    >
+                      <option value="" disabled>Selecione uma opção</option>
+                      <option value="COM EXCLUSIVIDADE">Com exclusividade</option>
+                      <option value="SEM EXCLUSIVIDADE">Sem exclusividade</option>
+                    </select>
+
+                    {/* Ícone de seta customizado */}
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="prazo" className="font-bold text-gray-700">Prazo Previsto</Label>
-                  <Input 
+                {/* Campo Prazo Previsto */}
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="prazo" className="text-sm font-bold text-gray-700 ml-1">
+                    Prazo Previsto
+                  </label>
+                  <input 
                     id="prazo" 
                     name="prazo"
+                    type="text"
                     placeholder="Ex: 30 dias, Imediato..." 
-                    className="h-12 rounded-xl bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                    className="w-full h-12 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all outline-none"
                     value={formData.prazo}
                     onChange={handleInputChange}
                     required
