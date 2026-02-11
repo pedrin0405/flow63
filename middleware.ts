@@ -1,7 +1,8 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // 1. Configuração inicial da resposta e cookies
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -13,43 +14,51 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
+        getAll() {
+          return request.cookies.getAll()
         },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options })
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
           response = NextResponse.next({
             request: {
               headers: request.headers,
             },
           })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({ name, value: '', ...options })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }
   )
 
-  // IMPORTANTE: getUser() é mais seguro que getSession() no middleware
-  const { data: { user } } = await supabase.auth.getUser()
+  // 2. Verificar o usuário
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
+  // 3. Definição de Rotas
+  const path = request.nextUrl.pathname
 
-  // 1. Se NÃO houver utilizador e tentar aceder a páginas protegidas (que não sejam o login)
-  // if (!user && pathname !== '/login') {
-  //   return NextResponse.redirect(new URL('/login', request.url))
-  // }
+  // Rotas de Autenticação (Login, Recuperação de senha, Callback)
+  const isAuthRoute = 
+    path.startsWith('/login') || 
+    path.startsWith('/auth') || 
+    path.startsWith('/forgot-password')
 
-  // 2. Se HOUVER utilizador e tentar aceder à página de login
-  if (user && pathname === '/login') {
+  // Rotas Públicas Específicas (Formulários Individuais)
+  // Lógica: Permite "/forms/123" mas bloqueia "/forms" (que é a lista administrativa)
+  const isPublicFormRoute = path.startsWith('/forms/') && path !== '/forms'
+
+  // 4. Lógica de Proteção
+  
+  // Se NÃO estiver logado e tentar acessar rota protegida (que não seja auth ou form público)
+  if (!user && !isAuthRoute && !isPublicFormRoute) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Se ESTIVER logado e tentar acessar login, manda para home
+  if (user && path === '/login') {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -59,10 +68,12 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Esta é a parte crítica para evitar o "ecrã vazio":
-     * Exclui explicitamente ficheiros estáticos, imagens, e recursos do Next.js
-     * da verificação de autenticação.
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public assets (images, etc)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
