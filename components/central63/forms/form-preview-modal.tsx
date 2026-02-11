@@ -8,7 +8,6 @@ import {
   Calendar, 
   Clock, 
   CheckCircle2, 
-  AlertCircle,
   User,
   Briefcase,
   ShieldCheck
@@ -18,7 +17,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -65,12 +63,13 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      {/* ESTRUTURA DE SCROLL INFALÍVEL:
-        1. max-h-[90vh]: Limita a altura do modal a 90% da tela.
-        2. flex flex-col: Organiza Header (fixo) e Body (flexível).
-        3. overflow-hidden no pai: Impede scroll na página de fundo.
+      {/* 1. showCloseButton={false}: Remove o botão nativo do componente UI.
+          2. Mantemos a estrutura de layout e scroll.
       */}
-      <DialogContent className="sm:max-w-[700px] w-[95%] h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-white dark:bg-zinc-950">
+      <DialogContent 
+        showCloseButton={false} 
+        className="sm:max-w-[700px] w-[95%] h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-white dark:bg-zinc-950"
+      >
         
         {/* --- CABEÇALHO (FIXO) --- */}
         <div className={`p-6 border-b flex-shrink-0 z-10 ${isCompleted ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : 'bg-amber-50/60 dark:bg-amber-950/20'}`}>
@@ -96,9 +95,11 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                   </div>
                 </div>
               </div>
+
+              {/* --- SEU BOTÃO MANUAL REINSERIDO AQUI --- */}
               <button 
                 onClick={onClose} 
-                className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors -mr-2 -mt-2 text-slate-400 hover:text-slate-700"
+                className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors -mr-2 -mt-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               >
                 <X size={20} />
               </button>
@@ -106,10 +107,7 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
           </DialogHeader>
         </div>
 
-        {/* --- CORPO ROLÁVEL (SCROLL NATIVO) --- 
-           overflow-y-auto: Habilita o scroll vertical nativo (roda do mouse funciona 100%).
-           flex-1: Ocupa todo o espaço restante abaixo do header.
-        */}
+        {/* --- CORPO ROLÁVEL --- */}
         <div className="flex-1 overflow-y-auto bg-white dark:bg-zinc-950 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-zinc-800 scrollbar-track-transparent">
           <div className="p-6 md:p-8 space-y-8">
             
@@ -129,7 +127,6 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                 </div>
               </div>
             ) : !details ? (
-              // Estado: Pendente / Sem dados
               <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
                 <div className="relative">
                   <div className="absolute inset-0 bg-amber-200 blur-xl opacity-30 rounded-full animate-pulse"></div>
@@ -159,10 +156,8 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                 </div>
               </div>
             ) : (
-              // Estado: Preenchido (Dados Reais)
               <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
                 
-                {/* Banner de Sucesso */}
                 <div className="bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900 rounded-2xl p-4 flex items-center gap-4">
                    <div className="bg-emerald-100 dark:bg-emerald-900/50 p-2 rounded-full">
                      <CheckCircle2 size={20} className="text-emerald-600 dark:text-emerald-400" />
@@ -173,7 +168,6 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                    </div>
                 </div>
 
-                {/* Seção 1 */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-zinc-800">
                     <User size={18} className="text-primary" />
@@ -199,7 +193,6 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                   </div>
                 </div>
 
-                {/* Seção 2 */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-zinc-800">
                     <Briefcase size={18} className="text-primary" />
@@ -218,7 +211,6 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                   </div>
                 </div>
 
-                {/* Seção 3 */}
                 <div className="space-y-4">
                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-zinc-800">
                     <ShieldCheck size={18} className="text-primary" />
