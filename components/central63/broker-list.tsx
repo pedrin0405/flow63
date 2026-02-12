@@ -220,3 +220,5 @@ export function BrokerList({ brokers, onUpdate }: BrokerListProps) {
     </div>
   )
 }
+
+export type { Broker }

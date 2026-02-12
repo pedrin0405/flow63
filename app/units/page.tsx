@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
 import { UnitSettingsDialog } from "@/components/central63/unit-settings-dialog";
-import { Building2, User, ShieldCheck, LayoutDashboard, MapPin } from "lucide-react";
+import { Building, Building2, User, ShieldCheck,Menu, LayoutDashboard, MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardPage from "../page";
 
@@ -46,6 +46,10 @@ export default function UnitsPage() {
     fetchUnits();
   }, []);
 
+  function setSidebarOpen(arg0: boolean): void {
+    throw new Error("Function not implemented.");
+  }
+
   return (
     <SidebarProvider>
       <Sidebar isOpen={false} onClose={function (): void {
@@ -54,7 +58,7 @@ export default function UnitsPage() {
               throw new Error("Function not implemented.");
           } } />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        {/* <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <Breadcrumb>
@@ -68,15 +72,17 @@ export default function UnitsPage() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
+        </header> */}
+
+        <header className="w-full bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
+            <div className="flex items-center gap-4">
+              <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
+              <Building className="text-primary" />
+              <h2 className="text-2xl font-bold text-foreground tracking-tight">Unidades</h2>
+            </div>
         </header>
 
         <main className="flex flex-1 flex-col gap-6 p-4 md:p-6 bg-slate-50/50 dark:bg-transparent overflow-x-hidden">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Nossas Unidades</h1>
-            <p className="text-muted-foreground text-sm md:text-base italic">
-              Gerencie as fotos e a equipe de corretores Destaques.
-            </p>
-          </div>
 
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">

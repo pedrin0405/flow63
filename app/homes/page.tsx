@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, Suspense, useCallback } from "react"
-import { Building2, Search, RefreshCw, Loader2, MapPin } from "lucide-react"
+import { Building2, Search, RefreshCw, Loader2, Menu, MapPin } from "lucide-react"
 import { Sidebar } from "@/components/central63/sidebar"
 import { StatCard } from "@/components/central63/stat-card"
 import { PropertyFilters } from "@/components/central63/property-filters"
@@ -177,10 +177,12 @@ export default function ImoveisPage() {
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={setActiveTab} />
         
         <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-          <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0">
-             <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-                <Building2 className="text-primary" /> Carteira de Imóveis
-             </h2>
+          <header className="w-full bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
+            <div className="flex items-center gap-4">
+              <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
+              <Building2 className="text-primary" />
+              <h2 className="text-2xl font-bold text-foreground tracking-tight">Carteira de Imóveis</h2>
+            </div>
           </header>
 
           <div className="flex-1 overflow-y-auto bg-background p-4 lg:p-8 space-y-6">

@@ -188,12 +188,13 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
       )}
 
       <aside 
-        className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 bg-card border-r border-border transform transition-all duration-300 ease-in-out flex flex-col",
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-          isCollapsed ? "w-[80px]" : "w-72"
-        )}
-      >
+          className={cn(
+            "fixed lg:static inset-y-0 left-0 z-50 bg-card border-r border-border transform transition-all duration-300 ease-in-out flex flex-col",
+            // CORREÇÃO: Se estiver aberto, move para 0 (visível). Se fechado, move para fora (-100%)
+            isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+            isCollapsed ? "w-[80px]" : "w-72"
+          )}
+        >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="hidden lg:flex absolute -right-3 top-9 w-6 h-6 bg-card border border-border rounded-full items-center justify-center text-muted-foreground hover:text-primary transition-colors shadow-sm z-50"

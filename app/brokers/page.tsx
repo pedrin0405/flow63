@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { Users } from "lucide-react"
+import { UserCog, Menu } from "lucide-react"
 import { Sidebar } from "@/components/central63/sidebar"
 import { BrokerList, Broker } from "@/components/central63/broker-list"
 import { useToast } from "@/hooks/use-toast"
@@ -35,7 +35,7 @@ export default function CorretoresPage() {
 
       setBrokers(allBrokers as Broker[])
     } catch (error: any) {
-      console.error("Erro ao buscar corretores:", error)
+      // console.error("Erro ao buscar corretores:", error)
       toast({ 
         title: "Erro", 
         description: "Falha ao carregar lista de corretores.", 
@@ -61,10 +61,13 @@ export default function CorretoresPage() {
         />
         
         <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-          <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0">
-             <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-                <Users className="text-primary" /> Gestão de Corretores
-             </h2>
+
+          <header className="w-full bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
+            <div className="flex items-center gap-4">
+              <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
+              <UserCog className="text-primary" />
+              <h2 className="text-2xl font-bold text-foreground tracking-tight">Gestão de Corretores</h2>
+            </div>
           </header>
 
           <div className="flex-1 overflow-y-auto bg-background p-4 lg:p-8">

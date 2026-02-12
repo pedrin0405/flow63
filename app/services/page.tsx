@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect, Suspense, useCallback } from "react"
 import { 
-  Menu, Users, DollarSign, Plus, Search, Briefcase, RefreshCw, Loader2
+  Menu, Users, DollarSign, Plus, Search, Briefcase, RefreshCw, Loader2,
+  Building2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/central63/sidebar"
@@ -632,6 +633,7 @@ export default function Central63App() {
           <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
             <div className="flex items-center gap-4">
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
+              <Users className="text-primary" />
               <h2 className="text-2xl font-bold text-foreground tracking-tight">Gestao de Atendimentos</h2>
             </div>
             {/* Botão Modificado para Atualizar Supabase */}

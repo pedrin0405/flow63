@@ -321,20 +321,23 @@ const generatePDF = async (form: any) => {
       />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        <header className="lg:hidden flex items-center justify-between p-4 border-b bg-white dark:bg-card">
+        {/* <header className="lg:hidden flex items-center justify-between p-4 border-b bg-white dark:bg-card">
           <div className="font-bold text-lg">Central<span className="text-primary">63</span></div>
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}><Menu size={24} /></Button>
-        </header>
+        </header> */}
+        
+        <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
+            <div className="flex items-center gap-4">
+              <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
+              <FileText className="text-primary" />
+              <h2 className="text-2xl font-bold text-foreground tracking-tight">Documentos & Fichas</h2>
+              {/* <p className="text-muted-foreground text-sm"> | Gerencie o fluxo de cadastros e atendimentos.</p> */}
+            </div>
+          </header>
+
 
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-[1600px] mx-auto p-6 md:p-8 space-y-8 pb-20">
-            
-            <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-50 flex items-center gap-2">
-                Documentos & Fichas
-              </h1>
-              <p className="text-muted-foreground text-sm">Gerencie o fluxo de cadastros e atendimentos.</p>
-            </div>
 
             {/* Dashboard Unificado */}
             <div className="bg-white dark:bg-card rounded-2xl border shadow-sm p-1 grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-800">

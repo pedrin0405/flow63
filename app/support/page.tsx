@@ -1,27 +1,46 @@
 "use client";
+import { useState } from "react";
 
-import React from "react";
-// Corrigindo as importações para caminhos relativos para evitar erros de resolução de alias
+// Importações mantidas conforme seu código
 import { Sidebar } from "../../components/central63/sidebar";
 import { Card, CardContent } from "../../components/ui/card";
-import { LifeBuoy } from "lucide-react";
+import { LifeBuoy, Menu } from "lucide-react";
 
 export default function SuportePage() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("suporte");
+
   return (
-    <div className="flex min-h-screen w-full bg-muted/40">
-      <Sidebar isOpen={false} onClose={function (): void {
-        throw new Error("Function not implemented.");
-      } } activeTab={""} onTabChange={function (tab: string): void {
-        throw new Error("Function not implemented.");
-      } }/>
-      <div className="flex flex-col flex-1">
-        <header className="flex h-14 items-center gap-4 border-b bg-background px-6 lg:h-[60px]">
-          <div className="flex items-center gap-2 font-semibold">
-            <LifeBuoy className="h-5 w-5 text-primary" />
-            <span>Suporte e Feedback</span>
+    // Adicionado h-screen e overflow-hidden para layout fixo de dashboard
+    <div className="flex h-screen w-full bg-muted/40 overflow-hidden">
+      
+      {/* CORREÇÃO AQUI: Conectando as props aos estados reais */}
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+        activeTab={activeTab} 
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          setSidebarOpen(false); // Fecha no mobile ao clicar
+        }} 
+      />
+
+      <div className="flex flex-col flex-1 min-w-0">
+        <header className="w-full bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
+          <div className="flex items-center gap-4">
+            <button 
+              className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" 
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu />
+            </button>
+            <LifeBuoy className="text-primary" />
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Suporte e Feedback</h2>
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
+
+        {/* Adicionado overflow-y-auto para o conteúdo rolar independentemente da sidebar */}
+        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
           <div className="mx-auto max-w-6xl h-full flex flex-col gap-6">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Como podemos ajudar?</h1>
@@ -30,14 +49,13 @@ export default function SuportePage() {
               </p>
             </div>
 
-            <Card className="flex-1 border-none shadow-md overflow-hidden bg-background">
+            {/* Ajustado min-height para garantir visibilidade do formulário */}
+            <Card className="flex-1 border-none shadow-md overflow-hidden bg-background min-h-[600px]">
               <CardContent className="p-0 h-full">
-                {/* Incorporação do Formulário ClickUp via Iframe */}
                 <iframe
                   src="https://forms.clickup.com/9013302439/f/8ckr557-2313/7PORADSZVWKFIFI3MG"
                   width="100%"
                   height="100%"
-                  // style={{ border: "none", minHeight: "700px" }}
                   style={{ border: "none" }}
                   title="Formulário de Suporte Central 63"
                   className="rounded-lg"
