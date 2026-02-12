@@ -212,6 +212,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
                                     width={30} 
                                     height={30} 
                                     className="priority"
+                                    priority
                                   />
               </div>
               <div className="absolute -bottom-1 -right-1 w-3 h-3 lg:w-4 lg:h-4 bg-emerald-500 rounded-full border-2 border-card" />
@@ -324,10 +325,10 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               {!isCollapsed && (
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <p className="text-sm font-semibold text-foreground truncate">
-                    {userData?.name || "Carregando..."}
+                    {userData?.name || "Usuário"} {/* Nome genérico em vez de "Carregando" */}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {userData?.email || "Conectado"}
+                    {userData?.email || "Acessando..."}
                   </p>
                 </div>
               )}

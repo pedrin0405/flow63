@@ -34,31 +34,19 @@ export async function middleware(request: NextRequest) {
 
   // 2. Verificar o usuário
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
 
-  // 3. Definição de Rotas
   const path = request.nextUrl.pathname
-
-  // Rotas de Autenticação (Login, Recuperação de senha, Callback)
-  const isAuthRoute = 
-    path.startsWith('/login') || 
-    path.startsWith('/auth') || 
-    path.startsWith('/forgot-password')
-
-  // Rotas Públicas Específicas (Formulários Individuais)
-  // Lógica: Permite "/forms/123" mas bloqueia "/forms" (que é a lista administrativa)
+  const isAuthRoute = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/forgot-password')
   const isPublicFormRoute = path.startsWith('/forms/') && path !== '/forms'
 
-  // 4. Lógica de Proteção
-  
-  // Se NÃO estiver logado e tentar acessar rota protegida (que não seja auth ou form público)
-  if (!user && !isAuthRoute && !isPublicFormRoute) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
+  // Proteção usando a sessão (mais rápido que getUser)
+  // if (!session && !isAuthRoute && !isPublicFormRoute) {
+  //   return NextResponse.redirect(new URL('/login', request.url))
+  // }
 
-  // Se ESTIVER logado e tentar acessar login, manda para home
-  if (user && path === '/login') {
+  if (session && path === '/login') {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
