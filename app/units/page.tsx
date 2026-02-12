@@ -22,6 +22,8 @@ import DashboardPage from "../page";
 export default function UnitsPage() {
   const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
     async function fetchUnits() {
@@ -46,17 +48,17 @@ export default function UnitsPage() {
     fetchUnits();
   }, []);
 
-  function setSidebarOpen(arg0: boolean): void {
-    throw new Error("Function not implemented.");
-  }
 
   return (
     <SidebarProvider>
-      <Sidebar isOpen={false} onClose={function (): void {
-              throw new Error("Function not implemented.");
-          } } activeTab={""} onTabChange={function (tab: string): void {
-              throw new Error("Function not implemented.");
-          } } />
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+        activeTab={activeTab} // Use a variável de estado aqui
+        onTabChange={(tab: string) => {
+          setActiveTab(tab); // Atualiza a aba ativa quando clicar
+          setSidebarOpen(false); // Fecha a sidebar no mobile após o clique
+        }}/>
       <SidebarInset>
         {/* <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
@@ -77,7 +79,7 @@ export default function UnitsPage() {
         <header className="w-full bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
             <div className="flex items-center gap-4">
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
-              <Building className="text-primary" />
+              <Building className="text-primary hidden sm:block" />
               <h2 className="text-2xl font-bold text-foreground tracking-tight">Unidades</h2>
             </div>
         </header>

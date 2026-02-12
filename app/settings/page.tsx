@@ -253,7 +253,7 @@ export default function ConfiguracoesPage() {
           >
             <Menu />
           </button>
-          <Settings className="text-primary" />
+          <Settings className="text-primary hidden sm:block" />
           <h2 className="text-2xl font-bold text-foreground tracking-tight">Configuração</h2>
         </div>
         <Button variant="outline" size="icon" onClick={fetchData} title="Atualizar dados">

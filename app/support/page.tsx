@@ -34,7 +34,7 @@ export default function SuportePage() {
             >
               <Menu />
             </button>
-            <LifeBuoy className="text-primary" />
+            <LifeBuoy className="text-primary hidden sm:block" />
             <h2 className="text-2xl font-bold text-foreground tracking-tight">Suporte e Feedback</h2>
           </div>
         </header>
