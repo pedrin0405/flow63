@@ -633,7 +633,7 @@ export default function Central63App() {
           <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
             <div className="flex items-center gap-4">
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
-              <Users className="text-primary" />
+              <Users className="text-primary hidden lg:block" />
               <h2 className="text-2xl font-bold text-foreground tracking-tight">Gestao de Atendimentos</h2>
             </div>
             {/* Botão Modificado para Atualizar Supabase */}

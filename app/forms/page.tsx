@@ -22,7 +22,8 @@ import {
   List as ListIcon,
   Copy,
   MoreHorizontal,
-  Check
+  Check,
+  Library,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -329,8 +330,8 @@ const generatePDF = async (form: any) => {
         <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
             <div className="flex items-center gap-4">
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
-              <FileText className="text-primary" />
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">Documentos & Fichas</h2>
+              <Library className="text-primary hidden lg:block" />
+              <h2 className="text-2xl font-bold text-foreground tracking-tight">Formulários</h2>
               {/* <p className="text-muted-foreground text-sm"> | Gerencie o fluxo de cadastros e atendimentos.</p> */}
             </div>
           </header>

@@ -14,7 +14,10 @@ import {
   ChevronRight, 
   ChevronLeft,
   UserCog,
-  type LucideIcon 
+  FileSpreadsheet,
+  Library,
+  type LucideIcon, 
+  House
 } from "lucide-react"
 import {
   Tooltip,
@@ -268,18 +271,35 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             />
             
             <SidebarItem 
-              icon={Building} 
+              icon={House} 
               label="Unidades" 
               active={isActive("unidades", "/units")} 
               onClick={() => handleNavigation("unidades", "/units")}
               collapsed={isCollapsed}
             />
 
+            {!isCollapsed && (
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
+                Documentos
+              </div>
+            )}
+            {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
+
+
             <SidebarItem 
-              icon={FileText} 
+              icon={Library} 
               label="Formulários" 
               active={isActive("formularios", "/forms")} 
               onClick={() => handleNavigation("formularios", "/forms")}
+              collapsed={isCollapsed}
+            />
+
+            {/* ITEM DE PLANILHAS */}
+            <SidebarItem 
+              icon={FileSpreadsheet} 
+              label="Planilhas" 
+              active={isActive("planilhas", "/spreadsheets")} 
+              onClick={() => handleNavigation("planilhas", "/spreadsheets")}
               collapsed={isCollapsed}
             />
 

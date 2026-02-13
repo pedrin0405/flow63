@@ -121,7 +121,7 @@ export default function DashboardPage() {
         <header className="w-full bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
             <div className="flex items-center gap-4">
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
-              <LayoutDashboard className="text-primary" />
+              <LayoutDashboard className="text-primary hidden lg:block" />
               <h2 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h2>
             </div>
           </header>
