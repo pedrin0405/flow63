@@ -29,7 +29,8 @@ import {
   FileSpreadsheet,
   FileImage,
   X,
-  Table as TableIcon
+  Table as TableIcon,
+  Filter
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion, Variants, AnimatePresence } from 'framer-motion';
@@ -178,6 +179,9 @@ export default function IndicatorsPage() {
 
   const fetchDashboardData = useCallback(async (filterString: string) => {
     setLoading(true);
+    const minWait = new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(filterString)
+
     try {
       const filters = parseFilterString(filterString);
       const response = await fetch('/api/imoview/indicators', {
@@ -186,7 +190,7 @@ export default function IndicatorsPage() {
         body: JSON.stringify({ action: 'default', filters }),
       });
 
-      const result = await response.json();
+      const [result] = await Promise.all([response.json(), minWait]);
       if (result.error) throw new Error(result.message);
       setData(result.body);
     } catch (error) {
@@ -202,7 +206,7 @@ export default function IndicatorsPage() {
 
     const interval = setInterval(() => {
     fetchDashboardData(defaultFilters);
-  }, 300000);
+  }, 600000);
 
   return () => clearInterval(interval);
   }, [fetchDashboardData]);

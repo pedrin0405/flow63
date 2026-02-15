@@ -332,6 +332,7 @@ const generatePDF = async (form: any) => {
               <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
               <Library className="text-primary hidden lg:block" />
               <h2 className="text-2xl font-bold text-foreground tracking-tight">Formulários</h2>
+              <p className="text-primary hidden sm:block" >| Autorização de Divulgação</p>
               {/* <p className="text-muted-foreground text-sm"> | Gerencie o fluxo de cadastros e atendimentos.</p> */}
             </div>
           </header>

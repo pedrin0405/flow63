@@ -10,7 +10,7 @@ export async function POST(req: Request) {
         // Cache inteligente baseado no estado do filtro
         const cacheKey = JSON.stringify({ action, filters });
         const cached = cache.get(cacheKey);
-        if (cached && (Date.now() - cached.time < 300000)) return NextResponse.json(cached.data);
+        if (cached && (Date.now() - cached.time < 600000)) return NextResponse.json(cached.data);
 
         const credentials = {
             codigoConvenio: process.env.IMOVIEW_CONVENIO,
