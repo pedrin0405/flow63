@@ -308,11 +308,11 @@ export default function IndicatorsPage() {
 
   return (
 
-    <div className="flex h-screen overflow-hidden bg-[#fafafa]">
+    <div className="flex h-screen overflow-hidden bg-[#fafafa] print:bg-white print:h-auto print:overflow-visible">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={(tab: string) => { setActiveTab(tab); setSidebarOpen(false); }} />
 
-      <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar">
-        <header className="sticky top-0 z-30 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-4 flex items-center justify-between shadow-sm">
+      <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar ">
+        <header className="sticky top-0 z-30 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-4 flex items-center justify-between shadow-sm print:hidden">
             <div className="flex items-center gap-3">
                 {/* ... botões existentes ... */}
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">Painel de Indicadores</h2>

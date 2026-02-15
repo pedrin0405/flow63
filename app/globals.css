@@ -123,3 +123,64 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  /* Configuração da Página: Paisagem ajuda a caber mais colunas */
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  /* Reset de layout para impressão */
+  html, body {
+    background: #ffffff !important;
+    height: auto !important;
+    overflow: visible !important;
+    zoom: 90%; /* Ajuste o "zoom" para caber tudo lateralmente */
+  }
+
+  /* Remove sombras complexas que bugam no PDF e substitui por bordas finas */
+  .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
+    box-shadow: none !important;
+    border: 1px solid #ebe5e7 !important; /* border-gray-200 */
+  }
+
+  /* Garante que o container principal se expanda */
+  .flex.h-screen {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Força visibilidade de cores de fundo e gráficos */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Esconde elementos de interface e o Modal de exportação */
+  aside, nav, header button, .print-none, [role="dialog"], .fixed {
+    display: none !important;
+  }
+
+  /* Ajuste dos Gráficos (Canvas) */
+  canvas {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    page-break-inside: avoid;
+  }
+
+  /* Evita que os Cards de KPI ou a Jornada sejam cortados ao meio */
+  .rounded-2xl, .Card, .bg-white {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Ajuste específico para a "Jornada de Atendimento" não sumir */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+}
