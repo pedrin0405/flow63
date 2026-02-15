@@ -9,7 +9,7 @@ import {
   TrendingUp, 
   Home,
   FileText,
-  LayoutDashboard,
+  ChartPie,
   Menu,
   AlertTriangle,
   PauseCircle,
@@ -314,8 +314,17 @@ export default function IndicatorsPage() {
       <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar ">
         <header className="sticky top-0 z-30 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-4 flex items-center justify-between shadow-sm print:hidden">
             <div className="flex items-center gap-3">
-                {/* ... botões existentes ... */}
+                <button 
+                    className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors" 
+                    onClick={() => setSidebarOpen(true)}
+                    aria-label="Abrir menu"
+                  >
+                    <Menu size={20} />
+                </button>                
+                <ChartPie className="text-primary hidden sm:block" />
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">Painel de Indicadores</h2>
+                <p className="text-primary hidden sm:block" >| Sicronização direta Imoview</p>
+                
             </div>
             
             {/* Novo Botão de Download */}
