@@ -9,6 +9,7 @@ import {
   Building2,
   LogOut,
   FileText,
+  ChartPie,
   Settings, 
   HelpCircle, 
   ChevronRight, 
@@ -280,11 +281,18 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
 
             {!isCollapsed && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
-                Documentos
+                Documentos & Métricas
               </div>
             )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
+            <SidebarItem 
+              icon={ChartPie} 
+              label="Indicadores" 
+              active={isActive("indicadores", "/indicators")} 
+              onClick={() => handleNavigation("indicadores", "/indicators")}
+              collapsed={isCollapsed}
+            />
 
             <SidebarItem 
               icon={Library} 

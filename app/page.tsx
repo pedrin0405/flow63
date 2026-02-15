@@ -71,6 +71,8 @@ export default function DashboardPage() {
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(val)
 
+  
+
   // Função auxiliar para converter datas no formato "DD/MM/YYYY HH:mm" ou ISO
   const parseDate = (dateStr: string | null) => {
     if (!dateStr) return null
