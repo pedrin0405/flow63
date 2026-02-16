@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -54,25 +54,20 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
   };
 
   const [filters, setFilters] = useState(initialFilters);
+  const isFirstRender = useRef(true);
 
   const parseUnitsFromSetting = (setting: any) => {
     try {
       const config = typeof setting.api_config === 'string' ? JSON.parse(setting.api_config) : setting.api_config;
-      
-      // Ajuste para a estrutura: config.unidade.value
-      if (config?.unidade?.value) {
-        let unidadeStr = config.unidade.value;
-        
-        if (typeof unidadeStr === 'string') {
-          // Converte aspas simples em duplas para o JSON.parse funcionar
-          const validJson = unidadeStr.replace(/'/g, '"');
-          const parsed = JSON.parse(validJson);
-          return Array.isArray(parsed) ? parsed : [parsed];
+      if (config.unidade) {
+        let unidadeData = config.unidade;
+        if (typeof unidadeData === 'string') {
+          unidadeData = JSON.parse(unidadeData.replace(/'/g, '"'));
         }
+        return Array.isArray(unidadeData) ? unidadeData : [unidadeData];
       }
       return [];
     } catch (e) {
-      console.error("Erro ao processar unidades:", e);
       return [];
     }
   };
@@ -113,17 +108,21 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     init();
   }, []); 
 
-  const handleClearFilters = () => setFilters(initialFilters);
-
-  const handleDateSelect = (date: Date | undefined, field: 'DataInicial' | 'DataFinal') => {
-    if (!date) return;
-    setFilters(prev => ({ ...prev, [field]: format(date, "dd/MM/yyyy") }));
-  };
-
   const loadFilterOptions = useCallback(async () => {
     if (!selectedInstance || !selectedUnitId) return;
 
     setLoading({ getEquipes: true, getCorretores: true, getEtiquetas: true });
+
+    const getPayload = (action: string) => ({
+      action,
+      instanceName: selectedInstance, 
+      filters: {
+        Finalidade: filters.Finalidade,
+        CodigoUnidade: Number(selectedUnitId),
+        instanceName: selectedInstance,
+        CodigoEquipe: filters.CodigoEquipe.join(',')
+      }
+    });
 
     try {
       const endpoints = ["getEquipes", "getCorretores", "getEtiquetas"];
@@ -131,15 +130,7 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
         const res = await fetch('/api/imoview/indicators', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action,
-              instanceName: selectedInstance, 
-              filters: {
-                Finalidade: filters.Finalidade,
-                CodigoUnidade: Number(selectedUnitId), // Envia apenas o ID numérico
-                CodigoEquipe: filters.CodigoEquipe.join(',')
-              }
-            }) 
+            body: JSON.stringify(getPayload(action)) 
         });
         if (res.ok) {
           const data = await res.json();
@@ -156,14 +147,21 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
   }, [selectedInstance, selectedUnitId, filters.Finalidade, filters.CodigoEquipe]);
 
   useEffect(() => {
+    if (isFirstRender.current) {
+        isFirstRender.current = false;
+        return;
+    }
     loadFilterOptions();
-  }, [loadFilterOptions]);
+  }, [selectedInstance, selectedUnitId, filters.Finalidade, filters.CodigoEquipe]);
 
   const handleInstanceChange = (name: string) => {
     const setting = allSettings.find(s => s.instance_name === name);
     if (setting) {
       const units = parseUnitsFromSetting(setting);
       const firstUnitId = units.length > 0 ? String(units[0].value) : "";
+      setEquipes([]);
+      setCorretores([]);
+      setEtiquetas([]);
       setSelectedInstance(name);
       setCurrentUnits(units);
       setSelectedUnitId(firstUnitId);
@@ -172,8 +170,19 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
   };
 
   const handleUnitChange = (unitId: string) => {
+    setEquipes([]);
+    setCorretores([]);
     setSelectedUnitId(unitId);
     setFilters(prev => ({ ...prev, CodigoEquipe: [], Corretores: [], Etiquetas: [] }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters(initialFilters);
+  };
+
+  const handleDateSelect = (date: Date | undefined, field: 'DataInicial' | 'DataFinal') => {
+    if (!date) return;
+    setFilters(prev => ({ ...prev, [field]: format(date, "dd/MM/yyyy") }));
   };
 
   const handleApply = () => {
@@ -228,14 +237,16 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
               key={opt.Codigo} 
               className={cn(
                 "flex items-center space-x-3 p-2.5 rounded-xl cursor-pointer transition-all", 
-                /* @ts-ignore */
-                filters[key].includes(opt.Codigo) ? "bg-indigo-600 text-white shadow-md font-bold" : "hover:bg-gray-100 text-gray-700"
+                Array.isArray(filters[key]) && (filters[key] as number[]).includes(opt.Codigo) 
+                    ? "bg-indigo-600 text-white shadow-md font-bold" 
+                    : "hover:bg-gray-100 text-gray-700"
               )} 
-              onClick={() => setFilters({...filters, [key]: toggleSelection(filters[key] as any, opt.Codigo)})}
+              onClick={() => setFilters({...filters, [key]: toggleSelection(filters[key] as number[], opt.Codigo)})}
             >
               <span className="text-[13px] truncate flex-1">{opt.Nome}</span>
-              {/* @ts-ignore */}
-              {filters[key].includes(opt.Codigo) && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+              {Array.isArray(filters[key]) && (filters[key] as number[]).includes(opt.Codigo) && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              )}
             </div>
           )) : <div className="p-4 text-center text-xs text-gray-400">Nenhum resultado</div>}
         </div>
@@ -247,125 +258,127 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     <div className="bg-white/90 backdrop-blur-md p-4 rounded-3xl border border-gray-200 shadow-[0_20px_50px_rgba(0,0,0,0.12)] mb-8 transition-all">
       <div className="flex flex-wrap items-center gap-3">
         
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 sm:flex-none min-w-[180px]">
-              <Database className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span className="text-[11px] font-bold text-gray-700 uppercase truncate">
-                {selectedInstance || '...'} | {currentUnits.find(u => String(u.value) === selectedUnitId)?.name || "Unidade"}
-              </span>
-              <ChevronDown className="w-3 h-3 text-gray-400 ml-auto shrink-0" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[220px] p-2 rounded-xl shadow-2xl border-gray-100 space-y-3" align="start">
-            <div className="space-y-1">
-              <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Instância (API)</p>
-              {instances.map((name) => (
-                <div key={name} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedInstance === name ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleInstanceChange(name)}>
-                  <Database size={14} className="mr-2 opacity-70" /> {name}
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-gray-100 pt-2 space-y-1">
-              <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Unidade</p>
-              {currentUnits.length > 0 ? (
-                currentUnits.map((item) => (
-                  <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedUnitId === String(item.value) ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleUnitChange(String(item.value))}>
-                    <MapPin size={14} className="mr-2 opacity-70" /> {item.name}
-                  </div>
-                ))
-              ) : (
-                <div className="p-2 text-xs text-gray-400 italic">Nenhuma unidade encontrada</div>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-        
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 sm:flex-none min-w-[110px]">
-              <Target className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span className="text-[12px] font-bold text-gray-700 uppercase truncate">
-                {filters.Finalidade === "2" ? "Venda" : "Aluguel"}
-              </span>
-              <ChevronDown className="w-3 h-3 text-gray-400 ml-auto shrink-0" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[150px] p-1 rounded-xl shadow-2xl border-gray-100" align="start">
-            {[{ label: "Venda", value: "2" }, { label: "Aluguel", value: "1" }].map((item) => (
-              <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", filters.Finalidade === item.value ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => setFilters({...filters, Finalidade: item.value})}>
-                {item.label}
-              </div>
-            ))}
-          </PopoverContent>
-        </Popover>
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className={cn(
-              "h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 sm:flex-none min-w-[160px]",
-              filters.Mes === "customizado" && "border-indigo-200 bg-indigo-50/30 ring-1 ring-indigo-200"
-            )}>
-              <CalendarDays className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span className="text-[12px] font-bold text-gray-700 uppercase truncate">
-                {filters.Mes === "customizado" ? "Personalizado" : meses[parseInt(filters.Mes)-1]}
-              </span>
-              <ChevronDown className="w-3 h-3 text-gray-400 ml-auto shrink-0" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[280px] p-4 rounded-3xl shadow-2xl border-gray-100 backdrop-blur-xl bg-white/95" align="start">
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-1.5">
-                <Button 
-                  variant="ghost" 
-                  className={cn("col-span-3 h-8 rounded-xl text-xs font-bold transition-all", filters.Mes === "customizado" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100")} 
-                  onClick={() => setFilters({...filters, Mes: "customizado"})}
-                >
-                  Intervalo Personalizado
-                </Button>
-                {meses.map((m, i) => (
-                  <div key={i} className={cn("p-2 rounded-xl cursor-pointer text-[11px] text-center transition-all", filters.Mes === (i+1).toString() ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => setFilters({...filters, Mes: (i+1).toString()})}>
-                    {m}
+        {/* GRUPO UNIFICADO DE FILTROS - Todos seguem a mesma lógica de responsividade */}
+        <div className="flex flex-wrap gap-2 md:gap-3 flex-1">
+          
+          {/* INSTÂNCIA E UNIDADE */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 min-w-[180px]">
+                <Database className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="text-[11px] font-bold text-gray-700 uppercase truncate">
+                  {selectedInstance || '...'} | {currentUnits.find(u => String(u.value) === selectedUnitId)?.name || "Unidade"}
+                </span>
+                <ChevronDown className="w-3 h-3 text-gray-400 ml-auto shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-2 rounded-xl shadow-2xl border-gray-100 space-y-3" align="start">
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Instância (API)</p>
+                {instances.map((name) => (
+                  <div key={name} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedInstance === name ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleInstanceChange(name)}>
+                    <Database size={14} className="mr-2 opacity-70" /> {name}
                   </div>
                 ))}
               </div>
-
-              {filters.Mes === "customizado" && (
-                <div className="pt-3 border-t border-gray-100 space-y-2 animate-in fade-in slide-in-from-top-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="h-9 flex-1 text-[10px] font-bold rounded-xl border-indigo-100 bg-white">
-                          {filters.DataInicial || "Início"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="p-0 border-none shadow-2xl" side="bottom">
-                        <Calendar mode="single" locale={ptBR} selected={filters.DataInicial ? parse(filters.DataInicial, "dd/MM/yyyy", new Date()) : undefined} onSelect={(d) => handleDateSelect(d, 'DataInicial')} initialFocus />
-                      </PopoverContent>
-                    </Popover>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="h-9 flex-1 text-[10px] font-bold rounded-xl border-indigo-100 bg-white">
-                          {filters.DataFinal || "Fim"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="p-0 border-none shadow-2xl" side="bottom">
-                        <Calendar mode="single" locale={ptBR} selected={filters.DataFinal ? parse(filters.DataFinal, "dd/MM/yyyy", new Date()) : undefined} onSelect={(d) => handleDateSelect(d, 'DataFinal')} initialFocus />
-                      </PopoverContent>
-                    </Popover>
+              <div className="border-t border-gray-100 pt-2 space-y-1">
+                <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Unidade</p>
+                {currentUnits.map((item) => (
+                  <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedUnitId === String(item.value) ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleUnitChange(String(item.value))}>
+                    <MapPin size={14} className="mr-2 opacity-70" /> {item.name}
                   </div>
-                </div>
-              )}
-              
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Ano</span>
-                <input className="w-16 bg-gray-50 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none border border-gray-100 text-center" type="number" value={filters.Ano} onChange={(e) => setFilters({...filters, Ano: e.target.value})} />
+                ))}
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+          
+          {/* FINALIDADE */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 min-w-[110px]">
+                <Target className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="text-[12px] font-bold text-gray-700 uppercase truncate">
+                  {filters.Finalidade === "2" ? "Venda" : "Aluguel"}
+                </span>
+                <ChevronDown className="w-3 h-3 text-gray-400 ml-auto shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[150px] p-1 rounded-xl shadow-2xl border-gray-100" align="start">
+              {[{ label: "Venda", value: "2" }, { label: "Aluguel", value: "1" }].map((item) => (
+                <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", filters.Finalidade === item.value ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => setFilters({...filters, Finalidade: item.value})}>
+                  {item.label}
+                </div>
+              ))}
+            </PopoverContent>
+          </Popover>
 
-        <div className="flex flex-wrap gap-2 md:gap-3 flex-1">
+          {/* PERÍODO */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn(
+                "h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 min-w-[140px]",
+                filters.Mes === "customizado" && "border-indigo-200 bg-indigo-50/30 ring-1 ring-indigo-200"
+              )}>
+                <CalendarDays className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="text-[12px] font-bold text-gray-700 uppercase truncate">
+                  {filters.Mes === "customizado" ? "Personalizado" : meses[parseInt(filters.Mes)-1]}
+                </span>
+                <ChevronDown className="w-3 h-3 text-gray-400 ml-auto shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] p-4 rounded-3xl shadow-2xl border-gray-100 backdrop-blur-xl bg-white/95" align="start">
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Button 
+                    variant="ghost" 
+                    className={cn("col-span-3 h-8 rounded-xl text-xs font-bold transition-all", filters.Mes === "customizado" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100")} 
+                    onClick={() => setFilters({...filters, Mes: "customizado"})}
+                  >
+                    Intervalo Personalizado
+                  </Button>
+                  {meses.map((m, i) => (
+                    <div key={i} className={cn("p-2 rounded-xl cursor-pointer text-[11px] text-center transition-all", filters.Mes === (i+1).toString() ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => setFilters({...filters, Mes: (i+1).toString()})}>
+                      {m}
+                    </div>
+                  ))}
+                </div>
+
+                {filters.Mes === "customizado" && (
+                  <div className="pt-3 border-t border-gray-100 space-y-2 animate-in fade-in slide-in-from-top-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="h-9 flex-1 text-[10px] font-bold rounded-xl border-indigo-100 bg-white">
+                            {filters.DataInicial || "Início"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 border-none shadow-2xl" side="bottom">
+                          <Calendar mode="single" locale={ptBR} selected={filters.DataInicial ? parse(filters.DataInicial, "dd/MM/yyyy", new Date()) : undefined} onSelect={(d) => handleDateSelect(d, 'DataInicial')} initialFocus />
+                        </PopoverContent>
+                      </Popover>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="h-9 flex-1 text-[10px] font-bold rounded-xl border-indigo-100 bg-white">
+                            {filters.DataFinal || "Fim"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 border-none shadow-2xl" side="bottom">
+                          <Calendar mode="single" locale={ptBR} selected={filters.DataFinal ? parse(filters.DataFinal, "dd/MM/yyyy", new Date()) : undefined} onSelect={(d) => handleDateSelect(d, 'DataFinal')} initialFocus />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Ano</span>
+                  <input className="w-16 bg-gray-50 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none border border-gray-100 text-center" type="number" value={filters.Ano} onChange={(e) => setFilters({...filters, Ano: e.target.value})} />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* EQUIPES, CORRETORES, ETIQUETAS */}
           {[
             { label: "Equipes", options: equipes, key: "CodigoEquipe", icon: Users, loadingKey: "getEquipes", searchKey: "equipes" as const },
             { label: "Corretores", options: corretores, key: "Corretores", icon: Users, loadingKey: "getCorretores", searchKey: "corretores" as const },
@@ -375,18 +388,15 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn(
                   "h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-3 shadow-sm flex-1 min-w-[135px] transition-all",
-                  /* @ts-ignore */
-                  filters[col.key].length > 0 && "border-indigo-200 bg-indigo-50/30 ring-1 ring-indigo-200"
+                  (filters[col.key as keyof typeof filters] as number[]).length > 0 && "border-indigo-200 bg-indigo-50/30 ring-1 ring-indigo-200"
                 )}>
                   <div className="flex items-center gap-2 overflow-hidden w-full">
                     {loading[col.loadingKey] ? (
                       <RotateCcw className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
                     ) : (
-                      /* @ts-ignore */
-                      filters[col.key].length > 0 ? (
+                      (filters[col.key as keyof typeof filters] as number[]).length > 0 ? (
                         <span className="bg-indigo-600 text-white text-[10px] font-black h-5 w-5 shrink-0 rounded-full flex items-center justify-center animate-in zoom-in">
-                          {/* @ts-ignore */}
-                          {filters[col.key].length}
+                          {(filters[col.key as keyof typeof filters] as number[]).length}
                         </span>
                       ) : <col.icon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                     )}
@@ -409,6 +419,7 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
           ))}
         </div>
 
+        {/* AÇÃO (RESET E SINCRONIZAR) */}
         <div className="flex items-center gap-2 ml-auto w-full lg:w-auto">
           <Button 
             variant="ghost" 
