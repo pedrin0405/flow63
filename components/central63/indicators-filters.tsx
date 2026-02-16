@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -29,6 +29,7 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
   const [etiquetas, setEtiquetas] = useState<Option[]>([]);
   const [loading, setLoading] = useState<{ [key: string]: boolean }>({});
   
+  // Estados para instâncias e unidades (Lógica trazida da Page)
   const [allSettings, setAllSettings] = useState<any[]>([]);
   const [instances, setInstances] = useState<string[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string>("");
@@ -54,17 +55,15 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
   };
 
   const [filters, setFilters] = useState(initialFilters);
-  const isFirstRender = useRef(true);
 
+  // Helper para parsear unidades do JSON de config
   const parseUnitsFromSetting = (setting: any) => {
     try {
       const config = typeof setting.api_config === 'string' ? JSON.parse(setting.api_config) : setting.api_config;
-      if (config.unidade) {
-        let unidadeData = config.unidade;
-        if (typeof unidadeData === 'string') {
-          unidadeData = JSON.parse(unidadeData.replace(/'/g, '"'));
-        }
-        return Array.isArray(unidadeData) ? unidadeData : [unidadeData];
+      if (config.unidade?.value) {
+        const rawValue = config.unidade.value;
+        const fixedJson = rawValue.replace(/'/g, '"');
+        return JSON.parse(fixedJson);
       }
       return [];
     } catch (e) {
@@ -72,117 +71,133 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     }
   };
 
+  // Inicialização das instâncias e unidades
   useEffect(() => {
-    async function init() {
-      const { data: settings } = await supabase.from('company_settings').select('*');
+  async function init() {
+    const { data: settings } = await supabase.from('company_settings').select('*');
+    
+    if (settings && settings.length > 0) {
+      setAllSettings(settings);
+      const names = settings.map(s => s.instance_name);
+      setInstances(names);
       
-      if (settings && settings.length > 0) {
-        setAllSettings(settings);
-        const names = settings.map(s => s.instance_name);
-        setInstances(names);
-        
-        const firstSetting = settings[0];
-        const units = parseUnitsFromSetting(firstSetting);
-        const firstUnitId = units.length > 0 ? String(units[0].value) : "";
+      const firstSetting = settings[0];
+      const units = parseUnitsFromSetting(firstSetting);
+      const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
 
-        setSelectedInstance(firstSetting.instance_name);
-        setCurrentUnits(units);
-        setSelectedUnitId(firstUnitId);
+      // 1. Atualiza os estados para refletir na interface
+      setSelectedInstance(firstSetting.instance_name);
+      setCurrentUnits(units);
+      setSelectedUnitId(firstUnitId);
 
-        const params = new URLSearchParams({
-          instanceName: firstSetting.instance_name,
-          Finalidade: initialFilters.Finalidade,
-          CodigoUnidade: firstUnitId,
-          CodigoEquipe: initialFilters.CodigoEquipe.join(','),
-          Corretores: initialFilters.Corretores.join(','),
-          Etiquetas: initialFilters.Etiquetas.join(','),
-          Mes: initialFilters.Mes,
-          Ano: initialFilters.Ano,
-          ConsiderarNosDemaisIndicadores: initialFilters.ConsiderarNosDemaisIndicadores,
-          Situacao: initialFilters.Situacao,
-          Funil: initialFilters.Funil
-        });
-        onFilterChange(params.toString());
-      }
+      // 2. Monta os parâmetros para o carregamento automático
+      const params = new URLSearchParams({
+        instanceName: firstSetting.instance_name,
+        Finalidade: initialFilters.Finalidade,
+        CodigoUnidade: firstUnitId,
+        CodigoEquipe: initialFilters.CodigoEquipe.join(','),
+        Corretores: initialFilters.Corretores.join(','),
+        Etiquetas: initialFilters.Etiquetas.join(','),
+        Mes: initialFilters.Mes,
+        Ano: initialFilters.Ano,
+        ConsiderarNosDemaisIndicadores: initialFilters.ConsiderarNosDemaisIndicadores,
+        Situacao: initialFilters.Situacao,
+        Funil: initialFilters.Funil
+      });
+
+      // 3. Dispara a sincronização automática para a página pai
+      onFilterChange(params.toString());
     }
-    init();
-  }, []); 
+  }
+  init();
+}, []); 
 
+  const handleClearFilters = () => setFilters(initialFilters);
+
+  const handleDateSelect = (date: Date | undefined, field: 'DataInicial' | 'DataFinal') => {
+    if (!date) return;
+    setFilters(prev => ({ ...prev, [field]: format(date, "dd/MM/yyyy") }));
+  };
+
+  /**
+   * CARREGAMENTO OTIMIZADO: Utiliza a lógica do route.ts para popular os campos
+   */
   const loadFilterOptions = useCallback(async () => {
-    if (!selectedInstance || !selectedUnitId) return;
+    if (!selectedInstance) return;
 
     setLoading({ getEquipes: true, getCorretores: true, getEtiquetas: true });
 
+    // Montagem do payload incluindo a instanceName dentro de filters
     const getPayload = (action: string) => ({
       action,
-      instanceName: selectedInstance, 
+      instanceName: selectedInstance,
       filters: {
         Finalidade: filters.Finalidade,
-        CodigoUnidade: Number(selectedUnitId),
-        instanceName: selectedInstance,
+        CodigoUnidade: selectedUnitId,
         CodigoEquipe: filters.CodigoEquipe.join(',')
       }
     });
 
+    const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
     try {
-      const endpoints = ["getEquipes", "getCorretores", "getEtiquetas"];
-      for (const action of endpoints) {
-        const res = await fetch('/api/imoview/indicators', { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(getPayload(action)) 
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (action === "getEquipes") setEquipes(data);
-          if (action === "getCorretores") setCorretores(data);
-          if (action === "getEtiquetas") setEtiquetas(data);
-        }
-      }
+      // 1. Carrega Equipes
+      const resEquipes = await fetch('/api/imoview/indicators', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getPayload("getEquipes")) 
+      });
+      if (resEquipes.ok) setEquipes(await resEquipes.json());
+      setLoading(prev => ({ ...prev, getEquipes: false }));
+
+      await delay(400); 
+
+      // 2. Carrega Corretores
+      const resCorretores = await fetch('/api/imoview/indicators', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getPayload("getCorretores")) 
+      });
+      if (resCorretores.ok) setCorretores(await resCorretores.json());
+      setLoading(prev => ({ ...prev, getCorretores: false }));
+
+      await delay(300);
+
+      // 3. Carrega Etiquetas
+      const resEtiquetas = await fetch('/api/imoview/indicators', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getPayload("getEtiquetas")) 
+      });
+      if (resEtiquetas.ok) setEtiquetas(await resEtiquetas.json());
+      
     } catch (e) {
-      console.error("Erro na requisição de filtros:", e);
+      console.error("Erro na sequência de filtros:", e);
     } finally {
       setLoading({ getEquipes: false, getCorretores: false, getEtiquetas: false });
     }
-  }, [selectedInstance, selectedUnitId, filters.Finalidade, filters.CodigoEquipe]);
+  }, [selectedInstance, selectedUnitId, filters.Finalidade, filters.CodigoEquipe.join(',')]);
 
   useEffect(() => {
-    if (isFirstRender.current) {
-        isFirstRender.current = false;
-        return;
-    }
     loadFilterOptions();
-  }, [selectedInstance, selectedUnitId, filters.Finalidade, filters.CodigoEquipe]);
+  }, [loadFilterOptions]);
 
   const handleInstanceChange = (name: string) => {
     const setting = allSettings.find(s => s.instance_name === name);
     if (setting) {
       const units = parseUnitsFromSetting(setting);
-      const firstUnitId = units.length > 0 ? String(units[0].value) : "";
-      setEquipes([]);
-      setCorretores([]);
-      setEtiquetas([]);
+      const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
       setSelectedInstance(name);
       setCurrentUnits(units);
       setSelectedUnitId(firstUnitId);
+      // Reseta seleções dependentes
       setFilters(prev => ({ ...prev, CodigoEquipe: [], Corretores: [], Etiquetas: [] }));
     }
   };
 
   const handleUnitChange = (unitId: string) => {
-    setEquipes([]);
-    setCorretores([]);
     setSelectedUnitId(unitId);
     setFilters(prev => ({ ...prev, CodigoEquipe: [], Corretores: [], Etiquetas: [] }));
-  };
-
-  const handleClearFilters = () => {
-    setFilters(initialFilters);
-  };
-
-  const handleDateSelect = (date: Date | undefined, field: 'DataInicial' | 'DataFinal') => {
-    if (!date) return;
-    setFilters(prev => ({ ...prev, [field]: format(date, "dd/MM/yyyy") }));
   };
 
   const handleApply = () => {
@@ -205,6 +220,7 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
       params.append("DataInicial", filters.DataInicial);
       params.append("DataFinal", filters.DataFinal);
     }
+    // Passamos também a instância selecionada para que a página saiba qual usar
     onFilterChange(params.toString());
   };
 
@@ -237,16 +253,14 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
               key={opt.Codigo} 
               className={cn(
                 "flex items-center space-x-3 p-2.5 rounded-xl cursor-pointer transition-all", 
-                Array.isArray(filters[key]) && (filters[key] as number[]).includes(opt.Codigo) 
-                    ? "bg-indigo-600 text-white shadow-md font-bold" 
-                    : "hover:bg-gray-100 text-gray-700"
+                /* @ts-ignore */
+                filters[key].includes(opt.Codigo) ? "bg-indigo-600 text-white shadow-md font-bold" : "hover:bg-gray-100 text-gray-700"
               )} 
-              onClick={() => setFilters({...filters, [key]: toggleSelection(filters[key] as number[], opt.Codigo)})}
+              onClick={() => setFilters({...filters, [key]: toggleSelection(filters[key] as any, opt.Codigo)})}
             >
               <span className="text-[13px] truncate flex-1">{opt.Nome}</span>
-              {Array.isArray(filters[key]) && (filters[key] as number[]).includes(opt.Codigo) && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              )}
+              {/* @ts-ignore */}
+              {filters[key].includes(opt.Codigo) && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
             </div>
           )) : <div className="p-4 text-center text-xs text-gray-400">Nenhum resultado</div>}
         </div>
@@ -258,13 +272,13 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     <div className="bg-white/90 backdrop-blur-md p-4 rounded-3xl border border-gray-200 shadow-[0_20px_50px_rgba(0,0,0,0.12)] mb-8 transition-all">
       <div className="flex flex-wrap items-center gap-3">
         
-        {/* GRUPO UNIFICADO DE FILTROS - Todos seguem a mesma lógica de responsividade */}
+        {/* GRUPO PRINCIPAL DE FILTROS (INSTÂNCIA, TIPO, PERÍODO E MULTI-SELECTS UNIFICADOS) */}
         <div className="flex flex-wrap gap-2 md:gap-3 flex-1">
           
           {/* INSTÂNCIA E UNIDADE */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 min-w-[180px]">
+              <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 lg:flex-none min-w-[180px]">
                 <Database className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                 <span className="text-[11px] font-bold text-gray-700 uppercase truncate">
                   {selectedInstance || '...'} | {currentUnits.find(u => String(u.value) === selectedUnitId)?.name || "Unidade"}
@@ -291,11 +305,11 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
               </div>
             </PopoverContent>
           </Popover>
-          
+
           {/* FINALIDADE */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 min-w-[110px]">
+              <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 lg:flex-none min-w-[110px]">
                 <Target className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                 <span className="text-[12px] font-bold text-gray-700 uppercase truncate">
                   {filters.Finalidade === "2" ? "Venda" : "Aluguel"}
@@ -316,7 +330,7 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className={cn(
-                "h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 min-w-[140px]",
+                "h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 lg:flex-none min-w-[160px]",
                 filters.Mes === "customizado" && "border-indigo-200 bg-indigo-50/30 ring-1 ring-indigo-200"
               )}>
                 <CalendarDays className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
@@ -388,15 +402,18 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn(
                   "h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-3 shadow-sm flex-1 min-w-[135px] transition-all",
-                  (filters[col.key as keyof typeof filters] as number[]).length > 0 && "border-indigo-200 bg-indigo-50/30 ring-1 ring-indigo-200"
+                  /* @ts-ignore */
+                  filters[col.key].length > 0 && "border-indigo-200 bg-indigo-50/30 ring-1 ring-indigo-200"
                 )}>
                   <div className="flex items-center gap-2 overflow-hidden w-full">
                     {loading[col.loadingKey] ? (
                       <RotateCcw className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
                     ) : (
-                      (filters[col.key as keyof typeof filters] as number[]).length > 0 ? (
+                      /* @ts-ignore */
+                      filters[col.key].length > 0 ? (
                         <span className="bg-indigo-600 text-white text-[10px] font-black h-5 w-5 shrink-0 rounded-full flex items-center justify-center animate-in zoom-in">
-                          {(filters[col.key as keyof typeof filters] as number[]).length}
+                          {/* @ts-ignore */}
+                          {filters[col.key].length}
                         </span>
                       ) : <col.icon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                     )}
@@ -419,8 +436,8 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
           ))}
         </div>
 
-        {/* AÇÃO (RESET E SINCRONIZAR) */}
-        <div className="flex items-center gap-2 ml-auto w-full lg:w-auto">
+        {/* AÇÕES */}
+        <div className="flex items-center gap-2 w-full lg:w-auto lg:ml-auto">
           <Button 
             variant="ghost" 
             size="icon" 
