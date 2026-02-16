@@ -21,22 +21,16 @@ import {
   Snowflake,
   Flame,
   PieChart,
-  Ban,
   LineChart,
   AreaChart,
-  Share2,
   Download,
-  FileSpreadsheet,
-  FileImage,
   X,
   Table as TableIcon,
-  Filter,
   Database,
   MapPin
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { motion, Variants, AnimatePresence } from 'framer-motion';
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -62,7 +56,6 @@ const StatCard = ({ title, value, icon: Icon, color, subValue }: any) => (
   </div>
 );
 
-// Componente de Modal para Exportação
 const ExportModal = ({ isOpen, onClose, dashboardData }: { isOpen: boolean, onClose: () => void, dashboardData: any }) => {
   if (!isOpen) return null;
 
@@ -120,7 +113,8 @@ const ExportModal = ({ isOpen, onClose, dashboardData }: { isOpen: boolean, onCl
           </div>
           <div className="p-4 space-y-2">
             {exportOptions.map((opt, i) => (
-              <button key={i} onClick={() => { opt.action(); ! (opt.name === 'Relatório em PDF') && onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100 group text-left">
+              /* @ts-ignore */
+              <button key={i} onClick={() => { opt.action(); if (opt.name !== 'Relatório em PDF') onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100 group text-left">
                 <div className="w-12 h-12 rounded-xl bg-indigo-100/50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <opt.icon size={24} />
                 </div>
@@ -137,24 +131,23 @@ const ExportModal = ({ isOpen, onClose, dashboardData }: { isOpen: boolean, onCl
   );
 };
 
+// --- Tipos para ícones dinâmicos ---
+import { LucideIcon, FileSpreadsheet, FileImage } from 'lucide-react';
+
 export default function IndicatorsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showAllMidia, setShowAllMidia] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  // Estados para instâncias e unidades
-  const [allSettings, setAllSettings] = useState<any[]>([]);
-  const [instances, setInstances] = useState<string[]>([]);
+  // Instância e Unidade selecionadas (gerenciadas via Filters, mas refletidas aqui)
   const [selectedInstance, setSelectedInstance] = useState<string>("");
-  const [currentUnits, setCurrentUnits] = useState<any[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
 
   const chartsInstance = useRef<{ [key: string]: Chart | null }>({});
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("dashboard")
-  const isInitialLoad = useRef(true);
-  const lastFilters = useRef<string>("Finalidade=2&Mes=customizado&Ano=2026&ConsiderarNosDemaisIndicadores=true&Situacao=undefined&Funil=0");
+  const lastFilters = useRef<string>("");
   
   const chartRefs = {
     tipoAtendimento: useRef<HTMLCanvasElement>(null),
@@ -169,26 +162,33 @@ export default function IndicatorsPage() {
     return filtersObj;
   };
 
-  const fetchDashboardData = useCallback(async (filterString: string, instanceName?: string, unitId?: string) => {
+  /**
+   * FUNÇÃO PRINCIPAL DE CARREGAMENTO
+   * Agora ela captura a instância e unidade direto da string de filtros ou estados
+   */
+  const fetchDashboardData = useCallback(async (filterString: string) => {
     setLoading(true);
     lastFilters.current = filterString;
-    const minWait = new Promise(resolve => setTimeout(resolve, 1000));
+    const minWait = new Promise(resolve => setTimeout(resolve, 800));
     
-    const targetInstance = instanceName || selectedInstance;
-    const targetUnit = unitId || selectedUnitId;
+    const filters = parseFilterString(filterString);
+    
+    // Atualiza estados locais de controle se vierem no filtro
+    if (filters.instanceName) setSelectedInstance(filters.instanceName);
+    if (filters.CodigoUnidade) setSelectedUnitId(filters.CodigoUnidade);
 
-    if (!targetInstance) return;
+    const params = new URLSearchParams(filterString);
+
+    setLoading(true);
+    lastFilters.current = filterString;
 
     try {
-      const filters = parseFilterString(filterString);
-      if (targetUnit) filters.CodigoUnidade = targetUnit;
-
       const response = await fetch('/api/imoview/indicators', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           action: 'default', 
-          instanceName: targetInstance, 
+          instanceName: params.get('instanceName') || params.get('instance'),
           filters 
         }),
       });
@@ -201,61 +201,23 @@ export default function IndicatorsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedInstance, selectedUnitId]);
+  }, [selectedInstance]);
 
-  const parseUnitsFromSetting = (setting: any) => {
-    try {
-      const config = typeof setting.api_config === 'string' ? JSON.parse(setting.api_config) : setting.api_config;
-      if (config.unidade?.value) {
-        const rawValue = config.unidade.value;
-        const fixedJson = rawValue.replace(/'/g, '"');
-        return JSON.parse(fixedJson);
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
-  };
-
-  useEffect(() => {
-    async function init() {
-      if (!isInitialLoad.current) return;
-      
-      const { data: settings } = await supabase.from('company_settings').select('*');
-      if (settings && settings.length > 0) {
-        setAllSettings(settings);
-        const names = settings.map(s => s.instance_name);
-        setInstances(names);
-        
-        const firstSetting = settings[0];
-        const units = parseUnitsFromSetting(firstSetting);
-        const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
-        
-        setSelectedInstance(firstSetting.instance_name);
-        setCurrentUnits(units);
-        setSelectedUnitId(firstUnitId);
-        
-        isInitialLoad.current = false;
-        fetchDashboardData(lastFilters.current, firstSetting.instance_name, firstUnitId);
-      }
-    }
-    init();
-  }, [fetchDashboardData]);
-
+  // Atualização periódica (10 min)
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchDashboardData(lastFilters.current);
+      if (lastFilters.current) fetchDashboardData(lastFilters.current);
     }, 600000);
     return () => clearInterval(interval);
   }, [fetchDashboardData]);
 
+  // Lógica de Renderização dos Gráficos (Chart.js)
   useEffect(() => {
     if (!data) return;
     Object.values(chartsInstance.current).forEach(chart => chart?.destroy());
 
-    // 1. Canais
     if (chartRefs.tipoAtendimento.current && data.dadosGraficos.tipoAtendimento) {
-      const colors = ['#6366F1', '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B'];
+      const colors = ['#6366F1', '#c55cf6', '#EC4899', '#06B6D4', '#F59E0B'];
       chartsInstance.current.tipoAtendimento = new Chart(chartRefs.tipoAtendimento.current, {
         type: 'doughnut',
         data: {
@@ -271,7 +233,6 @@ export default function IndicatorsPage() {
       });
     }
 
-    // 2. Desempenho Semanal
     if (chartRefs.desempenhoLinha.current && data.funilDeVendasSemanal) {
       const chartData = data.funilDeVendasSemanal.filter((item: any) => 
         item.semana !== 'Total' && item.semana !== 'Sem atividade programada'
@@ -282,7 +243,7 @@ export default function IndicatorsPage() {
           labels: chartData.map((item: any) => item.semana),
           datasets: [
             { label: 'Atendimentos', data: chartData.map((item: any) => item.atendimentos), borderColor: '#6366F1', fill: true, tension: 0.4, borderWidth: 3 },
-            { label: 'Visitas', data: chartData.map((item: any) => item.visitas), borderColor: '#8B5CF6', tension: 0.4 },
+            { label: 'Visitas', data: chartData.map((item: any) => item.visitas), borderColor: '#c55cf6', tension: 0.4 },
             { label: 'Propostas', data: chartData.map((item: any) => item.propostas), borderColor: '#EC4899', tension: 0.4 },
             { label: 'Negócios', data: chartData.map((item: any) => item.negocios), borderColor: '#10B981', tension: 0.4 }
           ]
@@ -291,7 +252,6 @@ export default function IndicatorsPage() {
       });
     }
 
-    // 3. Volume
     if (chartRefs.volumeAtividadesSemanal.current && data.funilDeVendasSemanal) {
       const chartData = data.funilDeVendasSemanal.filter((item: any) => 
         item.semana !== 'Total' && item.semana !== 'Sem atividade programada'
@@ -309,23 +269,6 @@ export default function IndicatorsPage() {
       });
     }
   }, [data]);
-
-  const handleInstanceChange = (name: string) => {
-    const setting = allSettings.find(s => s.instance_name === name);
-    if (setting) {
-      const units = parseUnitsFromSetting(setting);
-      const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
-      setSelectedInstance(name);
-      setCurrentUnits(units);
-      setSelectedUnitId(firstUnitId);
-      fetchDashboardData(lastFilters.current, name, firstUnitId);
-    }
-  };
-
-  const handleUnitChange = (unitId: string) => {
-    setSelectedUnitId(unitId);
-    fetchDashboardData(lastFilters.current, selectedInstance, unitId);
-  };
 
   const getMetricValue = (array: any[], key: string) => {
     const item = array?.find(i => i.categoria === key);
@@ -375,52 +318,21 @@ export default function IndicatorsPage() {
                 <button 
                     className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors" 
                     onClick={() => setSidebarOpen(true)}
-                    aria-label="Abrir menu"
                   >
                     <Menu size={20} />
                 </button>                
                 <ChartPie className="text-primary hidden sm:block" />
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">Painel de Indicadores</h2>
-                <p className="text-primary hidden sm:block" >| Sicronização direta Imoview</p>
+                <p className="text-gray-400 hidden sm:block font-medium">| Sincronização direta Imoview</p>
             </div>
             
             <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm min-w-[160px]">
-                    <Database className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                    <span className="text-[12px] font-bold text-gray-700 uppercase truncate">
-                      {selectedInstance || '...'} | {currentUnits.find(u => String(u.value) === selectedUnitId)?.name || "Unidade"}
-                    </span>
-                    <ChevronDown className="w-3 h-3 text-gray-400 ml-auto" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[220px] p-2 rounded-xl shadow-2xl border-gray-100 space-y-3" align="end">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Instância (API)</p>
-                    {instances.map((name) => (
-                      <div key={name} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedInstance === name ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleInstanceChange(name)}>
-                        <Database size={14} className="mr-2 opacity-70" /> {name}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="border-t border-gray-100 pt-2 space-y-1">
-                    <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Unidade</p>
-                    {currentUnits.map((item) => (
-                      <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedUnitId === String(item.value) ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleUnitChange(String(item.value))}>
-                        <MapPin size={14} className="mr-2 opacity-70" /> {item.name}
-                      </div>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-
               <button 
                   onClick={() => setIsShareModalOpen(true)}
-                  className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                  className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
               >
                   <Download size={18} />
-                  Exportar
+                  <span className="hidden sm:inline">Exportar</span>
               </button>
             </div>
         </header>
@@ -432,15 +344,18 @@ export default function IndicatorsPage() {
         />
 
         <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6">
+          
+          {/* COMPONENTE DE FILTROS INTEGRADO */}
           <IndicatorsFilters onFilterChange={fetchDashboardData} />
 
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24 space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
-              <p className="text-gray-500 font-extrabold animate-pulse">Processando dados do Imoview...</p>
+              <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-500 font-extrabold animate-pulse">Sincronizando dados com Imoview...</p>
             </div>
           ) : data ? (
-            <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              
               {/* KPIs Principais */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard title="Total Atendimentos" value={data.indicadoresGerais?.totalAtendimentos || 0} icon={Phone} color="#4F46E5" />
@@ -491,50 +406,69 @@ export default function IndicatorsPage() {
 
               {/* GRÁFICOS PRINCIPAIS */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Midia de Origem */}
-                <Card className="rounded-2xl border-none shadow-sm flex flex-col h-[530px]"> 
-                  <CardHeader className="border-b border-gray-50 pb-4 shrink-0">
-                    <CardTitle className="text-gray-700 flex items-center gap-2">
-                       <Target className="w-5 h-5 text-indigo-600" />
-                       Mídia de Origem
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-1 overflow-hidden relative p-0">
-                    <div className="h-full overflow-y-auto custom-scrollbar pb-10">
-                      <div className="flex flex-col">
-                        {displayedMidia.map((item: any, idx: number) => {
-                          const percent = (item.valor / maxMidiaValue) * 100;
-                          return (
-                            <div key={idx} className="relative py-4 px-6 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors group">
-                              <div className="flex justify-between items-center mb-2 relative z-10">
-                                <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                  <span className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-black ${idx < 3 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>{idx + 1}</span>
-                                  {item.categoria}
-                                </span>
-                                <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{item.valor}</span>
-                              </div>
-                              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                                <motion.div className={`h-full rounded-full ${idx < 3 ? 'bg-gradient-to-r from-indigo-500 to-purple-500' : 'bg-gray-400'}`} initial={{ width: 0 }} animate={{ width: `${percent}%` }} transition={{ duration: 1, delay: idx * 0.1, ease: "easeOut" }} />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    {sortedMidia.length > 5 && (
-                      <div className="absolute bottom-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-6 pb-2 flex justify-center z-20">
-                          <button onClick={() => setShowAllMidia(!showAllMidia)} className="flex items-center gap-1.5 px-4 py-1.5 bg-white border border-gray-200 shadow-sm rounded-full text-xs font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all transform hover:scale-105">
-                            {showAllMidia ? (<>Ver menos <ChevronUp className="w-3 h-3" /></>) : (<>Ver mais ({sortedMidia.length - 5}) <ChevronDown className="w-3 h-3" /></>)}
-                          </button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <Card className="rounded-2xl border-none shadow-sm flex flex-col h-[530px] print:h-[930px] print:max-h-[930px] print:col-span-1"> 
+                <CardHeader className="border-b border-gray-50 pb-4 shrink-0">
+                  <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
+                    <Target className="w-5 h-5 text-indigo-600" />
+                    Mídia de Origem
+                  </CardTitle>
+                </CardHeader>
+                
+                <CardContent className="flex-1 overflow-hidden relative p-0 print:overflow-visible">
+                  <div className="h-full overflow-y-auto custom-scrollbar pb-10 print:overflow-visible print:h-auto">
+                    <div className="flex flex-col">
+                      {/* Mapeamos a lista completa para o print ler os itens extras */}
+                      {sortedMidia.map((item: any, idx: number) => {
+                        const percent = (item.valor / maxMidiaValue) * 100;
+                        
+                        // Lógica de visibilidade:
+                        // Na tela: segue o estado 'showAllMidia' (limite 5)
+                        // No print: mostra até o índice 9 (total 10 itens) independente do botão
+                        const isHiddenOnScreen = !showAllMidia && idx > 4;
+                        const isVisibleOnPrint = idx < 10; 
 
-                {/* TEMPERATURA DO LEAD */}
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`relative py-4 px-6 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors group
+                              ${isHiddenOnScreen ? 'hidden' : 'flex'} 
+                              ${isVisibleOnPrint ? 'print:flex' : 'print:hidden'} flex-col`}
+                          >
+                            <div className="flex justify-between items-center mb-2 relative z-10">
+                              <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                <span className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-black ${idx < 3 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>{idx + 1}</span>
+                                {item.categoria}
+                              </span>
+                              <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{item.valor}</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                              <motion.div 
+                                className={`h-full rounded-full ${idx < 3 ? 'bg-gradient-to-r from-indigo-500 to-purple-500' : 'bg-gray-400'}`} 
+                                initial={{ width: 0 }} 
+                                animate={{ width: `${percent}%` }} 
+                                transition={{ duration: 1, delay: idx * 0.1, ease: "easeOut" }} 
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Botão original: print:hidden para não aparecer na impressão */}
+                  {sortedMidia.length > 5 && (
+                    <div className="absolute bottom-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-6 pb-2 flex justify-center z-20 print:hidden">
+                        <button onClick={() => setShowAllMidia(!showAllMidia)} className="flex items-center gap-1.5 px-4 py-1.5 bg-white border border-gray-200 shadow-sm rounded-full text-xs font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all transform hover:scale-105">
+                          {showAllMidia ? (<>Ver menos <ChevronUp className="w-3 h-3" /></>) : (<>Ver mais ({sortedMidia.length - 5}) <ChevronDown className="w-3 h-3" /></>)}
+                        </button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
                 <Card className="rounded-2xl border-none shadow-sm h-[530px] flex flex-col">
                   <CardHeader className="border-b border-gray-50 pb-4 shrink-0">
-                    <CardTitle className="text-gray-700 flex items-center gap-2">
+                    <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
                       <ThermometerSun className="w-5 h-5 text-indigo-600" />
                       Temperatura do Lead
                     </CardTitle>
@@ -582,8 +516,8 @@ export default function IndicatorsPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card className="rounded-2xl border-none shadow-sm flex flex-col h-[400px]">
                   <CardHeader className="border-b border-gray-50 pb-4">
-                    <CardTitle className="text-gray-700 flex items-center gap-2">
-                      <Ban className="w-5 h-5 text-rose-500" />
+                    <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
+                      <X className="w-5 h-5 text-rose-500" />
                       Motivos de Descarte
                     </CardTitle>
                   </CardHeader>
@@ -610,7 +544,7 @@ export default function IndicatorsPage() {
 
                 <Card className="rounded-2xl border-none shadow-sm flex flex-col h-[400px]">
                   <CardHeader className="border-b border-gray-50 pb-4">
-                    <CardTitle className="text-gray-700 flex items-center gap-2">
+                    <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
                       <PieChart className="w-5 h-5 text-indigo-600" />
                       Canais de Atendimento
                     </CardTitle>
@@ -652,23 +586,23 @@ export default function IndicatorsPage() {
               {/* TENDÊNCIA DE DESEMPENHO SEMANAL */}
               <Card className="rounded-2xl border-none shadow-sm overflow-hidden">
                 <CardHeader className="border-b border-gray-50 flex flex-row items-center justify-between">
-                  <CardTitle className="text-gray-700 flex items-center gap-2">
+                  <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
                     <LineChart className="w-5 h-5 text-indigo-600" />
                     Tendência de Desempenho Semanal (Funil)
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="h-[200px] pt-6"><canvas ref={chartRefs.desempenhoLinha}></canvas></CardContent>
+                <CardContent className="h-[250px] pt-6"><canvas ref={chartRefs.desempenhoLinha}></canvas></CardContent>
               </Card>
 
               {/* VOLUME DE RESULTADOS SEMANAL */}
               <Card className="rounded-2xl border-none shadow-sm overflow-hidden">
                 <CardHeader className="border-b border-gray-50 flex flex-row items-center justify-between">
-                  <CardTitle className="text-gray-700 flex items-center gap-2">
+                  <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
                     <AreaChart className="w-5 h-5 text-emerald-600" />
                     Volume de Resultados Semanal (Visitas vs Negócios)
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="h-[200px] pt-6"><canvas ref={chartRefs.volumeAtividadesSemanal}></canvas></CardContent>
+                <CardContent className="h-[250px] pt-6"><canvas ref={chartRefs.volumeAtividadesSemanal}></canvas></CardContent>
               </Card>
 
               {/* TABELA SEMANAL */}
@@ -685,7 +619,7 @@ export default function IndicatorsPage() {
                 </CardHeader>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
-                    <thead className="bg-white text-gray-500 font-medium border-b border-gray-100">
+                    <thead className="bg-gray-50/50 text-gray-500 font-medium border-b border-gray-100">
                       <tr>
                         <th className="py-4 px-6 font-semibold">Semana</th>
                         <th className="py-4 px-6 text-right font-semibold">Atendimentos</th>
@@ -728,17 +662,14 @@ export default function IndicatorsPage() {
               </Card>
 
             </div>
-          ) : null}
+          ) : (
+             <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+                <Database size={48} className="mb-4 opacity-20" />
+                <p className="font-bold">Aguardando definição de filtros para carregar dados.</p>
+             </div>
+          )}
         </main>
       </div>
     </div>
-  );
-}
-
-function Loader2(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }

@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { 
   Filter, 
-  ChevronDown, 
+  ChevronDown,
+  Database,
   Users, 
   Tag, 
   CalendarDays, 
@@ -18,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/lib/supabase";
 
 interface Option { Codigo: number; Nome: string; Cor?: string; }
 
@@ -27,14 +29,19 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
   const [etiquetas, setEtiquetas] = useState<Option[]>([]);
   const [loading, setLoading] = useState<{ [key: string]: boolean }>({});
   
-  // Estados para busca interna nos filtros (Otimização para listas grandes)
+  // Estados para instâncias e unidades (Lógica trazida da Page)
+  const [allSettings, setAllSettings] = useState<any[]>([]);
+  const [instances, setInstances] = useState<string[]>([]);
+  const [selectedInstance, setSelectedInstance] = useState<string>("");
+  const [currentUnits, setCurrentUnits] = useState<any[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+
   const [searchTerms, setSearchTerms] = useState({ equipes: "", corretores: "", etiquetas: "" });
 
   const currentMonth = (new Date().getMonth() + 1).toString();
   
   const initialFilters = {
     Finalidade: "2",
-    CodigoUnidade: "1048",
     CodigoEquipe: [] as number[],
     Corretores: [] as number[],
     Etiquetas: [] as number[],
@@ -49,6 +56,42 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
 
   const [filters, setFilters] = useState(initialFilters);
 
+  // Helper para parsear unidades do JSON de config
+  const parseUnitsFromSetting = (setting: any) => {
+    try {
+      const config = typeof setting.api_config === 'string' ? JSON.parse(setting.api_config) : setting.api_config;
+      if (config.unidade?.value) {
+        const rawValue = config.unidade.value;
+        const fixedJson = rawValue.replace(/'/g, '"');
+        return JSON.parse(fixedJson);
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  };
+
+  // Inicialização das instâncias e unidades
+  useEffect(() => {
+    async function init() {
+      const { data: settings } = await supabase.from('company_settings').select('*');
+      if (settings && settings.length > 0) {
+        setAllSettings(settings);
+        const names = settings.map(s => s.instance_name);
+        setInstances(names);
+        
+        const firstSetting = settings[0];
+        const units = parseUnitsFromSetting(firstSetting);
+        const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
+        
+        setSelectedInstance(firstSetting.instance_name);
+        setCurrentUnits(units);
+        setSelectedUnitId(firstUnitId);
+      }
+    }
+    init();
+  }, []);
+
   const handleClearFilters = () => setFilters(initialFilters);
 
   const handleDateSelect = (date: Date | undefined, field: 'DataInicial' | 'DataFinal') => {
@@ -57,48 +100,53 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
   };
 
   /**
-   * CARREGAMENTO OTIMIZADO: Dispara todas as requisições em paralelo.
-   * Se uma API falhar, as outras continuam funcionando.
+   * CARREGAMENTO OTIMIZADO: Utiliza a lógica do route.ts para popular os campos
    */
   const loadFilterOptions = useCallback(async () => {
+    if (!selectedInstance) return;
+
     setLoading({ getEquipes: true, getCorretores: true, getEtiquetas: true });
 
-    const payload = {
+    // Montagem do payload conforme esperado pelo route.ts
+    const getPayload = (action: string) => ({
+      action,
       filters: {
         Finalidade: filters.Finalidade,
-        CodigoUnidade: filters.CodigoUnidade,
+        CodigoUnidade: selectedUnitId,
         CodigoEquipe: filters.CodigoEquipe.join(',')
       }
-    };
+    });
 
-    // Função auxiliar para dar um pequeno intervalo entre chamadas
     const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
     try {
-      // 1. Carrega Equipes Primeiro
+      // 1. Carrega Equipes
       const resEquipes = await fetch('/api/imoview/indicators', { 
           method: 'POST', 
-          body: JSON.stringify({ action: "getEquipes", ...payload }) 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getPayload("getEquipes")) 
       });
-      if (resEquipes.ok) setEquipes(await resEquipes.ok ? await resEquipes.json() : []);
+      if (resEquipes.ok) setEquipes(await resEquipes.json());
       setLoading(prev => ({ ...prev, getEquipes: false }));
 
-      await delay(2000); // Respiro para o servidor
+      await delay(400); 
 
       // 2. Carrega Corretores
       const resCorretores = await fetch('/api/imoview/indicators', { 
           method: 'POST', 
-          body: JSON.stringify({ action: "getCorretores", ...payload }) 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getPayload("getCorretores")) 
       });
       if (resCorretores.ok) setCorretores(await resCorretores.json());
       setLoading(prev => ({ ...prev, getCorretores: false }));
 
-      await delay(300); // Respiro para o servidor
+      await delay(300);
 
       // 3. Carrega Etiquetas
       const resEtiquetas = await fetch('/api/imoview/indicators', { 
           method: 'POST', 
-          body: JSON.stringify({ action: "getEtiquetas", ...payload }) 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getPayload("getEtiquetas")) 
       });
       if (resEtiquetas.ok) setEtiquetas(await resEtiquetas.json());
       
@@ -107,16 +155,35 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     } finally {
       setLoading({ getEquipes: false, getCorretores: false, getEtiquetas: false });
     }
-  }, [filters.Finalidade, filters.CodigoUnidade, filters.CodigoEquipe.join(',')]);
+  }, [selectedInstance, selectedUnitId, filters.Finalidade, filters.CodigoEquipe.join(',')]);
 
   useEffect(() => {
     loadFilterOptions();
   }, [loadFilterOptions]);
 
+  const handleInstanceChange = (name: string) => {
+    const setting = allSettings.find(s => s.instance_name === name);
+    if (setting) {
+      const units = parseUnitsFromSetting(setting);
+      const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
+      setSelectedInstance(name);
+      setCurrentUnits(units);
+      setSelectedUnitId(firstUnitId);
+      // Reseta seleções dependentes
+      setFilters(prev => ({ ...prev, CodigoEquipe: [], Corretores: [], Etiquetas: [] }));
+    }
+  };
+
+  const handleUnitChange = (unitId: string) => {
+    setSelectedUnitId(unitId);
+    setFilters(prev => ({ ...prev, CodigoEquipe: [], Corretores: [], Etiquetas: [] }));
+  };
+
   const handleApply = () => {
     const params = new URLSearchParams({
+      instanceName: selectedInstance,
       Finalidade: filters.Finalidade,
-      CodigoUnidade: filters.CodigoUnidade,
+      CodigoUnidade: selectedUnitId,
       CodigoEquipe: filters.CodigoEquipe.join(','),
       Corretores: filters.Corretores.join(','),
       Etiquetas: filters.Etiquetas.join(','),
@@ -132,6 +199,7 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
       params.append("DataInicial", filters.DataInicial);
       params.append("DataFinal", filters.DataFinal);
     }
+    // Passamos também a instância selecionada para que a página saiba qual usar
     onFilterChange(params.toString());
   };
 
@@ -140,7 +208,6 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
 
   const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-  // Renderizador de lista com busca interna
   const renderFilterList = (options: Option[], key: keyof typeof filters, searchKey: keyof typeof searchTerms) => {
     const filtered = options.filter(opt => 
         opt.Nome.toLowerCase().includes(searchTerms[searchKey].toLowerCase())
@@ -184,25 +251,36 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     <div className="bg-white/90 backdrop-blur-md p-4 rounded-3xl border border-gray-200 shadow-[0_20px_50px_rgba(0,0,0,0.12)] mb-8 transition-all">
       <div className="flex flex-wrap items-center gap-3">
         
-        {/* UNIDADE */}
-        {/* <Popover>
+        {/* INSTÂNCIA E UNIDADE (Lógica da Page aplicada no Canvas) */}
+        <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 sm:flex-none min-w-[130px]">
-              <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span className="text-[12px] font-bold text-gray-700 uppercase truncate">
-                {filters.CodigoUnidade === "1048" ? "Palmas" : "Agro"}
+            <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 sm:flex-none min-w-[180px]">
+              <Database className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <span className="text-[11px] font-bold text-gray-700 uppercase truncate">
+                {selectedInstance || '...'} | {currentUnits.find(u => String(u.value) === selectedUnitId)?.name || "Unidade"}
               </span>
               <ChevronDown className="w-3 h-3 text-gray-400 ml-auto shrink-0" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[180px] p-1 rounded-xl shadow-2xl border-gray-100" align="start">
-            {[{ label: "Palmas", value: "1048" }, { label: "Agro", value: "8027" }].map((item) => (
-              <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", filters.CodigoUnidade === item.value ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => setFilters({...filters, CodigoUnidade: item.value})}>
-                {item.label}
-              </div>
-            ))}
+          <PopoverContent className="w-[220px] p-2 rounded-xl shadow-2xl border-gray-100 space-y-3" align="start">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Instância (API)</p>
+              {instances.map((name) => (
+                <div key={name} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedInstance === name ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleInstanceChange(name)}>
+                  <Database size={14} className="mr-2 opacity-70" /> {name}
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-gray-100 pt-2 space-y-1">
+              <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Unidade</p>
+              {currentUnits.map((item) => (
+                <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedUnitId === String(item.value) ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleUnitChange(String(item.value))}>
+                  <MapPin size={14} className="mr-2 opacity-70" /> {item.name}
+                </div>
+              ))}
+            </div>
           </PopoverContent>
-        </Popover> */}
+        </Popover>
 
         {/* FINALIDADE */}
         <Popover>
