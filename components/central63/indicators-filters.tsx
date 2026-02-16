@@ -29,7 +29,6 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
   const [etiquetas, setEtiquetas] = useState<Option[]>([]);
   const [loading, setLoading] = useState<{ [key: string]: boolean }>({});
   
-  // Estados para instâncias e unidades (Lógica trazida da Page)
   const [allSettings, setAllSettings] = useState<any[]>([]);
   const [instances, setInstances] = useState<string[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string>("");
@@ -56,62 +55,63 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
 
   const [filters, setFilters] = useState(initialFilters);
 
-  // Helper para parsear unidades do JSON de config
   const parseUnitsFromSetting = (setting: any) => {
     try {
       const config = typeof setting.api_config === 'string' ? JSON.parse(setting.api_config) : setting.api_config;
-      if (config.unidade?.value) {
-        const rawValue = config.unidade.value;
-        const fixedJson = rawValue.replace(/'/g, '"');
-        return JSON.parse(fixedJson);
+      
+      // Ajuste para a estrutura: config.unidade.value
+      if (config?.unidade?.value) {
+        let unidadeStr = config.unidade.value;
+        
+        if (typeof unidadeStr === 'string') {
+          // Converte aspas simples em duplas para o JSON.parse funcionar
+          const validJson = unidadeStr.replace(/'/g, '"');
+          const parsed = JSON.parse(validJson);
+          return Array.isArray(parsed) ? parsed : [parsed];
+        }
       }
       return [];
     } catch (e) {
+      console.error("Erro ao processar unidades:", e);
       return [];
     }
   };
 
-  // Inicialização das instâncias e unidades
   useEffect(() => {
-  async function init() {
-    const { data: settings } = await supabase.from('company_settings').select('*');
-    
-    if (settings && settings.length > 0) {
-      setAllSettings(settings);
-      const names = settings.map(s => s.instance_name);
-      setInstances(names);
+    async function init() {
+      const { data: settings } = await supabase.from('company_settings').select('*');
       
-      const firstSetting = settings[0];
-      const units = parseUnitsFromSetting(firstSetting);
-      const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
+      if (settings && settings.length > 0) {
+        setAllSettings(settings);
+        const names = settings.map(s => s.instance_name);
+        setInstances(names);
+        
+        const firstSetting = settings[0];
+        const units = parseUnitsFromSetting(firstSetting);
+        const firstUnitId = units.length > 0 ? String(units[0].value) : "";
 
-      // 1. Atualiza os estados para refletir na interface
-      setSelectedInstance(firstSetting.instance_name);
-      setCurrentUnits(units);
-      setSelectedUnitId(firstUnitId);
+        setSelectedInstance(firstSetting.instance_name);
+        setCurrentUnits(units);
+        setSelectedUnitId(firstUnitId);
 
-      // 2. Monta os parâmetros para o carregamento automático
-      // Use as variáveis locais (firstSetting, firstUnitId) e os valores iniciais (initialFilters)
-      const params = new URLSearchParams({
-        instanceName: firstSetting.instance_name,
-        Finalidade: initialFilters.Finalidade,
-        CodigoUnidade: firstUnitId,
-        CodigoEquipe: initialFilters.CodigoEquipe.join(','),
-        Corretores: initialFilters.Corretores.join(','),
-        Etiquetas: initialFilters.Etiquetas.join(','),
-        Mes: initialFilters.Mes,
-        Ano: initialFilters.Ano,
-        ConsiderarNosDemaisIndicadores: initialFilters.ConsiderarNosDemaisIndicadores,
-        Situacao: initialFilters.Situacao,
-        Funil: initialFilters.Funil
-      });
-
-      // 3. Dispara a sincronização automática para a página pai
-      onFilterChange(params.toString());
+        const params = new URLSearchParams({
+          instanceName: firstSetting.instance_name,
+          Finalidade: initialFilters.Finalidade,
+          CodigoUnidade: firstUnitId,
+          CodigoEquipe: initialFilters.CodigoEquipe.join(','),
+          Corretores: initialFilters.Corretores.join(','),
+          Etiquetas: initialFilters.Etiquetas.join(','),
+          Mes: initialFilters.Mes,
+          Ano: initialFilters.Ano,
+          ConsiderarNosDemaisIndicadores: initialFilters.ConsiderarNosDemaisIndicadores,
+          Situacao: initialFilters.Situacao,
+          Funil: initialFilters.Funil
+        });
+        onFilterChange(params.toString());
+      }
     }
-  }
-  init();
-}, []); // O array vazio garante que rode apenas uma vez ao montar o componente
+    init();
+  }, []); 
 
   const handleClearFilters = () => setFilters(initialFilters);
 
@@ -120,63 +120,40 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     setFilters(prev => ({ ...prev, [field]: format(date, "dd/MM/yyyy") }));
   };
 
-  /**
-   * CARREGAMENTO OTIMIZADO: Utiliza a lógica do route.ts para popular os campos
-   */
   const loadFilterOptions = useCallback(async () => {
-    if (!selectedInstance) return;
+    if (!selectedInstance || !selectedUnitId) return;
 
     setLoading({ getEquipes: true, getCorretores: true, getEtiquetas: true });
 
-    // Montagem do payload conforme esperado pelo route.ts
-    const getPayload = (action: string) => ({
-      action,
-      filters: {
-        Finalidade: filters.Finalidade,
-        CodigoUnidade: selectedUnitId,
-        CodigoEquipe: filters.CodigoEquipe.join(',')
-      }
-    });
-
-    const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
     try {
-      // 1. Carrega Equipes
-      const resEquipes = await fetch('/api/imoview/indicators', { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(getPayload("getEquipes")) 
-      });
-      if (resEquipes.ok) setEquipes(await resEquipes.json());
-      setLoading(prev => ({ ...prev, getEquipes: false }));
-
-      await delay(400); 
-
-      // 2. Carrega Corretores
-      const resCorretores = await fetch('/api/imoview/indicators', { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(getPayload("getCorretores")) 
-      });
-      if (resCorretores.ok) setCorretores(await resCorretores.json());
-      setLoading(prev => ({ ...prev, getCorretores: false }));
-
-      await delay(300);
-
-      // 3. Carrega Etiquetas
-      const resEtiquetas = await fetch('/api/imoview/indicators', { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(getPayload("getEtiquetas")) 
-      });
-      if (resEtiquetas.ok) setEtiquetas(await resEtiquetas.json());
-      
+      const endpoints = ["getEquipes", "getCorretores", "getEtiquetas"];
+      for (const action of endpoints) {
+        const res = await fetch('/api/imoview/indicators', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action,
+              instanceName: selectedInstance, 
+              filters: {
+                Finalidade: filters.Finalidade,
+                CodigoUnidade: Number(selectedUnitId), // Envia apenas o ID numérico
+                CodigoEquipe: filters.CodigoEquipe.join(',')
+              }
+            }) 
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (action === "getEquipes") setEquipes(data);
+          if (action === "getCorretores") setCorretores(data);
+          if (action === "getEtiquetas") setEtiquetas(data);
+        }
+      }
     } catch (e) {
-      console.error("Erro na sequência de filtros:", e);
+      console.error("Erro na requisição de filtros:", e);
     } finally {
       setLoading({ getEquipes: false, getCorretores: false, getEtiquetas: false });
     }
-  }, [selectedInstance, selectedUnitId, filters.Finalidade, filters.CodigoEquipe.join(',')]);
+  }, [selectedInstance, selectedUnitId, filters.Finalidade, filters.CodigoEquipe]);
 
   useEffect(() => {
     loadFilterOptions();
@@ -186,11 +163,10 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     const setting = allSettings.find(s => s.instance_name === name);
     if (setting) {
       const units = parseUnitsFromSetting(setting);
-      const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
+      const firstUnitId = units.length > 0 ? String(units[0].value) : "";
       setSelectedInstance(name);
       setCurrentUnits(units);
       setSelectedUnitId(firstUnitId);
-      // Reseta seleções dependentes
       setFilters(prev => ({ ...prev, CodigoEquipe: [], Corretores: [], Etiquetas: [] }));
     }
   };
@@ -220,7 +196,6 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
       params.append("DataInicial", filters.DataInicial);
       params.append("DataFinal", filters.DataFinal);
     }
-    // Passamos também a instância selecionada para que a página saiba qual usar
     onFilterChange(params.toString());
   };
 
@@ -272,7 +247,6 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
     <div className="bg-white/90 backdrop-blur-md p-4 rounded-3xl border border-gray-200 shadow-[0_20px_50px_rgba(0,0,0,0.12)] mb-8 transition-all">
       <div className="flex flex-wrap items-center gap-3">
         
-        {/* INSTÂNCIA E UNIDADE (Lógica da Page aplicada no Canvas) */}
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 sm:flex-none min-w-[180px]">
@@ -294,16 +268,19 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
             </div>
             <div className="border-t border-gray-100 pt-2 space-y-1">
               <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Unidade</p>
-              {currentUnits.map((item) => (
-                <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedUnitId === String(item.value) ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleUnitChange(String(item.value))}>
-                  <MapPin size={14} className="mr-2 opacity-70" /> {item.name}
-                </div>
-              ))}
+              {currentUnits.length > 0 ? (
+                currentUnits.map((item) => (
+                  <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedUnitId === String(item.value) ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleUnitChange(String(item.value))}>
+                    <MapPin size={14} className="mr-2 opacity-70" /> {item.name}
+                  </div>
+                ))
+              ) : (
+                <div className="p-2 text-xs text-gray-400 italic">Nenhuma unidade encontrada</div>
+              )}
             </div>
           </PopoverContent>
         </Popover>
-
-        {/* FINALIDADE */}
+        
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 sm:flex-none min-w-[110px]">
@@ -323,7 +300,6 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
           </PopoverContent>
         </Popover>
 
-        {/* PERÍODO */}
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className={cn(
@@ -389,7 +365,6 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
           </PopoverContent>
         </Popover>
 
-        {/* MULTI-SELECTS (Equipes, Corretores, Etiquetas) */}
         <div className="flex flex-wrap gap-2 md:gap-3 flex-1">
           {[
             { label: "Equipes", options: equipes, key: "CodigoEquipe", icon: Users, loadingKey: "getEquipes", searchKey: "equipes" as const },
@@ -434,7 +409,6 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
           ))}
         </div>
 
-        {/* AÇÃO */}
         <div className="flex items-center gap-2 ml-auto w-full lg:w-auto">
           <Button 
             variant="ghost" 
