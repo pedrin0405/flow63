@@ -73,24 +73,45 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
 
   // Inicialização das instâncias e unidades
   useEffect(() => {
-    async function init() {
-      const { data: settings } = await supabase.from('company_settings').select('*');
-      if (settings && settings.length > 0) {
-        setAllSettings(settings);
-        const names = settings.map(s => s.instance_name);
-        setInstances(names);
-        
-        const firstSetting = settings[0];
-        const units = parseUnitsFromSetting(firstSetting);
-        const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
-        
-        setSelectedInstance(firstSetting.instance_name);
-        setCurrentUnits(units);
-        setSelectedUnitId(firstUnitId);
-      }
+  async function init() {
+    const { data: settings } = await supabase.from('company_settings').select('*');
+    
+    if (settings && settings.length > 0) {
+      setAllSettings(settings);
+      const names = settings.map(s => s.instance_name);
+      setInstances(names);
+      
+      const firstSetting = settings[0];
+      const units = parseUnitsFromSetting(firstSetting);
+      const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
+
+      // 1. Atualiza os estados para refletir na interface
+      setSelectedInstance(firstSetting.instance_name);
+      setCurrentUnits(units);
+      setSelectedUnitId(firstUnitId);
+
+      // 2. Monta os parâmetros para o carregamento automático
+      // Use as variáveis locais (firstSetting, firstUnitId) e os valores iniciais (initialFilters)
+      const params = new URLSearchParams({
+        instanceName: firstSetting.instance_name,
+        Finalidade: initialFilters.Finalidade,
+        CodigoUnidade: firstUnitId,
+        CodigoEquipe: initialFilters.CodigoEquipe.join(','),
+        Corretores: initialFilters.Corretores.join(','),
+        Etiquetas: initialFilters.Etiquetas.join(','),
+        Mes: initialFilters.Mes,
+        Ano: initialFilters.Ano,
+        ConsiderarNosDemaisIndicadores: initialFilters.ConsiderarNosDemaisIndicadores,
+        Situacao: initialFilters.Situacao,
+        Funil: initialFilters.Funil
+      });
+
+      // 3. Dispara a sincronização automática para a página pai
+      onFilterChange(params.toString());
     }
-    init();
-  }, []);
+  }
+  init();
+}, []); // O array vazio garante que rode apenas uma vez ao montar o componente
 
   const handleClearFilters = () => setFilters(initialFilters);
 

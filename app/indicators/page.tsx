@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { motion, Variants, AnimatePresence } from 'framer-motion';
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import Loading from "../loading"
 
 Chart.register(...registerables);
 
@@ -323,7 +324,7 @@ export default function IndicatorsPage() {
                 </button>                
                 <ChartPie className="text-primary hidden sm:block" />
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">Painel de Indicadores</h2>
-                <p className="text-gray-400 hidden sm:block font-medium">| Sincronização direta Imoview</p>
+                <p className="text-primary hidden sm:block">| Sincronização direta Imoview</p>
             </div>
             
             <div className="flex items-center gap-2">
@@ -350,8 +351,7 @@ export default function IndicatorsPage() {
 
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24 space-y-4">
-              <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-gray-500 font-extrabold animate-pulse">Sincronizando dados com Imoview...</p>
+              <p className="text-gray-500 animate-pulse">Sincronizando dados com Imoview...</p>
             </div>
           ) : data ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
