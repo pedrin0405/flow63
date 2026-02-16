@@ -30,10 +30,16 @@ import {
   FileImage,
   X,
   Table as TableIcon,
-  Filter
+  Filter,
+  Database,
+  MapPin
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { motion, Variants, AnimatePresence } from 'framer-motion';
+import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 Chart.register(...registerables);
 
@@ -60,7 +66,6 @@ const StatCard = ({ title, value, icon: Icon, color, subValue }: any) => (
 const ExportModal = ({ isOpen, onClose, dashboardData }: { isOpen: boolean, onClose: () => void, dashboardData: any }) => {
   if (!isOpen) return null;
 
-  // Função genérica para download de arquivos
   const downloadFile = (content: string, fileName: string, contentType: string) => {
     const blob = new Blob([content], { type: contentType });
     const url = URL.createObjectURL(blob);
@@ -71,40 +76,29 @@ const ExportModal = ({ isOpen, onClose, dashboardData }: { isOpen: boolean, onCl
     URL.revokeObjectURL(url);
   };
 
-  // 1. Download JSON (Dados diretos da API)
   const handleDownloadJSON = () => {
     const jsonString = JSON.stringify(dashboardData, null, 2);
     downloadFile(jsonString, 'dados-dashboard.json', 'application/json');
   };
 
-  // 2. Download Excel (Convertido do JSON para CSV)
   const handleDownloadExcel = () => {
     if (!dashboardData) return;
-    
-    // Criando um CSV simples a partir dos indicadores gerais e funil
-    let csvContent = "\uFEFF"; // BOM para garantir acentos no Excel
+    let csvContent = "\uFEFF"; 
     csvContent += "Relatório de Indicadores - Central63\n\n";
-    
-    // Seção de Indicadores Gerais
     csvContent += "INDICADORES GERAIS\n";
     csvContent += "Métrica,Valor\n";
     Object.entries(dashboardData.indicadoresGerais || {}).forEach(([key, val]) => {
       csvContent += `${key},${val}\n`;
     });
-
     csvContent += "\nDETALHAMENTO SEMANAL\n";
     csvContent += "Semana,Atendimentos,Visitas,Propostas,Negócios\n";
     dashboardData.funilDeVendasSemanal?.forEach((item: any) => {
       csvContent += `${item.semana},${item.atendimentos},${item.visitas},${item.propostas},${item.negocios}\n`;
     });
-
     downloadFile(csvContent, 'indicadores.csv', 'text/csv;charset=utf-8;');
   };
 
-  // 3. Download PDF (Imprime o HTML removendo elementos indesejados via CSS)
-  const handleDownloadPDF = () => {
-    window.print();
-  };
+  const handleDownloadPDF = () => { window.print(); };
 
   const exportOptions = [
     { name: 'Relatório em PDF', icon: FileText, desc: 'Salvar visão completa em PDF', action: handleDownloadPDF },
@@ -116,25 +110,14 @@ const ExportModal = ({ isOpen, onClose, dashboardData }: { isOpen: boolean, onCl
     <AnimatePresence>
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm print:hidden" />
-        
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-          animate={{ scale: 1, opacity: 1, y: 0 }} 
-          exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden print:hidden"
-        >
-          {/* Header do Modal */}
+        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden print:hidden">
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-50/30">
             <div>
               <h3 className="text-lg font-bold text-gray-900">Exportar Dados</h3>
               <p className="text-xs text-gray-500">Escolha o formato de saída</p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors">
-              <X size={20} className="text-gray-400" />
-            </button>
+            <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors"><X size={20} className="text-gray-400" /></button>
           </div>
-
-          {/* Opções */}
           <div className="p-4 space-y-2">
             {exportOptions.map((opt, i) => (
               <button key={i} onClick={() => { opt.action(); ! (opt.name === 'Relatório em PDF') && onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100 group text-left">
@@ -160,9 +143,18 @@ export default function IndicatorsPage() {
   const [showAllMidia, setShowAllMidia] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+  // Estados para instâncias e unidades
+  const [allSettings, setAllSettings] = useState<any[]>([]);
+  const [instances, setInstances] = useState<string[]>([]);
+  const [selectedInstance, setSelectedInstance] = useState<string>("");
+  const [currentUnits, setCurrentUnits] = useState<any[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+
   const chartsInstance = useRef<{ [key: string]: Chart | null }>({});
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("dashboard")
+  const isInitialLoad = useRef(true);
+  const lastFilters = useRef<string>("Finalidade=2&Mes=customizado&Ano=2026&ConsiderarNosDemaisIndicadores=true&Situacao=undefined&Funil=0");
   
   const chartRefs = {
     tipoAtendimento: useRef<HTMLCanvasElement>(null),
@@ -177,17 +169,28 @@ export default function IndicatorsPage() {
     return filtersObj;
   };
 
-  const fetchDashboardData = useCallback(async (filterString: string) => {
+  const fetchDashboardData = useCallback(async (filterString: string, instanceName?: string, unitId?: string) => {
     setLoading(true);
+    lastFilters.current = filterString;
     const minWait = new Promise(resolve => setTimeout(resolve, 1000));
-    console.log(filterString)
+    
+    const targetInstance = instanceName || selectedInstance;
+    const targetUnit = unitId || selectedUnitId;
+
+    if (!targetInstance) return;
 
     try {
       const filters = parseFilterString(filterString);
+      if (targetUnit) filters.CodigoUnidade = targetUnit;
+
       const response = await fetch('/api/imoview/indicators', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'default', filters }),
+        body: JSON.stringify({ 
+          action: 'default', 
+          instanceName: targetInstance, 
+          filters 
+        }),
       });
 
       const [result] = await Promise.all([response.json(), minWait]);
@@ -198,17 +201,52 @@ export default function IndicatorsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedInstance, selectedUnitId]);
+
+  const parseUnitsFromSetting = (setting: any) => {
+    try {
+      const config = typeof setting.api_config === 'string' ? JSON.parse(setting.api_config) : setting.api_config;
+      if (config.unidade?.value) {
+        const rawValue = config.unidade.value;
+        const fixedJson = rawValue.replace(/'/g, '"');
+        return JSON.parse(fixedJson);
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  };
 
   useEffect(() => {
-    const defaultFilters = "Finalidade=2&CodigoUnidade=1048&Mes=customizado&Ano=2026&ConsiderarNosDemaisIndicadores=true&Situacao=undefined&Funil=0";
-    fetchDashboardData(defaultFilters);
+    async function init() {
+      if (!isInitialLoad.current) return;
+      
+      const { data: settings } = await supabase.from('company_settings').select('*');
+      if (settings && settings.length > 0) {
+        setAllSettings(settings);
+        const names = settings.map(s => s.instance_name);
+        setInstances(names);
+        
+        const firstSetting = settings[0];
+        const units = parseUnitsFromSetting(firstSetting);
+        const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
+        
+        setSelectedInstance(firstSetting.instance_name);
+        setCurrentUnits(units);
+        setSelectedUnitId(firstUnitId);
+        
+        isInitialLoad.current = false;
+        fetchDashboardData(lastFilters.current, firstSetting.instance_name, firstUnitId);
+      }
+    }
+    init();
+  }, [fetchDashboardData]);
 
+  useEffect(() => {
     const interval = setInterval(() => {
-    fetchDashboardData(defaultFilters);
-  }, 600000);
-
-  return () => clearInterval(interval);
+      fetchDashboardData(lastFilters.current);
+    }, 600000);
+    return () => clearInterval(interval);
   }, [fetchDashboardData]);
 
   useEffect(() => {
@@ -272,6 +310,23 @@ export default function IndicatorsPage() {
     }
   }, [data]);
 
+  const handleInstanceChange = (name: string) => {
+    const setting = allSettings.find(s => s.instance_name === name);
+    if (setting) {
+      const units = parseUnitsFromSetting(setting);
+      const firstUnitId = units[0]?.value ? String(units[0].value) : "1048";
+      setSelectedInstance(name);
+      setCurrentUnits(units);
+      setSelectedUnitId(firstUnitId);
+      fetchDashboardData(lastFilters.current, name, firstUnitId);
+    }
+  };
+
+  const handleUnitChange = (unitId: string) => {
+    setSelectedUnitId(unitId);
+    fetchDashboardData(lastFilters.current, selectedInstance, unitId);
+  };
+
   const getMetricValue = (array: any[], key: string) => {
     const item = array?.find(i => i.categoria === key);
     return item ? item.valor : 0;
@@ -311,7 +366,6 @@ export default function IndicatorsPage() {
   };
 
   return (
-
     <div className="flex h-screen overflow-hidden bg-[#fafafa] print:bg-white print:h-auto print:overflow-visible">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={(tab: string) => { setActiveTab(tab); setSidebarOpen(false); }} />
 
@@ -328,24 +382,53 @@ export default function IndicatorsPage() {
                 <ChartPie className="text-primary hidden sm:block" />
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">Painel de Indicadores</h2>
                 <p className="text-primary hidden sm:block" >| Sicronização direta Imoview</p>
-                
             </div>
             
-            {/* Novo Botão de Download */}
-            <button 
-                onClick={() => setIsShareModalOpen(true)}
-                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all"
-            >
-                <Download size={18} />
-                Exportar
-            </button>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm min-w-[160px]">
+                    <Database className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span className="text-[12px] font-bold text-gray-700 uppercase truncate">
+                      {selectedInstance || '...'} | {currentUnits.find(u => String(u.value) === selectedUnitId)?.name || "Unidade"}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-gray-400 ml-auto" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-2 rounded-xl shadow-2xl border-gray-100 space-y-3" align="end">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Instância (API)</p>
+                    {instances.map((name) => (
+                      <div key={name} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedInstance === name ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleInstanceChange(name)}>
+                        <Database size={14} className="mr-2 opacity-70" /> {name}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-gray-100 pt-2 space-y-1">
+                    <p className="text-[10px] font-black text-gray-400 uppercase px-2 mb-1 tracking-widest">Unidade</p>
+                    {currentUnits.map((item) => (
+                      <div key={item.value} className={cn("flex items-center p-2.5 rounded-xl cursor-pointer text-sm transition-all", selectedUnitId === String(item.value) ? "bg-indigo-600 text-white font-bold" : "hover:bg-gray-100 text-gray-600")} onClick={() => handleUnitChange(String(item.value))}>
+                        <MapPin size={14} className="mr-2 opacity-70" /> {item.name}
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              <button 
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all"
+              >
+                  <Download size={18} />
+                  Exportar
+              </button>
+            </div>
         </header>
 
-        {/* Modal de Compartilhamento */}
         <ExportModal 
-        isOpen={isShareModalOpen} 
-        onClose={() => setIsShareModalOpen(false)} 
-        dashboardData={data} 
+          isOpen={isShareModalOpen} 
+          onClose={() => setIsShareModalOpen(false)} 
+          dashboardData={data} 
         />
 
         <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6">
@@ -360,10 +443,10 @@ export default function IndicatorsPage() {
             <div className="space-y-6 animate-in fade-in duration-500">
               {/* KPIs Principais */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="Total Atendimentos" value={data.indicadoresGerais.totalAtendimentos} icon={Phone} color="#4F46E5" />
-                <StatCard title="Visitas Realizadas" value={data.funilDeVendasTotal.visitas} icon={Home} color="#8B5CF6" />
-                <StatCard title="Propostas" value={data.funilDeVendasTotal.propostas} icon={FileText} color="#EC4899" />
-                <StatCard title="Negócios" value={data.funilDeVendasTotal.negocios} icon={TrendingUp} color="#10B981" />
+                <StatCard title="Total Atendimentos" value={data.indicadoresGerais?.totalAtendimentos || 0} icon={Phone} color="#4F46E5" />
+                <StatCard title="Visitas Realizadas" value={data.funilDeVendasTotal?.visitas || 0} icon={Home} color="#8B5CF6" />
+                <StatCard title="Propostas" value={data.funilDeVendasTotal?.propostas || 0} icon={FileText} color="#EC4899" />
+                <StatCard title="Negócios" value={data.funilDeVendasTotal?.negocios || 0} icon={TrendingUp} color="#10B981" />
               </div>
 
               {/* JORNADA DE ATENDIMENTO */}
@@ -458,7 +541,7 @@ export default function IndicatorsPage() {
                   </CardHeader>
                   <CardContent className="flex-1 overflow-y-auto custom-scrollbar p-6">
                     <div className="flex flex-col gap-5">
-                      {data.dadosGraficos.termometro.map((item: any, idx: number) => {
+                      {data.dadosGraficos?.termometro?.map((item: any, idx: number) => {
                         const style = getTempStyle(item.categoria);
                         const Icon = style.icon;
                         const totalTemp = data.dadosGraficos.termometro.reduce((acc: number, curr: any) => acc + curr.valor, 0);
@@ -506,7 +589,7 @@ export default function IndicatorsPage() {
                   </CardHeader>
                   <CardContent className="flex-1 overflow-y-auto custom-scrollbar p-0">
                     <div className="flex flex-col">
-                      {data.dadosGraficos.motivoDescarte && data.dadosGraficos.motivoDescarte.sort((a: any, b: any) => b.valor - a.valor).slice(0, 10).map((item: any, idx: number) => {
+                      {data.dadosGraficos?.motivoDescarte?.sort((a: any, b: any) => b.valor - a.valor).slice(0, 10).map((item: any, idx: number) => {
                           const maxVal = data.dadosGraficos.motivoDescarte[0]?.valor || 1;
                           const percent = (item.valor / maxVal) * 100;
                           return (
@@ -588,7 +671,7 @@ export default function IndicatorsPage() {
                 <CardContent className="h-[200px] pt-6"><canvas ref={chartRefs.volumeAtividadesSemanal}></canvas></CardContent>
               </Card>
 
-              {/* TABELA SEMANAL - NOVO VISUAL CLEAN/ELEGANT */}
+              {/* TABELA SEMANAL */}
               <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden">
                 <CardHeader className="px-6 py-5 border-b border-gray-100 bg-white flex flex-row items-center justify-between">
                   <div className="flex flex-col gap-1">
@@ -612,9 +695,9 @@ export default function IndicatorsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {data.funilDeVendasSemanal.map((row: any, i: number) => {
+                      {data.funilDeVendasSemanal?.map((row: any, i: number) => {
                         const isTotal = row.semana === 'Total';
-                        if (isTotal) return null; // Renderizamos o total separadamente no final
+                        if (isTotal) return null; 
                         return (
                           <tr key={i} className="hover:bg-gray-50 transition-colors group">
                             <td className="py-4 px-6 font-medium text-gray-900">
@@ -630,8 +713,7 @@ export default function IndicatorsPage() {
                           </tr>
                         );
                       })}
-                      {/* Linha de Total com destaque sutil */}
-                      {data.funilDeVendasSemanal.filter((r:any) => r.semana === 'Total').map((row: any, i: number) => (
+                      {data.funilDeVendasSemanal?.filter((r:any) => r.semana === 'Total').map((row: any, i: number) => (
                          <tr key={'total'} className="bg-indigo-50/50 border-t border-indigo-100">
                             <td className="py-4 px-6 font-bold text-indigo-900">TOTAL</td>
                             <td className="py-4 px-6 text-right font-bold text-indigo-900 tabular-nums">{row.atendimentos}</td>

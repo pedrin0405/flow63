@@ -1,26 +1,54 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Inicialização do Supabase
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const cache = new Map();
 
 export async function POST(req: Request) { 
     try {
         const body = await req.json();
-        const { filters, action } = body;
+        const { filters, action, instanceName } = body;
+
+        if (!instanceName) {
+            return NextResponse.json({ error: true, message: "instanceName é obrigatório" }, { status: 400 });
+        }
         
-        // Cache inteligente baseado no estado do filtro
-        const cacheKey = JSON.stringify({ action, filters });
+        // Cache inteligente baseado no estado do filtro e na instância selecionada
+        const cacheKey = JSON.stringify({ action, filters, instanceName });
         const cached = cache.get(cacheKey);
         if (cached && (Date.now() - cached.time < 600000)) return NextResponse.json(cached.data);
 
+        // 1. Buscar configurações da instância no Supabase
+        const { data: settings, error: settingsError } = await supabase
+            .from('company_settings')
+            .select('*')
+            .eq('instance_name', instanceName)
+            .single();
+
+        if (settingsError || !settings) {
+            return NextResponse.json({ error: true, message: "Instância não encontrada no banco de dados" }, { status: 404 });
+        }
+
+        // Parse do api_config (JSON)
+        const config = typeof settings.api_config === 'string' 
+            ? JSON.parse(settings.api_config) 
+            : settings.api_config;
+
         const credentials = {
-            codigoConvenio: process.env.IMOVIEW_CONVENIO,
-            rota: process.env.IMOVIEW_ROTA,
-            login: process.env.IMOVIEW_LOGIN,
-            senha: process.env.IMOVIEW_SENHA,
+            codigoConvenio: config.codigoConvenio?.value,
+            rota: config.rota?.value,
+            login: config.login?.value,
+            senha: config.senha?.value,
         };
 
-        // 1. Autenticação e Extração de Cookies
-        const loginRes = await fetch('https://app.imoview.com.br/Login/LogOn', {
+        const baseUrl = settings.url_site.replace(/\/$/, ''); // Remove barra final da URL se existir
+
+        // 2. Autenticação e Extração de Cookies usando a URL e credenciais dinâmicas
+        const loginRes = await fetch(`${baseUrl}/Login/LogOn`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(credentials),
@@ -36,13 +64,14 @@ export async function POST(req: Request) {
             'Accept': 'application/json, text/javascript, */*; q=0.01'
         };
 
-        // 2. Roteamento de Ações Secundárias
+        // 3. Roteamento de Ações Secundárias com URL dinâmica
         if (['getEquipes', 'getEtiquetas'].includes(action)) {
             const endpoint = action === 'getEtiquetas' ? 'Etiqueta/Pesquisar?tiposRels=5' : (action === 'getEquipes' ? 'Equipe/RetornarEquipes' : 'Equipe/RetornarCorretores');
-            const res = await fetch(`https://app.imoview.com.br/${endpoint}?${new URLSearchParams(filters)}`, { headers: commonHeaders });
+            const res = await fetch(`${baseUrl}/${endpoint}?${new URLSearchParams(filters)}`, { headers: commonHeaders });
             const data = await res.json();
             return NextResponse.json(data);
         }
+        
         if (action === 'getCorretores') {
             const params = new URLSearchParams({
                 codigoEquipe: filters?.CodigoEquipe || '0',
@@ -50,27 +79,26 @@ export async function POST(req: Request) {
                 finalidade: filters?.Finalidade || '2'
             });
 
-            const response = await fetch(`https://app.imoview.com.br/Equipe/RetornarCorretores?${params.toString()}`, {
+            const response = await fetch(`${baseUrl}/Equipe/RetornarCorretores?${params.toString()}`, {
                 headers: commonHeaders
             });
 
-            if (!response.ok) return NextResponse.json([]); // Evita que o erro trave o front
+            if (!response.ok) return NextResponse.json([]); 
             const data = await response.json();
             return NextResponse.json(data);
         }
 
-        // 3. Extração Massiva de Indicadores
-        const indicatorsUrl = `https://app.imoview.com.br/Atendimento/Indicadores?${new URLSearchParams(filters)}`;
+        // 4. Extração Massiva de Indicadores
+        const indicatorsUrl = `${baseUrl}/Atendimento/Indicadores?${new URLSearchParams(filters)}`;
         const htmlRes = await fetch(indicatorsUrl, { headers: { ...commonHeaders, 'Accept': 'text/html' } });
         const html = await htmlRes.text();
 
-        // --- MOTOR DE EXTRAÇÃO DE ALTA CAPACIDADE ---
+        // --- MOTOR DE EXTRAÇÃO DE ALTA CAPACIDADE (MANTIDO ORIGINAL) ---
         const parseNum = (val: string | undefined) => parseInt(val?.replace(/\./g, '') || "0");
 
         function engineExtrair(html: string) {
             const res: any = { body: {} };
 
-            // A) Extrator de JSON por Delimitador (Captura arrays de qualquer tamanho)
             const extractRawArray = (chartId: string) => {
                 const trigger = `makeChart("${chartId}"`;
                 const startIdx = html.indexOf(trigger);
@@ -94,7 +122,6 @@ export async function POST(req: Request) {
                 }
 
                 try {
-                    // Limpeza agressiva para garantir o parse de centenas de itens
                     const cleanJson = buffer.replace(/,\s*\]/g, ']').replace(/undefined/g, 'null');
                     return JSON.parse(cleanJson).map((item: any) => ({
                         categoria: item.category || item.title || item.titleSformatar || "Sem nome",
@@ -103,13 +130,11 @@ export async function POST(req: Request) {
                 } catch { return []; }
             };
 
-            // B) Mapeamento de Indicadores Principais
             res.body.indicadoresGerais = {
                 totalAtendimentos: parseNum(html.match(/fa-phone[\s\S]*?h1[^>]*>([\d.]+)/i)?.[1]),
                 visitasSemParecer: parseNum(html.match(/semParecer[\s\S]*?h1[^>]*>([\d.]+)/i)?.[1])
             };
 
-            // C) Funil Semanal (Extração Global)
             const rowRegex = /<tr>\s*<td>(.*?)<\/td>[\s\S]*?(\d+)<\/a>[\s\S]*?(\d+)<\/a>[\s\S]*?(\d+)<\/a>[\s\S]*?(\d+)<\/a>[\s\S]*?(\d+)<\/a>/g;
             res.body.funilDeVendasSemanal = Array.from(html.matchAll(rowRegex)).map(m => ({
                 semana: m[1].trim(),
@@ -123,7 +148,6 @@ export async function POST(req: Request) {
             const totalRow = res.body.funilDeVendasSemanal.find((s: any) => s.semana.toLowerCase().includes("total")) || {};
             res.body.funilDeVendasTotal = { ...totalRow };
 
-            // D) Atividades (Captura todas as linhas da tabela de atividades)
             res.body.atividades = {};
             const activRegex = /<tr>\s*<td>([^<]+)<\/td>\s*<td><a[^>]*>([\d.]+)<\/a><\/td>\s*<td><a[^>]*>([\d.]+)<\/a><\/td>\s*<\/tr>/g;
             Array.from(html.matchAll(activRegex)).forEach(m => {
@@ -133,7 +157,6 @@ export async function POST(req: Request) {
                 };
             });
 
-            // E) Dados Gráficos (Extração por Buffer para garantir volume de dados)
             res.body.dadosGraficos = {
                 termometro: extractRawArray("chartTermometroV"),
                 midiaDeOrigem: extractRawArray("chartMidiaV"),
@@ -142,7 +165,6 @@ export async function POST(req: Request) {
                 tipoAtendimento: extractRawArray("chartTipoAtendimentoV")
             };
 
-            // F) Etapas da Jornada
             const etapas = ["Pré-atendimento", "Seleção do Perfil", "Seleção dos Imóveis", "Lead qualificado", "Agendamento", "Visita", "Proposta"];
             res.body.etapasAtendimento = etapas.map(nome => ({
                 nome, quantidade: parseNum(html.match(new RegExp(`${nome}[\\s\\S]*?h4">(\\d+)`, "i"))?.[1])
@@ -157,6 +179,7 @@ export async function POST(req: Request) {
         return NextResponse.json(data);
 
     } catch (error: any) {
+        console.error("Erro na API Route:", error);
         return NextResponse.json({ error: true, message: error.message }, { status: 500 });
     }
 }

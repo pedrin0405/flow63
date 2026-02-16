@@ -185,7 +185,7 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
       <div className="flex flex-wrap items-center gap-3">
         
         {/* UNIDADE */}
-        <Popover>
+        {/* <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="h-10 rounded-2xl border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-2 px-4 shadow-sm flex-1 sm:flex-none min-w-[130px]">
               <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
@@ -202,7 +202,7 @@ export function IndicatorsFilters({ onFilterChange }: { onFilterChange: (filters
               </div>
             ))}
           </PopoverContent>
-        </Popover>
+        </Popover> */}
 
         {/* FINALIDADE */}
         <Popover>
