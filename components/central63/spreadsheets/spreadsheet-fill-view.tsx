@@ -1,20 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { 
   ArrowLeft, 
   Send, 
-  FileSpreadsheet, 
   Building2, 
-  Info,
   Loader2,
   Plus,
-  Trash2,
   CheckCircle2,
-  Layout,
   Edit3,
   Type,
   DollarSign,
@@ -22,7 +17,7 @@ import {
   Percent,
   MinusCircle
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -31,6 +26,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -52,8 +49,29 @@ export function SpreadsheetFillView({ model, onBack, onSaveData, initialRows }: 
 
   const [rows, setRows] = useState<any[]>(initialRows && initialRows.length > 0 ? initialRows : [createEmptyRow()]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const [nomeTabela, setNomeTabela] = useState(model.nome_tabela || model.nome_customizado || "");
+  
+  // Estado para armazenar o perfil do usuário logado
+  const [perfilUsuario, setPerfilUsuario] = useState<{ full_name: string; avatar_url: string } | null>(null);
+
+  // Efeito para carregar os dados do usuário automaticamente ao montar o componente
+  useEffect(() => {
+    async function carregarPerfil() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile) {
+          setPerfilUsuario(profile);
+        }
+      }
+    }
+    carregarPerfil();
+  }, []);
 
   const getFieldIcon = (type: string) => {
     switch (type) {
@@ -105,7 +123,8 @@ export function SpreadsheetFillView({ model, onBack, onSaveData, initialRows }: 
         nome_tabela: nomeTabela,
         nome_modelo: model.nome,
         unidade: model.unidade,
-        criado_por: model.criado_por,
+        // Preenchimento automático do criador no envio dos dados
+        criado_por: perfilUsuario?.full_name || model.criado_por || "Usuário",
         dados: rows,
         data_preenchimento: new Date().toISOString()
       };
@@ -171,13 +190,19 @@ export function SpreadsheetFillView({ model, onBack, onSaveData, initialRows }: 
               </div>
             </div>
 
+            {/* Exibição dinâmica do Responsável com Foto */}
             <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm self-start">
-               <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-[10px] font-bold text-white shadow-inner">
-                 {model.criado_por?.charAt(0).toUpperCase() || "U"}
-               </div>
+               <Avatar className="h-8 w-8 rounded-xl shadow-inner border border-slate-100 dark:border-slate-800">
+                 <AvatarImage src={perfilUsuario?.avatar_url} alt={perfilUsuario?.full_name} />
+                 <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-600 text-[10px] font-bold text-white uppercase">
+                   {perfilUsuario?.full_name?.charAt(0) || model.criado_por?.charAt(0) || "U"}
+                 </AvatarFallback>
+               </Avatar>
                <div className="flex flex-col pr-2">
                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none tracking-tighter">Responsável</span>
-                 <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{model.criado_por || "Usuário"}</span>
+                 <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                   {perfilUsuario?.full_name || model.criado_por || "Carregando..."}
+                 </span>
                </div>
             </div>
           </div>
@@ -189,7 +214,6 @@ export function SpreadsheetFillView({ model, onBack, onSaveData, initialRows }: 
               <Table className="border-collapse">
                 <TableHeader>
                   <TableRow className="bg-slate-50/50 dark:bg-slate-900/50 border-none">
-                    {/* Cabeçalho de controle ajustado */}
                     <TableHead className="w-12 text-center text-[9px] font-bold text-slate-300 uppercase">#</TableHead>
                     {model.dados?.map((field: any, index: number) => (
                       <TableHead key={index} className="px-4 py-3 min-w-[160px] border-r border-slate-200/20 last:border-r-0">
@@ -208,8 +232,6 @@ export function SpreadsheetFillView({ model, onBack, onSaveData, initialRows }: 
                 <TableBody>
                   {rows.map((row, rowIndex) => (
                     <TableRow key={rowIndex} className="group border-b border-slate-100 dark:border-slate-900 hover:bg-sky-50/30 dark:hover:bg-sky-900/10 transition-colors">
-                      
-                      {/* Célula de Índice com Botão de Deletar Integrado (Solução Intuitiva) */}
                       <TableCell className="p-0 w-12 text-center bg-slate-50/20 dark:bg-slate-900/10">
                         <div className="relative flex items-center justify-center h-12 w-full">
                           <span className="font-mono text-[10px] text-slate-300 group-hover:opacity-0 transition-opacity">

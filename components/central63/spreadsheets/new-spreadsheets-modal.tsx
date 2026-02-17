@@ -32,7 +32,6 @@ export function NewSpreadsheetModal({ isOpen, onClose, onSave, onUseModel }: any
   const [view, setView] = useState<"gallery" | "form">("gallery");
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [existingModels, setExistingModels] = useState<any[]>([]);
-  // const [selectedModel, setSelectedModel] = useState<any>(null); // Mantido conforme solicitado
   
   // Estados do Formulário
   const [nome, setNome] = useState("");
@@ -40,7 +39,25 @@ export function NewSpreadsheetModal({ isOpen, onClose, onSave, onUseModel }: any
   const [criado_por, setCriadoPor] = useState("");
   const [fields, setFields] = useState<Field[]>([]);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
-  const [nomePlanilha, setNomePlanilha] = useState("");
+
+  // Efeito para carregar o usuário logado automaticamente
+  useEffect(() => {
+    async function carregarUsuario() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile?.full_name) {
+          setCriadoPor(profile.full_name);
+        }
+      }
+    }
+    if (isOpen) carregarUsuario();
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -64,15 +81,10 @@ export function NewSpreadsheetModal({ isOpen, onClose, onSave, onUseModel }: any
   const resetForm = () => {
     setNome("");
     setUnidade("");
-    setCriadoPor("");
+    // Não resetamos o criado_por aqui para manter o nome do usuário logado
     setFields([]);
     setEditingModelId(null);
   };
-
-  // const handleUseModel = (model: any) => {
-  //   setSelectedModel(model);
-  //   setIsModalOpen(false); // Fecha o modal de seleção
-  // }; // Mantido conforme solicitado
 
   const handleEditModel = (model: any) => {
     setEditingModelId(model.id);
@@ -201,28 +213,16 @@ export function NewSpreadsheetModal({ isOpen, onClose, onSave, onUseModel }: any
                           <User size={14} className="text-slate-400" />
                           <span className="truncate">{model.criado_por || "Autor não definido"}</span>
                         </div>
-                        {/* CAMPO DE ÚLTIMA ATUALIZAÇÃO ADICIONADO ABAIXO */}
                         <div className="flex items-center gap-2 text-[10px] font-medium text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg mt-2">
                           <Clock size={12} />
                           <span>Atualizado: {new Date(model.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       </div>
 
-                      {/* AJUSTE NO BOTÃO USAR MODELO */}
                       <div className="flex flex-col gap-2 pt-4 border-t border-slate-50 dark:border-slate-800">
-                        {/* <div className="space-y-2 mb-4">
-                          <Label className="text-[10px] font-bold uppercase text-slate-400">Nome desta Planilha</Label>
-                          <Input 
-                            placeholder="Ex: Relatório Mensal Jan..." 
-                            className="h-8 text-xs"
-                            onChange={(e) => setNomePlanilha(e.target.value)}
-                          />
-                        </div> */}
                         <Button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Chamada da função onUseModel passando o modelo clicado
-                            // if (!nomePlanilha) return toast.error("Dê um nome para a planilha antes de continuar");
                             if (onUseModel && typeof onUseModel === 'function') {
                               onUseModel({...model, nome_customizado: 'Planilha sem título'});
                             } else {
@@ -294,7 +294,7 @@ export function NewSpreadsheetModal({ isOpen, onClose, onSave, onUseModel }: any
                     <Input 
                       value={criado_por} 
                       onChange={(e) => setCriadoPor(e.target.value)} 
-                      placeholder="Autor..."
+                      placeholder="Carregando autor..."
                       className="h-12 md:h-14 rounded-xl md:rounded-2xl border-slate-100 bg-slate-50/50 font-medium"
                     />
                   </div>
