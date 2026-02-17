@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { NewSpreadsheetModal } from "@/components/central63/spreadsheets/new-spreadsheets-modal";
 import { SpreadsheetFillView } from "@/components/central63/spreadsheets/spreadsheet-fill-view";
-import { SpreadsheetDetailsView } from "@/components/central63/spreadsheets/spreadsheet-details-view";
 import { 
   Search, Plus, Filter, LayoutGrid, List, MoreHorizontal, 
   Eye, Copy, Trash2, Briefcase, Users as UsersIcon, Calendar, 
@@ -86,7 +85,6 @@ export default function SpreadsheetsPage() {
   const [selectedModel, setSelectedModel] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("spreadsheets");
-  const [viewingData, setViewingData] = useState<any>(null);
   const [editingData, setEditingData] = useState<any>(null); // ESTADO PARA EDIÇÃO
 
   // --- BUSCA DADOS DA TABELA SPREADSHEET_DATA ---
@@ -139,6 +137,7 @@ export default function SpreadsheetsPage() {
 
       setEditingData({
         ...record,
+        nome_tabela: record.nome_tabela,
         modelStructure: modelData.dados 
       });
     } catch (error) {
@@ -152,6 +151,7 @@ export default function SpreadsheetsPage() {
         const { error } = await supabase
           .from('spreadsheet_data')
           .update({
+            nome_tabela: data.nome_tabela,
             unidade: data.unidade,
             secretaria: data.secretaria || "Geral",
             dados: data.dados, 
@@ -167,6 +167,7 @@ export default function SpreadsheetsPage() {
           .from('spreadsheet_data')
           .insert([
             {
+              nome_tabela: data.nome_tabela,
               unidade: data.unidade,
               secretaria: data.secretaria || "Geral",
               modelo_tabela: data.nome_modelo,
@@ -219,6 +220,7 @@ export default function SpreadsheetsPage() {
             model={{
                 id: editingData.id,
                 nome: editingData.modelo_tabela, 
+                nome_tabela: editingData.nome_tabela,
                 unidade: editingData.unidade, 
                 criado_por: editingData.preenchido_por,
                 dados: editingData.modelStructure 
@@ -226,21 +228,6 @@ export default function SpreadsheetsPage() {
             initialRows={editingData.dados} 
             onBack={() => setEditingData(null)} 
             onSaveData={handleSaveData}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // --- VIEW DE DETALHES ---
-  if (viewingData) {
-    return (
-      <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={(tab: string) => setActiveTab(tab)} />
-        <div className="flex-1 overflow-y-auto bg-slate-50/30 dark:bg-transparent min-h-screen">
-          <SpreadsheetDetailsView 
-            data={viewingData} 
-            onBack={() => setViewingData(null)} 
           />
         </div>
       </div>
@@ -295,7 +282,6 @@ export default function SpreadsheetsPage() {
         <div className="flex-1 overflow-y-auto p-4 lg:p-8">
           {/* BARRA DE PESQUISA E BOTÕES */}
           <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-center md:justify-between">
-            {/* CORREÇÃO DO ERRO DE HYDRATION: Adicionado suppressHydrationWarning */}
             <div className="flex flex-1 items-center gap-3 max-w-xl" suppressHydrationWarning>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -340,7 +326,7 @@ export default function SpreadsheetsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredSpreadsheets.map((item) => (
                     <Card key={item.id} className="group relative border-0 shadow-sm hover:shadow-2xl transition-all duration-300 bg-white dark:bg-card overflow-hidden rounded-[2rem] ring-1 ring-slate-100 dark:ring-slate-800">
-                      <div className="absolute top-0 left-0 right-0 h-24 opacity-30 bg-gradient-to-b from-blue-100 to-transparent" />
+                      <div className="absolute top-0 left-0 right-0 h-24 opacity-40 bg-gradient-to-b from-blue-100 to-transparent" />
                       <CardContent className="p-0 flex flex-col h-full relative z-10">
                         <div className="p-6 pb-2 flex justify-between items-start">
                           <div className="flex gap-4">
@@ -349,18 +335,18 @@ export default function SpreadsheetsPage() {
                             </Avatar>
                             <div>
                               <div className="flex items-center gap-2 mb-1">
-                                <Badge variant="secondary" className="font-mono text-[9px] h-5 bg-white border">DATA-{item.id.substring(0,4)}</Badge>
-                                <span className="text-[10px] font-bold uppercase text-blue-600 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Registro
+                                {/* <Badge variant="secondary" className="font-mono text-[9px] h-5 bg-white border">ID-{item.id.substring(0,4)}</Badge> */}
+                                <span className="text-[10px] font-bold uppercase text-blue-800 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> ID-{item.id.substring(0,4)}
                                 </span>
                               </div>
-                              <h3 className="font-bold text-lg text-slate-800 leading-tight truncate w-48">{item.modelo_tabela}</h3>
+                              <h3 className="font-bold text-lg text-slate-800 leading-tight truncate w-48">{item.nome_tabela || item.modelo_tabela}</h3>
+                              <p className="text-[10px] font-medium text-slate-400">Por: {item.preenchido_por || "Autor"}</p>
                             </div>
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="rounded-full"><MoreHorizontal size={18} /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="rounded-xl w-48">
-                              <DropdownMenuItem className="cursor-pointer" onClick={() => setViewingData(item)}><Eye className="mr-2 h-4 w-4"/> Visualizar Linhas</DropdownMenuItem>
                               <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditData(item)}><Edit2 className="mr-2 h-4 w-4"/> Editar Dados</DropdownMenuItem>
                               <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={() => handleDeleteData(item.id)}><Trash2 className="mr-2 h-4 w-4"/> Excluir</DropdownMenuItem>
                             </DropdownMenuContent>
@@ -369,27 +355,22 @@ export default function SpreadsheetsPage() {
 
                         <div className="px-6 py-4">
                           <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-4 grid grid-cols-2 gap-4 border border-slate-100 dark:border-slate-800">
+                            <div className="space-y-1"><p className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1"><FileSpreadsheet size={10} /> Modelo</p><p className="text-xs font-bold text-slate-700 truncate">{item.modelo_tabela}</p></div>
                             <div className="space-y-1"><p className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1"><Building2 size={10} /> Unidade</p><p className="text-xs font-bold text-slate-700 truncate">{item.unidade}</p></div>
-                            <div className="space-y-1"><p className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1"><UsersIcon size={10} /> Secretaria</p><p className="text-xs font-bold text-slate-700 truncate">{item.secretaria}</p></div>
                             <div className="col-span-2 pt-2 border-t flex items-center justify-between">
                               <p className="text-[10px] font-medium text-slate-400 flex items-center gap-1.5"><Calendar size={10} /> {new Date(item.created_at).toLocaleDateString('pt-BR')}</p>
-                              <p className="text-[10px] font-medium text-slate-400">Por: {item.preenchido_por || "Autor"}</p>
+                              <p className="text-[10px] font-medium text-slate-400 flex items-center gap-1.5">{item.dados?.length || 0} cadastrados</p>
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-auto px-6 pb-6 pt-0 flex flex-col gap-3">
-                          <div className="flex gap-3">
-                            <Button variant="outline" className="flex-1 h-10 rounded-xl text-xs font-bold" onClick={(e) => handleCopyLink(item.id, e)}>
-                              {copiedId === item.id ? <Check size={14} className="mr-2" /> : <LinkIcon size={14} className="mr-2" />} Link
-                            </Button>
-                            <Button variant="outline" className="flex-1 h-10 rounded-xl text-xs font-bold"><Download size={14} className="mr-2" /> PDF</Button>
-                          </div>
+                        <div className="mt-auto px-6 pb-0 pt-0 flex flex-col gap-3">
                           <Button 
                             className="w-full h-10 rounded-xl font-bold text-xs bg-blue-600 text-white hover:bg-blue-700"
-                            onClick={() => setViewingData(item)}
+                            onClick={() => handleEditData(item)}
                           >
-                            <List size={14} className="mr-2" /> Ver {item.dados?.length || 0} Linhas Inseridas
+                            <List size={14} className="mr-2" /> Ver Planilha
+                            {/* <List size={14} className="mr-2" /> Ver Planilha: {item.dados?.length || 0} linhas */}
                           </Button>
                         </div>
                       </CardContent>
@@ -402,8 +383,7 @@ export default function SpreadsheetsPage() {
                     <TableHeader>
                       <TableRow className="bg-slate-50/50">
                         <TableHead>Modelo</TableHead>
-                        <TableHead>Unidade / Secretaria</TableHead>
-                        <TableHead>Total Linhas</TableHead>
+                        <TableHead>Total de Linhas</TableHead>
                         <TableHead>Preenchido por</TableHead>
                         <TableHead>Data</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
@@ -412,29 +392,23 @@ export default function SpreadsheetsPage() {
                     <TableBody>
                       {filteredSpreadsheets.map((item) => (
                         <TableRow key={item.id} className="group">
-                          <TableCell onClick={() => setViewingData(item)} className="cursor-pointer">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><FileSpreadsheet size={16} /></div>
-                              <span className="font-bold text-sm">{item.modelo_tabela}</span>
-                            </div>
-                          </TableCell>
                           <TableCell className="text-sm">
                             <div className="flex flex-col">
                               <span className="font-medium">{item.unidade}</span>
                               <span className="text-[10px] text-slate-400">{item.secretaria}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm font-black text-blue-600">{item.dados?.length || 0} linhas</TableCell>
+                          <TableCell className="text-sm text-slate-500">{item.dados?.length || 0} linhas</TableCell>
                           <TableCell className="text-sm text-slate-500">{item.preenchido_por}</TableCell>
                           <TableCell className="text-sm text-slate-400">{new Date(item.created_at).toLocaleDateString('pt-BR')}</TableCell>
                           <TableCell className="text-right">
                              <div className="flex items-center justify-end gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => setViewingData(item)}>
+                                <Button variant="ghost" size="icon" onClick={() => handleEditData(item)}>
                                    <Eye size={16} className="text-slate-400" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleEditData(item)}>
+                                {/* <Button variant="ghost" size="icon" onClick={() => handleEditData(item)}>
                                    <Edit2 size={16} className="text-slate-400" />
-                                </Button>
+                                </Button> */}
                                 <Button variant="ghost" size="icon" className="text-slate-400 hover:text-red-500" onClick={() => handleDeleteData(item.id)}>
                                   <Trash2 size={16} />
                                 </Button>

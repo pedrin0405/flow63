@@ -40,6 +40,7 @@ export function NewSpreadsheetModal({ isOpen, onClose, onSave, onUseModel }: any
   const [criado_por, setCriadoPor] = useState("");
   const [fields, setFields] = useState<Field[]>([]);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [nomePlanilha, setNomePlanilha] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -209,12 +210,21 @@ export function NewSpreadsheetModal({ isOpen, onClose, onSave, onUseModel }: any
 
                       {/* AJUSTE NO BOTÃO USAR MODELO */}
                       <div className="flex flex-col gap-2 pt-4 border-t border-slate-50 dark:border-slate-800">
+                        {/* <div className="space-y-2 mb-4">
+                          <Label className="text-[10px] font-bold uppercase text-slate-400">Nome desta Planilha</Label>
+                          <Input 
+                            placeholder="Ex: Relatório Mensal Jan..." 
+                            className="h-8 text-xs"
+                            onChange={(e) => setNomePlanilha(e.target.value)}
+                          />
+                        </div> */}
                         <Button 
                           onClick={(e) => {
                             e.stopPropagation();
                             // Chamada da função onUseModel passando o modelo clicado
+                            // if (!nomePlanilha) return toast.error("Dê um nome para a planilha antes de continuar");
                             if (onUseModel && typeof onUseModel === 'function') {
-                              onUseModel(model);
+                              onUseModel({...model, nome_customizado: 'Planilha sem título'});
                             } else {
                               toast.error("Erro: Ação de uso não configurada.");
                             }
