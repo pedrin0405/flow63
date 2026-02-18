@@ -10,7 +10,9 @@ import {
   CheckCircle2, 
   User,
   Briefcase,
-  ShieldCheck
+  ShieldCheck,
+  Mail,
+  Phone
 } from "lucide-react"
 import {
   Dialog,
@@ -63,9 +65,6 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      {/* 1. showCloseButton={false}: Remove o botão nativo do componente UI.
-          2. Mantemos a estrutura de layout e scroll.
-      */}
       <DialogContent 
         showCloseButton={false} 
         className="sm:max-w-[700px] w-[95%] h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-white dark:bg-zinc-950"
@@ -96,7 +95,6 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                 </div>
               </div>
 
-              {/* --- SEU BOTÃO MANUAL REINSERIDO AQUI --- */}
               <button 
                 onClick={onClose} 
                 className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors -mr-2 -mt-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
@@ -179,6 +177,26 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                       <label className="text-xs font-bold text-slate-400 uppercase">Nome Completo</label>
                       <div className="text-base font-bold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-zinc-900 p-3.5 rounded-xl border border-slate-100 dark:border-zinc-800">
                         {details.nome}
+                      </div>
+                    </div>
+
+                    {/* NOVOS CAMPOS: EMAIL E TELEFONE */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">
+                          <Mail size={12} /> E-mail
+                        </label>
+                        <div className="text-sm font-bold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-zinc-900 p-3.5 rounded-xl border border-slate-100 dark:border-zinc-800 truncate">
+                          {details.email || "Não informado"}
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">
+                          <Phone size={12} /> Telefone
+                        </label>
+                        <div className="text-sm font-bold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-zinc-900 p-3.5 rounded-xl border border-slate-100 dark:border-zinc-800">
+                          {details.telefone || "Não informado"}
+                        </div>
                       </div>
                     </div>
                     
