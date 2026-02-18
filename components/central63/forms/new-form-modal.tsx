@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ScrollArea } from "@/components/ui/scroll-area" // Importação adicionada
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { supabase } from "@/lib/supabase"
 
 interface NewFormModalProps {
@@ -36,13 +36,11 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
   const [brokers, setBrokers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  // Busca dados iniciais
   useEffect(() => {
     if (isOpen) {
       const initData = async () => {
         setIsLoading(true)
         try {
-          // 1. Busca usuário logado
           const { data: { user } } = await supabase.auth.getUser()
           if (user) {
             const userName = user.user_metadata?.full_name || 
@@ -52,14 +50,34 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
             setSecretaryName(userName)
           }
 
-          // 2. Busca corretores
-          const { data: brokersData, error: brokersError } = await supabase
-            .from('corretores_pmw')
-            .select('id, nome')
-            .order('nome', { ascending: true })
+          const [pmwResponse, auxResponse] = await Promise.all([
+            supabase.from('corretores_pmw').select('id, nome'),
+            supabase.from('corretores_aux').select('id, nome')
+          ])
 
-          if (brokersError) throw brokersError
-          setBrokers(brokersData || [])
+          if (pmwResponse.error) throw pmwResponse.error
+          if (auxResponse.error) throw auxResponse.error
+
+          // 1. Junta as listas
+          const combined = [
+            ...(pmwResponse.data || []),
+            ...(auxResponse.data || [])
+          ]
+
+          // 2. Remove duplicados baseando-se no NOME (ignora maiúsculas/minúsculas e espaços extras)
+          const uniqueBrokers = combined.reduce((acc: any[], current) => {
+            const x = acc.find(item => item.nome.trim().toLowerCase() === current.nome.trim().toLowerCase())
+            if (!x) {
+              return acc.concat([current])
+            } else {
+              return acc
+            }
+          }, [])
+
+          // 3. Ordena alfabeticamente
+          const sortedBrokers = uniqueBrokers.sort((a, b) => a.nome.localeCompare(b.nome))
+
+          setBrokers(sortedBrokers)
 
         } catch (error) {
           console.error("Erro ao carregar dados:", error)
@@ -67,22 +85,14 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
           setIsLoading(false)
         }
       }
-
       initData()
     }
   }, [isOpen])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (!clientName || !brokerName || !secretaryName) return
-
-    onSubmit({
-      clientName,
-      brokerName,
-      secretaryName
-    })
-
+    onSubmit({ clientName, brokerName, secretaryName })
     setClientName("")
     setBrokerName("")
     onClose()
@@ -91,7 +101,6 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] gap-0 p-0 overflow-hidden rounded-2xl">
-        {/* Header Fixo */}
         <div className="p-6 pb-4 border-b">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
@@ -104,12 +113,8 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col">
-          
-          {/* Área de Scroll para os Campos */}
           <ScrollArea className="max-h-[60vh] px-6 py-4">
             <div className="space-y-6 p-1">
-              
-              {/* Campo Cliente */}
               <div className="space-y-2">
                 <Label htmlFor="client" className="text-xs font-bold uppercase text-muted-foreground">
                   Nome do Cliente
@@ -127,7 +132,6 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
                 </div>
               </div>
 
-              {/* Campo Corretor */}
               <div className="space-y-2">
                 <Label htmlFor="broker" className="text-xs font-bold uppercase text-muted-foreground">
                   Corretor Responsável
@@ -142,7 +146,8 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
                   <SelectContent>
                     {brokers.length > 0 ? (
                       brokers.map((broker) => (
-                        <SelectItem key={broker.id} value={broker.nome}>
+                        // Usamos o NOME como key agora que garantimos que ele é único
+                        <SelectItem key={broker.nome} value={broker.nome}>
                           {broker.nome}
                         </SelectItem>
                       ))
@@ -155,7 +160,6 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
                 </Select>
               </div>
 
-              {/* Campo Secretária */}
               <div className="space-y-2">
                 <Label htmlFor="secretary" className="text-xs font-bold uppercase text-muted-foreground">
                   Secretária (Responsável)
@@ -172,11 +176,9 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
                   />
                 </div>
               </div>
-
             </div>
           </ScrollArea>
 
-          {/* Footer Fixo */}
           <div className="p-6 pt-4 border-t bg-gray-50/50 dark:bg-zinc-900/50">
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl h-11 font-bold">
@@ -191,7 +193,6 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
               </Button>
             </DialogFooter>
           </div>
-
         </form>
       </DialogContent>
     </Dialog>
