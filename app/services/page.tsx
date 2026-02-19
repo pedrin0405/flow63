@@ -143,8 +143,8 @@ export default function Central63App() {
       try {
         // Busca corretores e seus departamentos em ambas as tabelas
         const [resPmw, resAux] = await Promise.all([
-          supabase.from('corretores_pmw').select('*'),
-          supabase.from('corretores_aux').select('*')
+          supabase.from('corretores_pmw').select('id, nome, departamento,imagem_url'),
+          supabase.from('corretores_aux').select('id, nome, departamento,imagem_url')
         ]);
 
         const corretoresPmw = resPmw.data || [];

@@ -4,6 +4,9 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
+
+import { SuportePopup } from "@/components/central63/support/support-popup"
+
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
@@ -43,6 +46,7 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         {children}
+        <SuportePopup />
         <Analytics />
       </body>
     </html>

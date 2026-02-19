@@ -1,5 +1,6 @@
 "use client"
 
+
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { 
@@ -9,6 +10,7 @@ import {
   Building2,
   LogOut,
   FileText,
+  MessageCircle,
   ChartPie,
   Settings, 
   HelpCircle, 
@@ -323,6 +325,14 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               label="Configurações" 
               active={isActive("config", "/settings")} 
               onClick={() => handleNavigation("config", "/settings")}
+              collapsed={isCollapsed}
+            />
+
+            <SidebarItem 
+              icon={MessageCircle} 
+              label="Chat de Suporte" 
+              active={isActive("chat", "/chat-support")} 
+              onClick={() => handleNavigation("chat", "/chat-support")}
               collapsed={isCollapsed}
             />
 
