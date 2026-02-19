@@ -38,7 +38,7 @@ export default function Central63App() {
   // Estados de Dados
   const [selectedLead, setSelectedLead] = useState<any | null>(null)
   const [leadsData, setLeadsData] = useState<any[]>([]) 
-  const [totalItems, setTotalItems] = useState(0) // Estado adicionado para contagem exata do Supabase
+  const [totalItems, setTotalItems] = useState(0) 
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -50,7 +50,7 @@ export default function Central63App() {
   // Controle do Modal
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<"edit" | "sale">("edit")
-  const [listaCorretores, setListaCorretores] = useState<any[]>([]) // MOCK REMOVIDO
+  const [listaCorretores, setListaCorretores] = useState<any[]>([]) 
   
   // Filtros
   const [filters, setFilters] = useState({
@@ -69,8 +69,6 @@ export default function Central63App() {
   const handleUpdateSupabase = async () => {
     setIsUpdating(true)
     try {
-      // Faz a requisição em background ("aciona" o link)
-      // mode: 'no-cors' permite disparar a requisição mesmo se o servidor não retornar headers CORS
       await fetch("https://n8n.srv1207506.hstgr.cloud/webhook/f9908aaf-229a-4df3-a95c-0dba6546305e", { method: "GET", mode: "no-cors" })
 
       toast({
@@ -138,10 +136,11 @@ export default function Central63App() {
   useEffect(() => {
     const fetchBrokersAndTeams = async () => {
       try {
-        // Busca corretores e seus departamentos em ambas as tabelas
+        // OTIMIZAÇÃO: Removido 'imagem_url' e 'id' do payload.
+        // O select agora traz o mínimo necessário para popular os dropdowns de filtro.
         const [resPmw, resAux] = await Promise.all([
-          supabase.from('corretores_pmw').select('id, nome, departamento'),
-          supabase.from('corretores_aux').select('id, nome, departamento')
+          supabase.from('corretores_pmw').select('nome, departamento'),
+          supabase.from('corretores_aux').select('nome, departamento')
         ]);
 
         const corretoresPmw = resPmw.data || [];
@@ -152,9 +151,8 @@ export default function Central63App() {
 
         [...corretoresPmw, ...corretoresAux].forEach(c => {
             if (c.nome && !mapNomes.has(c.nome)) {
-                mapNomes.set(c.nome, c.imagem_url || "");
+                mapNomes.set(c.nome, { depto: c.departamento });
             }
-            // Coleta departamentos válidos para o filtro de equipes
             if (c.departamento && c.departamento.trim() !== "") {
               departamentosSet.add(c.departamento.trim());
             }
@@ -162,14 +160,17 @@ export default function Central63App() {
 
         const corretoresFormatados = Array.from(mapNomes.keys())
           .sort()
-          .map((nome, index) => ({
-            id: index + 100,
-            name: nome,
-            avatar: mapNomes.get(nome)
-          }));
+          .map((nome, index) => {
+            const data = mapNomes.get(nome);
+            return {
+              id: index + 100,
+              name: nome,
+              departamento: data.depto 
+            }
+          });
 
         setListaCorretores(corretoresFormatados);
-        setTeams(Array.from(departamentosSet).sort()); // Define as opções do filtro de equipe
+        setTeams(Array.from(departamentosSet).sort());
 
       } catch (error) {
         console.error("Erro ao carregar lista de corretores e equipes:", error);
@@ -182,7 +183,6 @@ export default function Central63App() {
   const fetchLeads = useCallback(async () => {
     setIsLoading(true)
     try {
-      // 1. Configuração do Contexto
       const isPmw = !filters.city || filters.city === "Palmas"
       const currentPrefix = isPmw ? "pmw" : "aux"
 
@@ -194,18 +194,54 @@ export default function Central63App() {
       const tableCorretores = isPmw ? "corretores_pmw" : "corretores_aux" 
       
       // ---------------------------------------------------------
-      // ETAPA 1: Busca Atendimentos (Paginação Automática Server-Side)
+      // ETAPA 1: Busca Atendimentos (DB Filtering & Pagination)
       // ---------------------------------------------------------
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
+      let selectString = `*, ${tableLead} (*)`
+      let searchTerm = "";
+      let isNumericSearch = false;
+
+      if (filters.search) {
+          searchTerm = filters.search.trim();
+          isNumericSearch = /^\d+$/.test(searchTerm);
+          if (!isNumericSearch) {
+              selectString = `*, ${tableLead}!inner (*)`;
+          }
+      }
+
       let query = supabase
         .from(tableAtendimento)
-        .select(`*, ${tableLead} (*)`, { count: 'exact' })
+        .select(selectString, { count: 'exact' })
         .range(from, to);
 
       if (filters.status) query = query.eq('situacao', filters.status)
       if (filters.purpose !== "Todos") query = query.eq('finalidade', filters.purpose)
+      
+      if (filters.search) {
+          if (isNumericSearch) {
+              query = query.ilike('codigo', `${searchTerm}%`);
+          } else {
+              query = query.ilike(`${tableLead}.nome`, `%${searchTerm}%`);
+          }
+      }
+
+      if (filters.brokerId) {
+          const selectedBroker = listaCorretores.find(b => b.id.toString() === filters.brokerId.toString())
+          if (selectedBroker) {
+              query = query.eq('corretor', selectedBroker.name)
+          }
+      }
+
+      if (filters.team) {
+          const brokersInTeam = listaCorretores.filter(b => b.departamento === filters.team).map(b => b.name);
+          if (brokersInTeam.length > 0) {
+              query = query.in('corretor', brokersInTeam);
+          } else {
+              query = query.eq('equipe', filters.team);
+          }
+      }
       
       const { data, count, error } = await query;
       
@@ -224,14 +260,14 @@ export default function Central63App() {
         return;
       }
 
-      // Prepara IDs Seguros
       const itemsWithSafeIds = allAtendimentos.map((item: any, index: number) => {
          const safeId = item.id || item.codigo || index;
          return { ...item, safeId };
       });
 
       // ---------------------------------------------------------
-      // ETAPA 1.5: Busca Dados dos Corretores (Avatar e Departamento)
+      // ETAPA 1.5: Busca Dados dos Corretores
+      // Aqui sim buscamos os avatares, mas APENAS dos corretores desta página
       // ---------------------------------------------------------
       const uniqueBrokerNames = Array.from(new Set(
         allAtendimentos
@@ -240,7 +276,7 @@ export default function Central63App() {
       )) as string[];
 
       let brokerAvatarMap: Record<string, string> = {} 
-      let brokerDeptMap: Record<string, string> = {} // Mapa para armazenar departamento por nome
+      let brokerDeptMap: Record<string, string> = {}
 
       if (uniqueBrokerNames.length > 0) {
         const { data: brokersData, error: errBrokers } = await supabase
@@ -252,7 +288,6 @@ export default function Central63App() {
           brokersData.forEach((broker: any) => {
             if (broker.nome) {
                 if (broker.imagem_url) brokerAvatarMap[broker.nome] = broker.imagem_url
-                // Armazena o departamento limpo (trim) para facilitar comparação
                 if (broker.departamento) brokerDeptMap[broker.nome] = broker.departamento.trim()
             }
           })
@@ -335,7 +370,7 @@ export default function Central63App() {
             const chunk = idsToVerify.slice(i, i + verifyBatchSize);
             const { data: vendasMatches, error: errVendas } = await supabase
                 .from('vendas')
-                .select('id, valor_venda') // Buscamos o valor lançado
+                .select('id, valor_venda') 
                 .in('id', chunk)
             
             if (!errVendas && vendasMatches) {
@@ -403,8 +438,7 @@ export default function Central63App() {
         
         const clientName = linkedLead.nome || "Cliente";
         const fullIdToCheck = `${currentPrefix}_${item.safeId}`;
-        const saleInfo = salesDataMap.get(fullIdToCheck); // Obtém os dados da venda
-        const isOnDash = salesDataMap.has(fullIdToCheck);
+        const saleInfo = salesDataMap.get(fullIdToCheck); 
         
         const details = imovelDetailsMap[item.codigo] || { url: null, valor: 0, address: "Endereço Pendente" }
         const resolvedImage = details.url || "https://app.imoview.com.br//Front/img/house1.png"
@@ -416,8 +450,6 @@ export default function Central63App() {
         const brokerAvatar = brokerAvatarMap[brokerName] 
           || `https://static.vecteezy.com/ti/vetor-gratis/p1/15934676-icone-de-perfil-de-imagem-icone-masculino-humanos-ou-pessoas-assinam-e-simbolizam-vetor.jpg`;
         
-        // Define a equipe com base no departamento do corretor mapeado
-        // Prioridade: Mapa (tabela corretores) -> Item direto (tabela atendimento) -> Fallback
         const teamName = brokerDeptMap[brokerName] || (item.equipe ? item.equipe.trim() : "Sem Equipe");
 
         const resolvedHistory = interactionsMap[item.codigo] || [
@@ -436,7 +468,6 @@ export default function Central63App() {
         const rawDate = item.created_at || item.data_cadastro || new Date().toISOString();
         const formattedDate = new Date(rawDate).toLocaleDateString("pt-BR");
 
-
         return {
           id: item.safeId, 
           sourceTable: isPmw ? "atendimento_pmw" : "atendimento_aux",
@@ -453,7 +484,7 @@ export default function Central63App() {
           },
 
           phase: matchedPhase, 
-          team: teamName, // Agora contém o departamento correto
+          team: teamName, 
           city: filters.city || (isPmw ? "Palmas" : "Outra"),
           purpose: item.finalidade || "Indefinido",
           status: item.situacao || "Novo",
@@ -478,7 +509,7 @@ export default function Central63App() {
           raw_midia: item.midia,
           
           visibleOnDashboard: !!saleInfo, 
-          valueLaunched: saleInfo?.valorVenda || 0, // Novo campo com o valor do dash
+          valueLaunched: saleInfo?.valorVenda || 0, 
         }
       })
 
@@ -490,42 +521,19 @@ export default function Central63App() {
     } finally {
       setIsLoading(false)
     }
-  }, [filters.city, filters.status, filters.purpose, currentPage, toast]) // currentPage adicionado nas dependências para refetch no evento de paginação
+  }, [filters, currentPage, toast, listaCorretores]) 
 
   useEffect(() => {
     fetchLeads()
   }, [fetchLeads])
 
-  // --- FILTROS (Lógica Client-Side) ---
+  // --- FILTROS (Fallback de Segurança Client-Side) ---
   const filteredLeads = useMemo(() => {
     return leadsData.filter(lead => {
-      // 1. Busca por Texto
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase()
-        const matchesName = lead.clientName.toLowerCase().includes(searchLower)
-        const matchesId = lead.id.toString().includes(searchLower)
-        const matchesBroker = lead.broker.name.toLowerCase().includes(searchLower)
-        if (!matchesName && !matchesId && !matchesBroker) return false
-      }
-
-      // 2. Filtro por Corretor
-      if (filters.brokerId) {
-        const selectedBroker = listaCorretores.find(b => b.id.toString() === filters.brokerId.toString())
-        if (selectedBroker && lead.broker.name !== selectedBroker.name) return false
-      }
-
-      // 3. Filtro por Equipe (Departamento)
-      if (filters.team) {
-         // Compara o departamento do lead (obtido do corretor) com o filtro selecionado
-         if (lead.team !== filters.team) return false;
-      }
-
-      // 4. Filtro por Fase
       if (filters.phase) {
          if (lead.phase.id.toString() !== filters.phase.toString()) return false;
       }
 
-      // 5. Filtro por Data
       if (filters.dateStart || filters.dateEnd) {
         const leadDate = parseDateBr(lead.leadData.createdAt);
         if (leadDate) {
@@ -544,14 +552,14 @@ export default function Central63App() {
 
       return true
     })
-  }, [filters, leadsData, listaCorretores])
+  }, [filters, leadsData])
 
-  const totalPages = Math.ceil(totalItems / itemsPerPage) // Atualizado para usar o número real de itens do DB
-  const paginatedLeads = filteredLeads // Removemos o ".slice" porque os dados já estão paginados do server
+  const totalPages = Math.ceil(totalItems / itemsPerPage) 
+  const paginatedLeads = filteredLeads 
   
   const stats = useMemo(() => {
     return {
-      total: totalItems, // Atualizado para exibir o montante total retornado do banco
+      total: totalItems, 
       negotiation: filteredLeads.filter(l => l.status === "Negócio realizado").length,
       volume: filteredLeads.reduce((acc, curr) => acc + (curr.value || 0), 0)
     }
@@ -611,8 +619,6 @@ export default function Central63App() {
     }
   }
 
-  // console.log("Rederizando leads:", leadsData)
-
   return (
     <Suspense fallback={<Loading />}>
       <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground selection:bg-primary/10 selection:text-primary">
@@ -625,7 +631,6 @@ export default function Central63App() {
               <Users className="text-primary hidden lg:block" />
               <h2 className="text-2xl font-bold text-foreground tracking-tight">Gestao de Atendimentos</h2>
             </div>
-            {/* Botão Modificado para Atualizar Supabase */}
             <button 
               onClick={handleUpdateSupabase}
               disabled={isUpdating}

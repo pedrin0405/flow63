@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Search, X, Filter, CalendarDays, ChevronDown, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,6 +49,18 @@ export function Filters({
   statuses,
   purposes
 }: FiltersProps) {
+  // Estado local para o input de busca não disparar requests a cada letra
+  const [localSearch, setLocalSearch] = useState(filters.search)
+
+  // Sincroniza o estado local caso os filtros sejam limpos externamente
+  useEffect(() => {
+    setLocalSearch(filters.search)
+  }, [filters.search])
+
+  const handleSearchTrigger = () => {
+    onFilterChange("search", localSearch)
+  }
+
   // Verifica se há filtros ativos (exceto busca e finalidade, que são "padrão")
   const activeFiltersCount = [
     filters.city,
@@ -101,13 +114,24 @@ export function Filters({
         {/* Área Principal: Busca + Finalidade */}
         <div className="flex flex-1 items-center gap-2 w-full">
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <button 
+              onClick={handleSearchTrigger}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors cursor-pointer p-1 rounded-md"
+              title="Buscar"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <Input
               type="text"
-              placeholder="Buscar atendimentos..."
-              className="pl-9 h-10 w-full bg-background/50 border-transparent focus:bg-background transition-all rounded-xl"
-              value={filters.search}
-              onChange={e => onFilterChange("search", e.target.value)}
+              placeholder="Buscar atendimentos (Aperte Enter)..."
+              className="pl-10 h-10 w-full bg-background/50 border-transparent focus:bg-background transition-all rounded-xl"
+              value={localSearch}
+              onChange={e => setLocalSearch(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  handleSearchTrigger()
+                }
+              }}
             />
           </div>
 
@@ -194,7 +218,6 @@ export function Filters({
 
                 <Separator className="bg-border/60" />
 
-                {/* Filtro de Equipe agora usa o mesmo estilo do Corretor (Select Nativo) */}
                 <FilterSection title="Equipe">
                     <select 
                         className="w-full h-10 px-3 text-sm bg-background rounded-lg border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
@@ -206,29 +229,7 @@ export function Filters({
                      </select>
                 </FilterSection>
 
-
-                 {/* <FilterSection title="Fase do Funil">
-                   <div className="space-y-1">
-                      <SelectItemCustom 
-                        label="Todas as Fases" 
-                        isSelected={!filters.phase} 
-                        onClick={() => onFilterChange("phase", "")} 
-                      />
-                      {phases.map(p => (
-                        <SelectItemCustom 
-                          key={p.id} 
-                          label={p.label} 
-                          isSelected={filters.phase === p.id.toString()} 
-                          onClick={() => onFilterChange("phase", p.id.toString())} 
-                        />
-                      ))}
-                   </div>
-                </FilterSection>
-
-                <Separator /> */}
-
                 <FilterSection title="Corretor">
-                   {/* Usando Select nativo aqui apenas para lista longa, ou poderia ser outro SelectItemCustom com scroll */}
                      <select 
                         className="w-full p-2 text-sm bg-muted/30 rounded-md border border-border outline-none focus:ring-2 focus:ring-primary/20"
                         value={filters.brokerId}
@@ -308,7 +309,6 @@ export function Filters({
                         </div>
                     </div>
                 </div>
-                 {/* Calendário Visual opcional pode ser adicionado aqui */}
              </PopoverContent>
           </Popover>
 
@@ -358,6 +358,12 @@ export function Filters({
                 <Badge variant="secondary" className="bg-background border border-border/60 text-muted-foreground font-normal gap-1 hover:bg-muted pl-2">
                   Corretor: <span className="text-foreground font-medium truncate max-w-[100px]">{brokers.find(b => b.id.toString() === filters.brokerId)?.name}</span>
                   <X className="h-3 w-3 ml-1 cursor-pointer hover:text-foreground" onClick={() => onFilterChange("brokerId", "")} />
+               </Badge>
+            )}
+            {filters.search && (
+                <Badge variant="secondary" className="bg-background border border-border/60 text-muted-foreground font-normal gap-1 hover:bg-muted pl-2">
+                  Busca: <span className="text-foreground font-medium truncate max-w-[150px]">{filters.search}</span>
+                  <X className="h-3 w-3 ml-1 cursor-pointer hover:text-foreground" onClick={() => onFilterChange("search", "")} />
                </Badge>
             )}
          </div>
