@@ -1,30 +1,55 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { MessageCircle, Send, X } from 'lucide-react'
+import { MessageCircle, Send, X, User, Mail, Loader2, Check } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { supabase } from "@/lib/supabase"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+
+// Configuração dos atendentes disponíveis
+const ATENDENTES = [
+  { id: 'marketing_1', nome: 'Equipa Marketing', cargo: 'Marketing', avatar: '' },
+  { id: 'gestor_1', nome: 'Gestor de Suporte', cargo: 'Gestão', avatar: '' },
+]
 
 export function SuportePopup() {
   const [isOpen, setIsOpen] = useState(false)
   const [mensagem, setMensagem] = useState("")
   const [mensagens, setMensagens] = useState<any[]>([])
   const [chamadoId, setChamadoId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  
+  // Estados para identificação e seleção
+  const [userData, setUserData] = useState({ nome: "", email: "" })
+  const [atendenteSelecionado, setAtendenteSelecionado] = useState<any>(null)
+  const [isIdentifying, setIsIdentifying] = useState(false)
+  
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
-  // 1. Ao carregar, verifica se já existe um chamado guardado no navegador
+  // 1. Verifica se já existe um chamado ou utilizador logado
   useEffect(() => {
     const idSalvo = localStorage.getItem('flow63_chamado_id')
     if (idSalvo) {
       setChamadoId(idSalvo)
       carregarHistorico(idSalvo)
     }
+
+    async function checkUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserData({ 
+          nome: user.user_metadata?.full_name || user.email?.split('@')[0] || "Utilizador", 
+          email: user.email || "" 
+        })
+      }
+    }
+    checkUser()
   }, [])
 
-  // 2. Realtime: Ouve novas mensagens sempre que o chamadoId mudar ou o chat abrir
+  // 2. Realtime para novas mensagens
   useEffect(() => {
     if (chamadoId && isOpen) {
       const canal = supabase
@@ -63,19 +88,35 @@ export function SuportePopup() {
     scrollToBottom()
   }
 
-  async function enviarMensagem() {
-    if (!mensagem.trim()) return
+  async function iniciarEEnviar() {
+    if (!mensagem.trim() || isLoading) return
+    
+    // Se não houver chamado e os dados/atendente estiverem vazios, pede identificação
+    if (!chamadoId && (!userData.nome || !userData.email || !atendenteSelecionado)) {
+      setIsIdentifying(true)
+      return
+    }
 
+    setIsLoading(true)
     let currentChamadoId = chamadoId
 
-    // 3. Se não houver chamado ativo, cria um agora
     if (!currentChamadoId) {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: novoChamado, error } = await supabase
         .from('suporte_chamados')
         .insert({ 
-          usuario_id: user?.id || null, // null para deslogados
-          status: 'aberto'
+          usuario_id: user?.id || null,
+          status: 'aberto',
+          tag: 'novo',
+          metadados: {
+            nome: userData.nome,
+            email: userData.email,
+            atendente_preferencia: atendenteSelecionado?.nome,
+            atendente_cargo: atendenteSelecionado?.cargo,
+            avatar_url: user?.user_metadata?.avatar_url || null,
+            plataforma: window.navigator.platform,
+            origem: 'Chat Pop-up'
+          }
         })
         .select()
         .single()
@@ -98,8 +139,10 @@ export function SuportePopup() {
       })
       
       setMensagem("")
+      setIsIdentifying(false)
       scrollToBottom()
     }
+    setIsLoading(false)
   }
 
   return (
@@ -113,42 +156,104 @@ export function SuportePopup() {
         <PopoverContent side="top" align="end" className="w-80 h-[500px] p-0 rounded-[2rem] overflow-hidden border-none shadow-2xl bg-card">
           <div className="bg-blue-600 p-5 text-white">
             <h3 className="font-bold text-lg leading-none mb-1">Suporte Central63</h3>
-            <p className="text-xs opacity-70">Estamos online para ajudar</p>
+            <p className="text-xs opacity-70">
+              {isIdentifying ? "Configure seu atendimento" : "Estamos online para ajudar"}
+            </p>
           </div>
           
           <ScrollArea ref={scrollAreaRef} className="h-[340px] p-4 bg-slate-50 dark:bg-slate-900/50">
-            <div className="flex flex-col gap-3">
-              {mensagens.length === 0 && (
-                <p className="text-center text-xs text-muted-foreground mt-4">
-                  Olá! Como podemos ajudar hoje?
-                </p>
-              )}
-              {mensagens.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.eh_admin ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${
-                    msg.eh_admin 
-                    ? 'bg-white dark:bg-slate-800 text-foreground rounded-tl-none border' 
-                    : 'bg-[#dcf8c6] dark:bg-[#056162] text-slate-900 dark:text-white rounded-tr-none'
-                  }`}>
-                    {msg.conteudo}
+            {isIdentifying ? (
+              <div className="flex flex-col gap-4 py-4 animate-in fade-in slide-in-from-bottom-2">
+                <p className="text-[11px] text-slate-500 font-medium px-1 uppercase tracking-wider">Identificação</p>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 text-slate-400" size={16} />
+                    <Input 
+                      placeholder="Seu nome" 
+                      className="pl-10 h-11 bg-white border-slate-200 rounded-xl"
+                      value={userData.nome}
+                      onChange={(e) => setUserData({...userData, nome: e.target.value})}
+                    />
+                  </div>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 text-slate-400" size={16} />
+                    <Input 
+                      placeholder="Seu e-mail" 
+                      type="email"
+                      className="pl-10 h-11 bg-white border-slate-200 rounded-xl"
+                      value={userData.email}
+                      onChange={(e) => setUserData({...userData, email: e.target.value})}
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <p className="text-[11px] text-slate-500 font-medium px-1 uppercase tracking-wider mt-2">Escolha com quem falar</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {ATENDENTES.map((atendente) => (
+                    <div 
+                      key={atendente.id}
+                      onClick={() => setAtendenteSelecionado(atendente)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                        atendenteSelecionado?.id === atendente.id 
+                        ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' 
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-slate-100 text-[10px] font-bold">{atendente.nome.substring(0,2)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">{atendente.nome}</p>
+                        <p className="text-[10px] text-slate-500">{atendente.cargo}</p>
+                      </div>
+                      {atendenteSelecionado?.id === atendente.id && <Check size={14} className="text-blue-600" />}
+                    </div>
+                  ))}
+                </div>
+
+                <Button onClick={iniciarEEnviar} className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-xl mt-2 font-bold shadow-lg shadow-blue-600/20">
+                  Iniciar Atendimento
+                </Button>
+                <button onClick={() => setIsIdentifying(false)} className="text-[11px] text-slate-400 hover:text-slate-600 transition-colors font-medium">Cancelar</button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {mensagens.length === 0 && (
+                  <p className="text-center text-xs text-muted-foreground mt-4">
+                    Olá! Como podemos ajudar hoje?
+                  </p>
+                )}
+                {mensagens.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.eh_admin ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${
+                      msg.eh_admin 
+                      ? 'bg-white dark:bg-slate-800 text-foreground rounded-tl-none border border-slate-100' 
+                      : 'bg-blue-600 text-white rounded-tr-none'
+                    }`}>
+                      {msg.conteudo}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </ScrollArea>
 
-          <div className="p-4 flex gap-2 items-center border-t bg-card">
-            <Input 
-              placeholder="Digite sua dúvida..." 
-              value={mensagem} 
-              onChange={(e) => setMensagem(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && enviarMensagem()}
-              className="rounded-full bg-slate-100 dark:bg-slate-800 border-none h-10"
-            />
-            <Button size="icon" onClick={enviarMensagem} className="rounded-full bg-[#075E54] hover:bg-[#128C7E] shrink-0 h-10 w-10">
-              <Send className="h-4 w-4 text-white" />
-            </Button>
-          </div>
+          {!isIdentifying && (
+            <div className="p-4 border-t bg-card">
+              <div className="flex gap-2 items-center">
+                <Input 
+                  placeholder="Digite sua dúvida..." 
+                  value={mensagem} 
+                  onChange={(e) => setMensagem(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && iniciarEEnviar()}
+                  className="rounded-full bg-slate-100 dark:bg-slate-800 border-none h-10 px-4 focus-visible:ring-1 focus-visible:ring-blue-500"
+                />
+                <Button size="icon" onClick={iniciarEEnviar} disabled={isLoading} className="rounded-full bg-blue-600 hover:bg-blue-700 shrink-0 h-10 w-10 shadow-md">
+                  {isLoading ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <Send className="h-4 w-4 text-white" />}
+                </Button>
+              </div>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     </div>

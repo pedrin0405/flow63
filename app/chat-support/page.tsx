@@ -6,7 +6,7 @@ import {
   Search, Clock, ChevronRight, CheckCheck, 
   Paperclip, StickyNote, History, CheckCircle2,
   Settings, Globe, Cpu, Hash, ShieldCheck, 
-  Zap, Loader2, Save, Trash2, MessageCircle
+  Zap, Loader2, Save, Trash2, MessageCircle, Mail
 } from "lucide-react"
 import { Sidebar } from "../../components/central63/sidebar"
 import { supabase } from "../../lib/supabase"
@@ -117,23 +117,46 @@ export default function App() {
     }
   }
 
-  // CORREÇÃO 3: Função de Deletar com remoção prévia das mensagens (Evita erro de Foreign Key)
+  // CORREÇÃO: Lógica de exclusão persistente no banco de dados
   async function excluirChamado(e: React.MouseEvent, id: string) {
     e.stopPropagation(); 
     if (!confirm("Tem certeza que deseja apagar este atendimento de forma permanente?")) return;
 
-    // Remove as mensagens primeiro para não dar erro de restrição no banco
-    await supabase.from('suporte_mensagens').delete().eq('chamado_id', id);
-    
-    // Agora remove o chamado
-    const { error } = await supabase.from('suporte_chamados').delete().eq('id', id);
-    
-    if (!error) {
-      toast({ title: "Atendimento removido com sucesso", variant: "default" });
-      if (chamadoSelecionado?.id === id) setChamadoSelecionado(null);
-      carregarChamados();
-    } else {
-      toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
+    try {
+      // 1. Deletar as mensagens primeiro para evitar erro de Foreign Key
+      const { error: errorMessages } = await supabase
+        .from('suporte_mensagens')
+        .delete()
+        .eq('chamado_id', id);
+
+      if (errorMessages) throw errorMessages;
+
+      // 2. Deletar o chamado definitivamente do banco de dados
+      const { error: errorChamado } = await supabase
+        .from('suporte_chamados')
+        .delete()
+        .eq('id', id);
+
+      if (errorChamado) throw errorChamado;
+
+      // 3. Atualizar estados locais apenas após confirmação do banco
+      toast({ title: "Atendimento removido permanentemente" });
+      
+      if (chamadoSelecionado?.id === id) {
+        setChamadoSelecionado(null);
+        setMensagens([]);
+      }
+      
+      // Filtra a lista local para remover o item sem precisar de um novo fetch imediato
+      setChamados(prev => prev.filter(c => c.id !== id));
+
+    } catch (error: any) {
+      console.error("Erro ao deletar:", error);
+      toast({ 
+        title: "Erro ao remover do banco", 
+        description: error.message, 
+        variant: "destructive" 
+      });
     }
   }
 
@@ -178,7 +201,6 @@ export default function App() {
   if (isLoading) return <Loading />
 
   return (
-    // Ajuste de background para um tom mais macOS (F5F5F7)
     <div className="flex h-screen bg-[#F5F5F7] dark:bg-background overflow-hidden font-sans">
       <Sidebar 
         isOpen={sidebarOpen} 
@@ -215,7 +237,6 @@ export default function App() {
 
         <div className="flex-1 overflow-hidden p-6 lg:p-8 flex gap-6">
           
-          {/* COLUNA 1: Lista de Tickets (Smart List) */}
           <div className="w-[320px] flex flex-col bg-white rounded-[1.5rem] border border-slate-200/60 shadow-lg shadow-slate-200/40 overflow-hidden shrink-0">
             <div className="p-4 border-b border-slate-100">
               <div className="relative group">
@@ -229,7 +250,6 @@ export default function App() {
                   <div 
                     key={c.id} 
                     onClick={() => setChamadoSelecionado(c)}
-                    // CORREÇÃO 1: Design de seleção Apple-like (Suave, sem atrapalhar leitura)
                     className={`group flex flex-col p-4 rounded-[1rem] cursor-pointer transition-all duration-200 relative ${
                       chamadoSelecionado?.id === c.id 
                       ? 'bg-[#E8F0FE] shadow-md shadow-blue-600/20 ring-1 ring-blue-500/30' 
@@ -238,16 +258,20 @@ export default function App() {
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <Avatar className="h-9 w-9 border border-slate-100 shadow-sm">
-                        <AvatarFallback className={chamadoSelecionado?.id === c.id ? 'bg-blue-600 text-white text-[11px] font-bold' : 'bg-slate-100 text-slate-600 text-[11px] font-bold'}>
-                          {c.usuario_id ? 'U' : 'V'}
-                        </AvatarFallback>
+                        {c.metadados?.avatar_url ? (
+                          <img src={c.metadados.avatar_url} className="object-cover" />
+                        ) : (
+                          <AvatarFallback className={chamadoSelecionado?.id === c.id ? 'bg-blue-600 text-white text-[11px] font-bold' : 'bg-slate-100 text-slate-600 text-[11px] font-bold'}>
+                            {c.metadados?.nome?.substring(0, 1).toUpperCase() || (c.usuario_id ? 'U' : 'V')}
+                          </AvatarFallback>
+                        )}
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-semibold truncate leading-tight ${chamadoSelecionado?.id === c.id ? 'text-slate-900' : 'text-slate-800'}`}>
-                          {c.usuario_id ? `Utilizador #${c.usuario_id.substring(0, 5)}` : `Visitante ${c.id.substring(0, 4)}`}
+                          {c.metadados?.nome || (c.usuario_id ? `Utilizador #${c.usuario_id.substring(0, 5)}` : `Visitante ${c.id.substring(0, 4)}`)}
                         </p>
                         <p className={`text-[11px] truncate font-medium mt-0.5 ${chamadoSelecionado?.id === c.id ? 'text-blue-600/80' : 'text-slate-400'}`}>
-                          {new Date(c.atualizado_em).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {c.metadados?.email || new Date(c.atualizado_em).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </p>
                       </div>
                     </div>
@@ -263,19 +287,22 @@ export default function App() {
             </ScrollArea>
           </div>
 
-          {/* COLUNA 2: Janela de Chat Central */}
           <div className="flex-1 flex flex-col bg-white rounded-[1.5rem] border border-slate-200/60 shadow-lg shadow-slate-200/40 overflow-hidden min-w-0">
             {chamadoSelecionado ? (
               <>
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white/50 backdrop-blur-md z-20">
                   <div className="flex items-center gap-4">
                     <Avatar className="h-10 w-10 ring-1 ring-slate-200 shadow-sm">
-                      <AvatarFallback className="bg-gradient-to-br from-slate-800 to-slate-900 text-white font-bold text-xs">
-                        {chamadoSelecionado.id.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
+                      {chamadoSelecionado.metadados?.avatar_url ? (
+                        <img src={chamadoSelecionado.metadados.avatar_url} className="object-cover" />
+                      ) : (
+                        <AvatarFallback className="bg-gradient-to-br from-slate-800 to-slate-900 text-white font-bold text-xs">
+                          {chamadoSelecionado.metadados?.nome?.substring(0, 2).toUpperCase() || chamadoSelecionado.id.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <div>
-                      <h3 className="font-semibold text-base text-slate-900">Suporte #{chamadoSelecionado.id.substring(0, 8)}</h3>
+                      <h3 className="font-semibold text-base text-slate-900">{chamadoSelecionado.metadados?.nome || `Suporte #${chamadoSelecionado.id.substring(0, 8)}`}</h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                         <span className="text-[11px] text-slate-500 font-medium">Sincronizado</span>
@@ -316,7 +343,7 @@ export default function App() {
                           <div className={`max-w-[75%] flex flex-col ${msg.eh_admin ? 'items-end' : 'items-start'}`}>
                             <div className={`px-5 py-3 rounded-[1.2rem] text-[14px] shadow-sm leading-relaxed ${
                               msg.eh_admin 
-                              ? 'bg-[#007AFF] text-white rounded-br-sm' // Apple iMessage Blue
+                              ? 'bg-[#007AFF] text-white rounded-br-sm'
                               : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
                             }`}>
                               {msg.conteudo}
@@ -358,7 +385,6 @@ export default function App() {
             )}
           </div>
 
-          {/* COLUNA 3: CRM & Notas */}
           <div className="w-[320px] flex flex-col shrink-0 gap-6">
             {chamadoSelecionado ? (
               <div className="bg-white rounded-[1.5rem] border border-slate-200/60 shadow-lg shadow-slate-200/40 flex flex-col overflow-hidden h-full">
@@ -370,30 +396,33 @@ export default function App() {
                     </TabsList>
                   </div>
 
-                  {/* CORREÇÃO 4: Aba Perfil com Absolute Inset para garantir o ScrollArea perfeito */}
                   <TabsContent value="info" className="flex-1 overflow-hidden m-0 relative data-[state=active]:flex flex-col">
                     <div className="absolute inset-0 overflow-y-auto">
                       <div className="p-6 space-y-8">
                         <div className="flex flex-col items-center text-center">
                           <Avatar className="h-20 w-20 mb-4 shadow-sm border border-slate-100">
-                            <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-xl">
-                              {chamadoSelecionado.usuario_id ? 'U' : 'V'}
-                            </AvatarFallback>
+                            {chamadoSelecionado.metadados?.avatar_url ? (
+                              <img src={chamadoSelecionado.metadados.avatar_url} className="rounded-full object-cover" />
+                            ) : (
+                              <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-xl">
+                                {chamadoSelecionado.metadados?.nome?.substring(0, 1) || 'V'}
+                              </AvatarFallback>
+                            )}
                           </Avatar>
-                          <h4 className="font-semibold text-slate-900 text-[15px]">Informações do Ticket</h4>
-                          <span className="text-[11px] font-medium text-slate-400 mt-1">ID: {chamadoSelecionado.id.substring(0, 12)}</span>
+                          <h4 className="font-semibold text-slate-900 text-[15px]">{chamadoSelecionado.metadados?.nome || 'Informações do Ticket'}</h4>
+                          <span className="text-[11px] font-medium text-blue-600 mt-1">{chamadoSelecionado.metadados?.email || `ID: ${chamadoSelecionado.id.substring(0, 12)}`}</span>
                         </div>
 
                         <div className="space-y-6">
                           <div className="space-y-3">
-                            <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Sistema</h5>
+                            <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Contato</h5>
+                            <div className="bg-slate-50 p-3 rounded-xl flex justify-between items-center text-sm border border-slate-100">
+                              <span className="font-medium text-slate-500">Email</span>
+                              <span className="font-semibold text-slate-800 text-xs">{chamadoSelecionado.metadados?.email || 'N/A'}</span>
+                            </div>
                             <div className="bg-slate-50 p-3 rounded-xl flex justify-between items-center text-sm border border-slate-100">
                               <span className="font-medium text-slate-500">Plataforma</span>
                               <span className="font-semibold text-slate-800">{chamadoSelecionado.metadados?.plataforma || 'Desconhecida'}</span>
-                            </div>
-                            <div className="bg-slate-50 p-3 rounded-xl flex justify-between items-center text-sm border border-slate-100">
-                              <span className="font-medium text-slate-500">Localização</span>
-                              <span className="font-semibold text-slate-800">{chamadoSelecionado.metadados?.localizacao || 'Não informada'}</span>
                             </div>
                           </div>
 
@@ -415,10 +444,8 @@ export default function App() {
                     </div>
                   </TabsContent>
 
-                  {/* CORREÇÃO 2: Aba Notas estilo Apple Notes (Fundo branco, texto limpo, sem bordas pesadas) */}
                   <TabsContent value="notes" className="flex-1 overflow-hidden m-0 relative data-[state=active]:flex flex-col bg-white">
                     <div className="absolute inset-0 flex flex-col p-6">
-                      
                       <div className="flex items-center justify-center mb-6 relative">
                          <span className="text-[11px] font-medium text-slate-400">
                             {new Date(chamadoSelecionado.atualizado_em).toLocaleString([], { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
@@ -444,7 +471,6 @@ export default function App() {
                         )}
                       </div>
                       
-                      {/* O salvamento automático já funciona pelo onBlur, mas mantivemos o botão opcional e mais discreto */}
                       <div className="pt-4 border-t border-slate-50 mt-auto">
                         <Button 
                           onClick={guardarNota} 
@@ -456,7 +482,6 @@ export default function App() {
                           {noteSaved ? 'Guardado' : 'Guardar Manualmente'}
                         </Button>
                       </div>
-
                     </div>
                   </TabsContent>
                 </Tabs>
