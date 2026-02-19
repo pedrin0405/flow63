@@ -7,7 +7,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/central63/sidebar"
-import { StatCard } from "@/components/central63/stat-card"
+import { StatCard } from "@/components/central63/services/stat-card"
 import { Filters } from "@/components/central63/filters"
 import { LeadCard } from "@/components/central63/lead-card"
 import { Pagination } from "@/components/central63/pagination"
@@ -30,10 +30,6 @@ const PHASES = [
   { id: 6, label: "Fechamento", percent: 100 },
 ]
 
-const MOCK_BROKERS = [
-  { id: 0, name: "Carregando...", avatar: "" },
-]
-
 export default function Central63App() {
   const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -42,6 +38,7 @@ export default function Central63App() {
   // Estados de Dados
   const [selectedLead, setSelectedLead] = useState<any | null>(null)
   const [leadsData, setLeadsData] = useState<any[]>([]) 
+  const [totalItems, setTotalItems] = useState(0) // Estado adicionado para contagem exata do Supabase
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -53,7 +50,7 @@ export default function Central63App() {
   // Controle do Modal
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<"edit" | "sale">("edit")
-  const [listaCorretores, setListaCorretores] = useState<any[]>(MOCK_BROKERS)
+  const [listaCorretores, setListaCorretores] = useState<any[]>([]) // MOCK REMOVIDO
   
   // Filtros
   const [filters, setFilters] = useState({
@@ -68,7 +65,7 @@ export default function Central63App() {
     dateEnd: ""
   })
 
-  // Função para lidar com o click no botão Atualizar [!code ++]
+  // Função para lidar com o click no botão Atualizar
   const handleUpdateSupabase = async () => {
     setIsUpdating(true)
     try {
@@ -143,8 +140,8 @@ export default function Central63App() {
       try {
         // Busca corretores e seus departamentos em ambas as tabelas
         const [resPmw, resAux] = await Promise.all([
-          supabase.from('corretores_pmw').select('id, nome, departamento,imagem_url'),
-          supabase.from('corretores_aux').select('id, nome, departamento,imagem_url')
+          supabase.from('corretores_pmw').select('id, nome, departamento'),
+          supabase.from('corretores_aux').select('id, nome, departamento')
         ]);
 
         const corretoresPmw = resPmw.data || [];
@@ -197,40 +194,32 @@ export default function Central63App() {
       const tableCorretores = isPmw ? "corretores_pmw" : "corretores_aux" 
       
       // ---------------------------------------------------------
-      // ETAPA 1: Busca Atendimentos (Paginação Automática)
+      // ETAPA 1: Busca Atendimentos (Paginação Automática Server-Side)
       // ---------------------------------------------------------
-      let allAtendimentos: any[] = [];
-      let hasMore = true;
-      let from = 0;
-      const batchSize = 1000;
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
 
-      while (hasMore) {
-        let query = supabase
-          .from(tableAtendimento)
-          .select(`*, ${tableLead} (*)`)
-          .range(from, from + batchSize - 1);
+      let query = supabase
+        .from(tableAtendimento)
+        .select(`*, ${tableLead} (*)`, { count: 'exact' })
+        .range(from, to);
 
-        if (filters.status) query = query.eq('situacao', filters.status)
-        if (filters.purpose !== "Todos") query = query.eq('finalidade', filters.purpose)
-        
-        const { data, error } = await query;
-        
-        if (error) {
-            console.error("Erro na query Supabase:", error);
-            throw error;
-        }
-        
-        if (data && data.length > 0) {
-          allAtendimentos = [...allAtendimentos, ...data];
-          from += batchSize;
-          if (data.length < batchSize) hasMore = false;
-        } else {
-          hasMore = false;
-        }
+      if (filters.status) query = query.eq('situacao', filters.status)
+      if (filters.purpose !== "Todos") query = query.eq('finalidade', filters.purpose)
+      
+      const { data, count, error } = await query;
+      
+      if (error) {
+          console.error("Erro na query Supabase:", error);
+          throw error;
       }
+      
+      if (count !== null) setTotalItems(count);
+      let allAtendimentos: any[] = data || [];
 
       if (allAtendimentos.length === 0) {
         setLeadsData([]);
+        setTotalItems(0);
         setIsLoading(false);
         return;
       }
@@ -501,7 +490,7 @@ export default function Central63App() {
     } finally {
       setIsLoading(false)
     }
-  }, [filters.city, filters.status, filters.purpose, toast])
+  }, [filters.city, filters.status, filters.purpose, currentPage, toast]) // currentPage adicionado nas dependências para refetch no evento de paginação
 
   useEffect(() => {
     fetchLeads()
@@ -557,19 +546,19 @@ export default function Central63App() {
     })
   }, [filters, leadsData, listaCorretores])
 
-  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
-  const paginatedLeads = filteredLeads.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const totalPages = Math.ceil(totalItems / itemsPerPage) // Atualizado para usar o número real de itens do DB
+  const paginatedLeads = filteredLeads // Removemos o ".slice" porque os dados já estão paginados do server
   
   const stats = useMemo(() => {
     return {
-      total: filteredLeads.length,
+      total: totalItems, // Atualizado para exibir o montante total retornado do banco
       negotiation: filteredLeads.filter(l => l.status === "Negócio realizado").length,
       volume: filteredLeads.reduce((acc, curr) => acc + (curr.value || 0), 0)
     }
-  }, [filteredLeads])
+  }, [filteredLeads, totalItems])
 
   const handleFilterChange = (key: string, value: string) => { setFilters(prev => ({ ...prev, [key]: value })); setCurrentPage(1) }
-  const handleClearFilters = () => { setFilters({ city: "Palmas", team: "", purpose: "Todos", status: "", phase: "", search: "", brokerId: "", dateStart: "", dateEnd: "" }) }
+  const handleClearFilters = () => { setFilters({ city: "Palmas", team: "", purpose: "Todos", status: "", phase: "", search: "", brokerId: "", dateStart: "", dateEnd: "" }); setCurrentPage(1); }
   const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
   const formatCompact = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(value)
 
@@ -672,7 +661,7 @@ export default function Central63App() {
               purposes={PURPOSES} 
             />
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-muted-foreground font-medium"><span className="text-foreground font-bold">{filteredLeads.length}</span> resultados encontrados</h3>
+              <h3 className="text-muted-foreground font-medium"><span className="text-foreground font-bold">{totalItems}</span> resultados encontrados</h3>
             </div>
 
             {isLoading ? (
@@ -686,8 +675,6 @@ export default function Central63App() {
                     formatCurrency={formatCurrency}
                     onClick={() => setSelectedLead(lead)}
                     onAddToDashboard={(e) => handleAddToDashboard(lead)}
-                    // Se o LeadCard for um componente customizado que você criou,
-                    // ele agora terá acesso a lead.valueLaunched
                   />
                 ))}
               </div>
@@ -700,7 +687,7 @@ export default function Central63App() {
               </div>
             )}
 
-            {filteredLeads.length > 0 && totalPages > 1 && (
+            {totalItems > 0 && totalPages > 1 && (
               <div className="py-8"><Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} /></div>
             )}
             <footer className="border-t border-border pt-6 pb-8 text-center"><p className="text-sm text-muted-foreground">2026 - <span className="font-semibold text-foreground">Central63</span></p></footer>
@@ -708,12 +695,9 @@ export default function Central63App() {
         </main>
 
         <DetailsDrawer 
-          // Exibe o lead apenas se o modal de edição estiver fechado
           lead={!editModalOpen ? selectedLead : null} 
           onClose={() => setSelectedLead(null)} 
-          // Use a função formatCurrency que já está definida no seu componente (linha 548)
           formatCurrency={formatCurrency} 
-          // Use a lógica para abrir o modal de edição corretamente
           onEditClick={() => { 
             setModalMode("edit"); 
             setEditModalOpen(true); 
@@ -726,7 +710,7 @@ export default function Central63App() {
           onClose={() => { 
             setEditModalOpen(false); 
             setModalMode("edit");
-            setSelectedLead(null); // Limpa o lead ao fechar para garantir que o Drawer não "brote" depois
+            setSelectedLead(null);
           }} 
           onSave={handleSaveData} 
           mode={modalMode} 

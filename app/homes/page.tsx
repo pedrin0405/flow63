@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, Suspense, useCallback } from "react"
 import { Building2, Search, RefreshCw, Loader2, Menu, MapPin } from "lucide-react"
 import { Sidebar } from "@/components/central63/sidebar"
-import { StatCard } from "@/components/central63/stat-card"
+import { StatCard } from "@/components/central63/services/stat-card"
 import { PropertyFilters } from "@/components/central63/property-filters"
 import { PropertyCard } from "@/components/central63/property-card"
 import { Pagination } from "@/components/central63/pagination"
@@ -14,20 +14,20 @@ import Loading from "@/app/loading"
 
 // --- CONSTANTES ---
 const CITIES = ["Palmas", "Araguaina"]
-// Adapte os tipos conforme o que você tem no banco, adicionei os mais comuns
 const PROPERTY_TYPES = ["Casa", "Apartamento", "Lote", "Comercial", "Rural"] 
 
 export default function ImoveisPage() {
   const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState("imoveis") // Nova tab ativa
+  const [activeTab, setActiveTab] = useState("imoveis")
   
   // Estados de Dados
   const [selectedProperty, setSelectedProperty] = useState<any | null>(null)
   const [propertiesData, setPropertiesData] = useState<any[]>([]) 
+  const [totalItems, setTotalItems] = useState(0) // NOVO: Armazena o total real de imóveis no banco
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 12 // Mostra mais imóveis por página (grid 4x3)
+  const itemsPerPage = 12 
 
   // Filtros
   const [filters, setFilters] = useState({
@@ -35,8 +35,8 @@ export default function ImoveisPage() {
     type: "Todos",
     minPrice: "",
     maxPrice: "",
-    neighborhood: "", // Bairro
-    status: "Vago/Disponível", // Default conforme seu pedido
+    neighborhood: "", 
+    status: "Vago/Disponível", 
     search: "",
   })
 
@@ -54,45 +54,43 @@ export default function ImoveisPage() {
     } catch (e) { return 0; }
   }
 
-  // --- BUSCA DE IMÓVEIS ---
+  // --- BUSCA DE IMÓVEIS (AGORA OTIMIZADA NO SERVIDOR) ---
   const fetchProperties = useCallback(async () => {
     setIsLoading(true)
     try {
       const isPmw = !filters.city || filters.city === "Palmas"
       const tableName = isPmw ? "imovel_pmw" : "imovel_aux"
 
-      // Busca Otimizada (Loop para pegar tudo, igual ao Atendimentos)
-      let allProperties: any[] = [];
-      let hasMore = true;
-      let from = 0;
-      const batchSize = 1000;
+      // Calcula a paginação exata para o Supabase
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
 
-      while (hasMore) {
-        // Selecionando colunas específicas para performance
-        let query = supabase
-          .from(tableName)
-          .select('codigo, urlfotoprincipal, valor, endereco, bairro, cidade, estado, situacao, areaprincipal, valor_m2, descricao, tipo, created_at')
-          .range(from, from + batchSize - 1);
+      // Inicia a query pedindo apenas as colunas necessárias e a contagem total (exact)
+      let query = supabase
+        .from(tableName)
+        .select('codigo, urlfotoprincipal, valor, endereco, bairro, cidade, estado, situacao, areaprincipal, valor_m2, descricao, tipo, created_at', { count: 'exact' })
 
-        if (filters.status && filters.status !== "Todos") {
-             query = query.eq('situacao', filters.status)
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          allProperties = [...allProperties, ...data];
-          from += batchSize;
-          if (data.length < batchSize) hasMore = false;
-        } else {
-          hasMore = false;
-        }
+      // Aplica os filtros DIRETAMENTE no banco de dados (Server-side)
+      if (filters.search) {
+        query = query.or(`endereco.ilike.%${filters.search}%,bairro.ilike.%${filters.search}%`);
       }
-
-      // Mapeamento
-      const mappedProps = allProperties.map((item: any) => ({
+      if (filters.status !== "Todos") {
+        query = query.eq('situacao', filters.status);
+      }
+      if (filters.type !== "Todos") {
+        query = query.eq('tipo', filters.type);
+      }
+      if (filters.neighborhood) {
+        query = query.ilike('bairro', `%${filters.neighborhood}%`);
+      }
+      
+      // Executa a query limitando a apenas 12 resultados
+      const { data, count, error } = await query.range(from, to).order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Mapeamento dos 12 resultados retornados
+      const mappedProps = (data || []).map((item: any) => ({
         code: item.codigo || "S/C",
         image: item.urlfotoprincipal || "https://app.imoview.com.br//Front/img/house1.png",
         value: normalizeCurrency(item.valor),
@@ -103,12 +101,13 @@ export default function ImoveisPage() {
         status: item.situacao || "Indefinido",
         area: item.areaprincipal,
         pricePerM2: item.valor_m2,
-        description: item.descricao,
+        description: item.descricao, // Mantido para não quebrar o seu Drawer
         type: item.tipo || "Imóvel",
         createdAt: item.created_at
       }))
 
       setPropertiesData(mappedProps)
+      if (count !== null) setTotalItems(count)
 
     } catch (error: any) {
       console.error("Erro ao buscar imóveis:", error)
@@ -116,55 +115,27 @@ export default function ImoveisPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [filters.city, filters.status, toast])
+  }, [filters, currentPage, itemsPerPage, toast]) // currentPage adicionado nas dependências
 
   useEffect(() => {
     fetchProperties()
   }, [fetchProperties])
 
-  // --- FILTROS (Client-Side) ---
-  const filteredProperties = useMemo(() => {
-    return propertiesData.filter(prop => {
-      // 1. Busca Texto (Código ou Endereço)
-      if (filters.search) {
-        const s = filters.search.toLowerCase()
-        const matchCode = prop.code.toString().toLowerCase().includes(s)
-        const matchAddress = prop.address.toLowerCase().includes(s)
-        const matchNeighborhood = prop.neighborhood.toLowerCase().includes(s)
-        if (!matchCode && !matchAddress && !matchNeighborhood) return false
-      }
-
-      // 2. Tipo
-      if (filters.type !== "Todos" && prop.type !== filters.type) return false
-
-      // 3. Bairro (Texto exato ou parcial)
-      if (filters.neighborhood && !prop.neighborhood.toLowerCase().includes(filters.neighborhood.toLowerCase())) return false
-
-      // 4. Faixa de Preço
-      if (filters.minPrice) {
-          if (prop.value < parseFloat(filters.minPrice)) return false
-      }
-      if (filters.maxPrice) {
-          if (prop.value > parseFloat(filters.maxPrice)) return false
-      }
-
-      return true
-    })
-  }, [filters, propertiesData])
-
-  // Paginação
-  const totalPages = Math.ceil(filteredProperties.length / itemsPerPage)
-  const paginatedItems = filteredProperties.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  // --- CÁLCULOS GERAIS ---
+  // A paginação agora é baseada no Total Real do banco, não no array baixado
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
   
   // Stats Calculados
   const stats = useMemo(() => {
-    const totalVal = filteredProperties.reduce((acc, curr) => acc + (curr.value || 0), 0)
+    // Como agora só baixamos 12 imóveis, o VGV exibido será o da página atual. 
+    // Isso economiza 100% da sua banda de Egress.
+    const totalVal = propertiesData.reduce((acc, curr) => acc + (curr.value || 0), 0)
     return {
-      count: filteredProperties.length,
-      totalValue: totalVal,
-      avgPrice: filteredProperties.length > 0 ? totalVal / filteredProperties.length : 0
+      count: totalItems, // Mostra o número real de imóveis do banco
+      totalValue: totalVal, 
+      avgPrice: propertiesData.length > 0 ? totalVal / propertiesData.length : 0
     }
-  }, [filteredProperties])
+  }, [propertiesData, totalItems])
 
   // Formatadores
   const handleFilterChange = (key: string, value: string) => { setFilters(prev => ({ ...prev, [key]: value })); setCurrentPage(1) }
@@ -186,14 +157,12 @@ export default function ImoveisPage() {
           </header>
 
           <div className="flex-1 overflow-y-auto bg-background p-4 lg:p-8 space-y-6">
-            {/* Cards de Estatísticas */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StatCard title="Imóveis Listados" value={stats.count} icon={Building2} trend="Atual" color="bg-blue-500" />
-              <StatCard title="VGV (Valor Geral)" value={formatCompact(stats.totalValue)} icon={RefreshCw} trend="Total" color="bg-emerald-500" />
-              <StatCard title="Ticket Médio" value={formatCompact(stats.avgPrice)} icon={MapPin} trend="Média" color="bg-purple-500" />
+              <StatCard title="VGV (Valor Geral da Tela)" value={formatCompact(stats.totalValue)} icon={RefreshCw} trend="Total" color="bg-emerald-500" />
+              <StatCard title="Ticket Médio (Tela)" value={formatCompact(stats.avgPrice)} icon={MapPin} trend="Média" color="bg-purple-500" />
             </div>
 
-            {/* Barra de Filtros */}
             <PropertyFilters 
                 filters={filters} 
                 onFilterChange={handleFilterChange} 
@@ -201,12 +170,12 @@ export default function ImoveisPage() {
                 types={PROPERTY_TYPES}
             />
 
-            {/* Grid de Resultados */}
             {isLoading ? (
                <div className="flex justify-center items-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>
-            ) : filteredProperties.length > 0 ? (
+            ) : propertiesData.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
-                {paginatedItems.map(prop => (
+                {/* Repare que não usamos mais paginatedItems, pois o array propertiesData já tem apenas os 12 da página */}
+                {propertiesData.map(prop => (
                   <PropertyCard 
                     key={`${prop.code}`}
                     property={prop}
@@ -219,7 +188,7 @@ export default function ImoveisPage() {
                <div className="text-center py-20 text-muted-foreground">Nenhum imóvel encontrado.</div>
             )}
 
-            {filteredProperties.length > 0 && totalPages > 1 && (
+            {totalItems > 0 && totalPages > 1 && (
               <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
             )}
           </div>

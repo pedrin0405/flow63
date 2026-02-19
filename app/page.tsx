@@ -6,7 +6,7 @@ import {
   MapPin, Trophy, Menu, LayoutDashboard, CheckCircle2
 } from "lucide-react"
 import { Sidebar } from "@/components/central63/sidebar"
-import { StatCard } from "@/components/central63/stat-card"
+import { StatCard } from "@/components/central63/services/stat-card"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 

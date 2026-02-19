@@ -51,6 +51,8 @@ export default function App() {
   const [isSending, setIsSending] = useState(false)
   const [noteSaved, setNoteSaved] = useState(false)
 
+  const [userRole, setUserRole] = useState<string | null>(null)
+
   useEffect(() => {
     carregarChamados()
   }, [])
