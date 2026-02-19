@@ -51,8 +51,6 @@ export default function App() {
   const [isSending, setIsSending] = useState(false)
   const [noteSaved, setNoteSaved] = useState(false)
 
-  const [userRole, setUserRole] = useState<string | null>(null)
-
   useEffect(() => {
     carregarChamados()
   }, [])
@@ -117,48 +115,32 @@ export default function App() {
     }
   }
 
-  // CORREÇÃO: Lógica de exclusão persistente no banco de dados
-  async function excluirChamado(e: React.MouseEvent, id: string) {
-    e.stopPropagation(); 
-    if (!confirm("Tem certeza que deseja apagar este atendimento de forma permanente?")) return;
+  // AJUSTE: Função de exclusão utilizando ID exato e limpando estados de forma persistente
+  async function excluirChamado(e: React.MouseEvent, idParaExcluir: string) {
+  e.stopPropagation(); 
+  if (!confirm("Tem certeza que deseja apagar este atendimento de forma permanente?")) return;
 
-    try {
-      // 1. Deletar as mensagens primeiro para evitar erro de Foreign Key
-      const { error: errorMessages } = await supabase
-        .from('suporte_mensagens')
-        .delete()
-        .eq('chamado_id', id);
+  try {
+    // 1. Deleta mensagens primeiro para evitar erro de Foreign Key
+    await supabase.from('suporte_mensagens').delete().eq('chamado_id', idParaExcluir);
+    
+    // 2. Deleta o chamado
+    const { error } = await supabase.from('suporte_chamados').delete().eq('id', idParaExcluir);
+    
+    if (error) throw error;
 
-      if (errorMessages) throw errorMessages;
-
-      // 2. Deletar o chamado definitivamente do banco de dados
-      const { error: errorChamado } = await supabase
-        .from('suporte_chamados')
-        .delete()
-        .eq('id', id);
-
-      if (errorChamado) throw errorChamado;
-
-      // 3. Atualizar estados locais apenas após confirmação do banco
-      toast({ title: "Atendimento removido permanentemente" });
-      
-      if (chamadoSelecionado?.id === id) {
-        setChamadoSelecionado(null);
-        setMensagens([]);
-      }
-      
-      // Filtra a lista local para remover o item sem precisar de um novo fetch imediato
-      setChamados(prev => prev.filter(c => c.id !== id));
-
-    } catch (error: any) {
-      console.error("Erro ao deletar:", error);
-      toast({ 
-        title: "Erro ao remover do banco", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+    // 3. LIMPEZA IMEDIATA DO FRONT-END (Isso evita que ele volte ao atualizar)
+    setChamados(prev => prev.filter(c => c.id !== idParaExcluir));
+    if (chamadoSelecionado?.id === idParaExcluir) {
+      setChamadoSelecionado(null);
+      setMensagens([]);
     }
+
+    toast({ title: "Atendimento removido com sucesso" });
+  } catch (error: any) {
+    toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
   }
+}
 
   async function guardarNota() {
     if (!chamadoSelecionado || isSavingNote) return
