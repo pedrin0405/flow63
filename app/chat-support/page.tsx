@@ -112,7 +112,6 @@ export default function App() {
   }
 
   async function carregarMensagens(chamado: any) {
-    // Sincroniza a nota interna ao carregar o chat
     setNotaInterna(chamado.notas_internas || "")
     const { data } = await supabase.from('suporte_mensagens').select('*').eq('chamado_id', chamado.id).order('criado_em', { ascending: true })
     setMensagens(data || [])
@@ -171,7 +170,7 @@ export default function App() {
     if (!error) {
       setNoteSaved(true)
       toast({ title: "Notas guardadas" })
-      carregarChamadosSilencioso() // Atualiza a lista lateral para refletir a mudança
+      carregarChamadosSilencioso()
       setTimeout(() => setNoteSaved(false), 3000)
     } else {
       toast({ title: "Erro ao salvar nota", variant: "destructive" })
@@ -405,6 +404,15 @@ export default function App() {
                           <span className="text-[11px] font-medium text-blue-600 mt-1">{chamadoSelecionado.metadados?.email || `ID: ${chamadoSelecionado.id.substring(0, 12)}`}</span>
                         </div>
                         <div className="space-y-6">
+                          {/* NOVA FUNCIONALIDADE: ATENDIMENTO SELECIONADO */}
+                          <div className="space-y-3">
+                            <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Atendimento Selecionado</h5>
+                            <div className="bg-blue-50/50 p-3 rounded-xl flex flex-col gap-1 border border-blue-100/50">
+                              <span className="font-bold text-slate-800 text-sm">{chamadoSelecionado.metadados?.atendente_preferencia || 'Não especificado'}</span>
+                              <span className="text-[11px] text-blue-600 font-semibold">{chamadoSelecionado.metadados?.atendente_cargo || 'Nenhum cargo definido'}</span>
+                            </div>
+                          </div>
+
                           <div className="space-y-3">
                             <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Contato</h5>
                             <div className="bg-slate-50 p-3 rounded-xl flex justify-between items-center text-sm border border-slate-100">
