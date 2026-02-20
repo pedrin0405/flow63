@@ -55,36 +55,45 @@ export default function App() {
     carregarChamados()
   }, [])
 
+  // EFEITO REALTIME PARA LISTA E CHAT
   useEffect(() => {
+    // 1. Canal para a lista de chamados (Garante que novos tickets apareçam na hora)
+    const canalLista = supabase
+      .channel('lista-tickets-realtime')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'suporte_chamados' 
+      }, () => {
+        carregarChamadosSilencioso(); // Atualiza a lista sem o Loading global
+      })
+      .subscribe();
+
+    // 2. Canal para mensagens do chat aberto
+    let canalChat: any;
     if (chamadoSelecionado) {
-      carregarMensagens(chamadoSelecionado.id)
-      setNotaInterna(chamadoSelecionado.notas_internas || "")
-      setNoteSaved(false)
-      
-      const canal = supabase
-        .channel(`atendimento-realtime-${chamadoSelecionado.id}`)
+      canalChat = supabase
+        .channel(`chat-ativo-${chamadoSelecionado.id}`)
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
           table: 'suporte_mensagens',
           filter: `chamado_id=eq.${chamadoSelecionado.id}` 
         }, (payload) => {
-          setMensagens((prev) => [...prev, payload.new])
-          scrollToBottom()
+          setMensagens((prev) => {
+            if (prev.find(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+          scrollToBottom();
         })
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'suporte_chamados',
-          filter: `id=eq.${chamadoSelecionado.id}`
-        }, (payload) => {
-          setChamadoSelecionado(payload.new)
-        })
-        .subscribe()
-        
-      return () => { supabase.removeChannel(canal) }
+        .subscribe();
     }
-  }, [chamadoSelecionado?.id])
+
+    return () => {
+      supabase.removeChannel(canalLista);
+      if (canalChat) supabase.removeChannel(canalChat);
+    };
+  }, [chamadoSelecionado?.id]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -100,47 +109,63 @@ export default function App() {
     setIsLoading(false)
   }
 
+  // Função auxiliar para atualizar a lista sem disparar o skeleton/loading
+  async function carregarChamadosSilencioso() {
+    const { data } = await supabase.from('suporte_chamados').select('*').order('atualizado_em', { ascending: false })
+    if (data) setChamados(data)
+  }
+
   async function carregarMensagens(id: string) {
     const { data } = await supabase.from('suporte_mensagens').select('*').eq('chamado_id', id).order('criado_em', { ascending: true })
     setMensagens(data || [])
     scrollToBottom()
   }
 
+  // CORREÇÃO DO SELETOR DE STATUS: Atualiza localmente e no banco
   async function atualizarStatusKanban(tag: string) {
     if (!chamadoSelecionado) return
-    const { error } = await supabase.from('suporte_chamados').update({ tag, atualizado_em: new Date().toISOString() }).eq('id', chamadoSelecionado.id)
+    
+    // Atualiza o estado local para resposta imediata na UI
+    setChamadoSelecionado(prev => ({ ...prev, tag }));
+    
+    const { error } = await supabase
+      .from('suporte_chamados')
+      .update({ tag, atualizado_em: new Date().toISOString() })
+      .eq('id', chamadoSelecionado.id)
+    
     if (!error) {
-      carregarChamados()
+      carregarChamadosSilencioso()
       toast({ title: "Status Atualizado" })
     }
   }
 
-  // AJUSTE: Função de exclusão utilizando ID exato e limpando estados de forma persistente
   async function excluirChamado(e: React.MouseEvent, idParaExcluir: string) {
-  e.stopPropagation(); 
-  if (!confirm("Tem certeza que deseja apagar este atendimento de forma permanente?")) return;
+    e.stopPropagation(); 
+    if (!confirm("Tem certeza que deseja apagar este atendimento permanentemente?")) return;
 
-  try {
-    // 1. Deleta mensagens primeiro para evitar erro de Foreign Key
-    await supabase.from('suporte_mensagens').delete().eq('chamado_id', idParaExcluir);
-    
-    // 2. Deleta o chamado
-    const { error } = await supabase.from('suporte_chamados').delete().eq('id', idParaExcluir);
-    
-    if (error) throw error;
+    try {
+      const { error: errorMsgs } = await supabase
+        .from('suporte_mensagens')
+        .delete()
+        .eq('id', idParaExcluir);
 
-    // 3. LIMPEZA IMEDIATA DO FRONT-END (Isso evita que ele volte ao atualizar)
-    setChamados(prev => prev.filter(c => c.id !== idParaExcluir));
-    if (chamadoSelecionado?.id === idParaExcluir) {
-      setChamadoSelecionado(null);
-      setMensagens([]);
+      const { error: errorChamado } = await supabase
+        .from('suporte_chamados')
+        .delete()
+        .eq('id', idParaExcluir);
+
+      if (!errorChamado) {
+        setChamados(prev => prev.filter(c => c.id !== idParaExcluir));
+        if (chamadoSelecionado?.id === idParaExcluir) {
+          setChamadoSelecionado(null);
+          setMensagens([]);
+        }
+        toast({ title: "Atendimento removido" });
+      }
+    } catch (error: any) {
+      toast({ title: "Erro ao remover", variant: "destructive" });
     }
-
-    toast({ title: "Atendimento removido com sucesso" });
-  } catch (error: any) {
-    toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
   }
-}
 
   async function guardarNota() {
     if (!chamadoSelecionado || isSavingNote) return
@@ -154,31 +179,37 @@ export default function App() {
       setIsSavingNote(false)
       if (!error) {
         setNoteSaved(true)
-        toast({ title: "Notas guardadas com sucesso" })
+        toast({ title: "Notas guardadas" })
         setTimeout(() => setNoteSaved(false), 3000)
       }
     }, 600)
   }
 
   async function enviarResposta() {
-    if (!novaResposta.trim() || !chamadoSelecionado || isSending) return
-    setIsSending(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    const { error } = await supabase.from('suporte_mensagens').insert({
-      chamado_id: chamadoSelecionado.id,
-      remetente_id: user?.id,
-      conteudo: novaResposta,
-      eh_admin: true
-    })
-    
-    if (!error) {
-      await supabase.from('suporte_chamados').update({ atualizado_em: new Date().toISOString() }).eq('id', chamadoSelecionado.id)
-      setNovaResposta("")
-      scrollToBottom()
-    }
-    setIsSending(false)
+  if (!novaResposta.trim() || !chamadoSelecionado || isSending) return
+  setIsSending(true)
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  // Busca o nome do admin logado para enviar junto com a mensagem
+  const nomeAdmin = user?.user_metadata?.full_name || "Suporte Central63"
+  
+  const { error } = await supabase.from('suporte_mensagens').insert({
+    chamado_id: chamadoSelecionado.id,
+    remetente_id: user?.id,
+    conteudo: novaResposta,
+    eh_admin: true,
+    // Enviamos o nome de quem responde nos metadados da mensagem
+    metadados: { nome_remetente: nomeAdmin } 
+  })
+  
+  if (!error) {
+    await supabase.from('suporte_chamados').update({ atualizado_em: new Date().toISOString() }).eq('id', chamadoSelecionado.id)
+    setNovaResposta("")
+    scrollToBottom()
   }
+  setIsSending(false)
+}
 
   if (isLoading) return <Loading />
 
@@ -231,7 +262,7 @@ export default function App() {
                 {chamados.map((c) => (
                   <div 
                     key={c.id} 
-                    onClick={() => setChamadoSelecionado(c)}
+                    onClick={() => { setChamadoSelecionado(c); carregarMensagens(c.id); }}
                     className={`group flex flex-col p-4 rounded-[1rem] cursor-pointer transition-all duration-200 relative ${
                       chamadoSelecionado?.id === c.id 
                       ? 'bg-[#E8F0FE] shadow-md shadow-blue-600/20 ring-1 ring-blue-500/30' 
@@ -241,10 +272,14 @@ export default function App() {
                     <div className="flex items-center gap-3 mb-3">
                       <Avatar className="h-9 w-9 border border-slate-100 shadow-sm">
                         {c.metadados?.avatar_url ? (
-                          <img src={c.metadados.avatar_url} className="object-cover" />
+                          <img 
+                            src={c.metadados.avatar_url} 
+                            alt="Foto" 
+                            className="h-full w-full object-cover rounded-full"
+                          />
                         ) : (
-                          <AvatarFallback className={chamadoSelecionado?.id === c.id ? 'bg-blue-600 text-white text-[11px] font-bold' : 'bg-slate-100 text-slate-600 text-[11px] font-bold'}>
-                            {c.metadados?.nome?.substring(0, 1).toUpperCase() || (c.usuario_id ? 'U' : 'V')}
+                          <AvatarFallback>
+                            {c.metadados?.nome?.substring(0, 1).toUpperCase() || 'V'}
                           </AvatarFallback>
                         )}
                       </Avatar>

@@ -105,19 +105,20 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosCount }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true)
-  const [userData, setUserData] = useState<{ name: string; email: string; initial: string; avatarUrl?: string } | null>(null)
+  // Adicionado a propriedade 'role' ao estado userData
+  const [userData, setUserData] = useState<{ name: string; email: string; initial: string; avatarUrl?: string; role?: string } | null>(null)
   const router = useRouter()
   const pathname = usePathname()
 
-  // Busca os dados atualizados do perfil (incluindo o avatar)
+  // Busca os dados atualizados do perfil (incluindo o avatar e a role)
   useEffect(() => {
     const getUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        // Busca os dados da tabela profiles para pegar o avatar_url e nome real
+        // Busca os dados da tabela profiles para pegar avatar_url, full_name e role
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('full_name, avatar_url')
+          .select('full_name, avatar_url, role')
           .eq('id', user.id)
           .maybeSingle()
 
@@ -128,19 +129,18 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
           name: fullName,
           email: user.email || "",
           initial: initial,
-          avatarUrl: profileData?.avatar_url
+          avatarUrl: profileData?.avatar_url,
+          role: profileData?.role // Armazena a role (ex: 'admin', 'marketing', 'gestao', 'corretor')
         })
       }
     }
     getUserData()
     
-    // Opcional: Escutar mudanças em tempo real na tabela profiles para atualizar o avatar instantaneamente
     const profileSubscription = supabase
       .channel('profile_changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, payload => {
-        if (userData && payload.new.id === userData.email) { // Ajuste conforme sua lógica de ID
-           getUserData()
-        }
+        // Verificação simplificada para atualizar dados do usuário logado
+        getUserData()
       })
       .subscribe()
 
@@ -184,6 +184,9 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
     return false
   }
 
+  // Lógica de permissão para o Chat de Suporte
+  const canAccessChat = userData?.role === 'Marketing' || userData?.role === 'Gestor' || userData?.role === 'Diretor';
+
   return (
     <>
       {isOpen && (
@@ -196,7 +199,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
       <aside 
           className={cn(
             "fixed lg:static inset-y-0 left-0 z-50 bg-card border-r border-border transform transition-all duration-300 ease-in-out flex flex-col",
-            // CORREÇÃO: Se estiver aberto, move para 0 (visível). Se fechado, move para fora (-100%)
             isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
             isCollapsed ? "w-[80px]" : "w-72"
           )}
@@ -213,13 +215,13 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <div className="relative flex-shrink-0">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-primary to-primary/60 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
                 <Image 
-                                    src="/icon.svg" 
-                                    alt="Logo Central63" 
-                                    width={30} 
-                                    height={30} 
-                                    className="priority"
-                                    priority
-                                  />
+                  src="/icon.svg" 
+                  alt="Logo Central63" 
+                  width={30} 
+                  height={30} 
+                  className="priority"
+                  priority
+                />
               </div>
               <div className="absolute -bottom-1 -right-1 w-3 h-3 lg:w-4 lg:h-4 bg-emerald-500 rounded-full border-2 border-card" />
             </div>
@@ -242,9 +244,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <SidebarItem 
               icon={LayoutDashboard}
               label="Dashboard" 
-              // Alterado de "Dashboard" para "dashboard" para bater com o estado
               active={isActive("dashboard") && pathname === "/"} 
-              // Alterado para garantir consistência
               onClick={() => handleNavigation("dashboard")}
               badge={atendimentosCount}
               collapsed={isCollapsed}
@@ -304,7 +304,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               collapsed={isCollapsed}
             />
 
-            {/* ITEM DE PLANILHAS */}
             <SidebarItem 
               icon={FileSpreadsheet} 
               label="Planilhas" 
@@ -320,19 +319,22 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
+            {/* RENDERIZAÇÃO CONDICIONAL: Apenas para marketing ou gestão */}
+            {canAccessChat && (
+              <SidebarItem 
+                icon={MessageCircle} 
+                label="Chat de Suporte" 
+                active={isActive("chat", "/chat-support")} 
+                onClick={() => handleNavigation("chat", "/chat-support")}
+                collapsed={isCollapsed}
+              />
+            )}
+
             <SidebarItem 
               icon={Settings} 
               label="Configurações" 
               active={isActive("config", "/settings")} 
               onClick={() => handleNavigation("config", "/settings")}
-              collapsed={isCollapsed}
-            />
-
-            <SidebarItem 
-              icon={MessageCircle} 
-              label="Chat de Suporte" 
-              active={isActive("chat", "/chat-support")} 
-              onClick={() => handleNavigation("chat", "/chat-support")}
               collapsed={isCollapsed}
             />
 
@@ -363,7 +365,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               {!isCollapsed && (
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <p className="text-sm font-semibold text-foreground truncate">
-                    {userData?.name || "Usuário"} {/* Nome genérico em vez de "Carregando" */}
+                    {userData?.name || "Usuário"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {userData?.email || "Acessando..."}
