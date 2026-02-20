@@ -11,8 +11,8 @@ import { StatCard } from "@/components/central63/services/stat-card"
 import { Filters } from "@/components/central63/filters"
 import { LeadCard } from "@/components/central63/lead-card"
 import { Pagination } from "@/components/central63/pagination"
-import { DetailsDrawer } from "@/components/central63/details-drawer"
-import { EditLeadModal, type EditableLeadData } from "@/components/central63/edit-lead-modal"
+import { DetailsDrawer } from "@/components/central63/services/details-drawer"
+import { EditLeadModal, type EditableLeadData } from "@/components/central63/services/edit-lead-modal"
 import { useToast } from "@/hooks/use-toast"
 import Loading from "../loading"
 import { supabase } from "@/lib/supabase"
@@ -581,6 +581,16 @@ export default function Central63App() {
       try {
         const lead = leadsData.find(l => l.id === leadId)
         if (!lead) return
+
+        // CASO DE REMOÇÃO: Se o valor vier como 0 ou status_dashboard falso via modal
+        if (data.valor_venda === 0 || data.status_dashboard === false) {
+          setLeadsData(prev => prev.map(l => 
+            l.id === leadId ? { ...l, visibleOnDashboard: false, valueLaunched: 0 } : l
+          ))
+          toast({ title: "Venda Removida", description: "O card foi atualizado automaticamente." })
+          return
+        }
+
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
         const newId = `${prefix}_${lead.id}`
 
@@ -607,7 +617,7 @@ export default function Central63App() {
         const { error } = await supabase.from('vendas').upsert([payload])
         if (error) throw error
         
-        setLeadsData(prev => prev.map(l => l.id === leadId ? { ...l, visibleOnDashboard: true } : l))
+        setLeadsData(prev => prev.map(l => l.id === leadId ? { ...l, visibleOnDashboard: true, valueLaunched: data.valor_venda || 0 } : l))
         toast({ title: lead.visibleOnDashboard ? "Venda Atualizada!" : "Venda Lançada!", description: `Sucesso para ${data.clientName}`, className: "bg-emerald-500 text-white border-none" })
       } catch (error: any) {
         console.error("Erro venda:", error)
