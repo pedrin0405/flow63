@@ -101,7 +101,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
         imoveisMap.set(String(lead.propertyLocation), {
           codigo: String(lead.propertyLocation),
           valor: lead.valueLaunched || lead.value || 0,
-          imagem: lead.image
+          imagem: lead.image,
         });
       }
 
@@ -148,9 +148,27 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
         lista_imoveis: imoveisFinal,
         valor_venda: imoveisFinal.reduce((acc, curr) => acc + curr.valor, 0),
         comissao: lead.comissao || 5,
-        data_venda: lead.data_venda || new Date().toISOString().slice(0, 16),
+        // Correção aqui: Garantimos a conversão para Date e formatamos para o input (AAAA-MM-DDTHH:mm)
+        data_venda: (() => {
+          if (!lead.raw_data) return new Date().toISOString().slice(0, 16);
+
+          try {
+            // Divide a string "05/01/2026 15:43" em partes
+            const [data, hora] = lead.raw_data.split(" ");
+            const [dia, mes, ano] = data.split("/");
+            
+            // O input datetime-local EXIGE o formato: YYYY-MM-DDTHH:mm
+            // Montamos a string exatamente como o navegador precisa
+            return `${ano}-${mes}-${dia}T${hora}`;
+          } catch (e) {
+            // Caso a string venha em outro formato inesperado, usa a data atual como fallback
+            return new Date().toISOString().slice(0, 16);
+          }
+        })(),
         obs_venda: lead.obs_venda || "",
-        status_dashboard: lead.status_dashboard !== undefined ? (lead.status_dashboard === "Visível" || lead.status_dashboard === true) : true
+        status_dashboard: lead.status_dashboard !== undefined 
+          ? (lead.status_dashboard === "Visível" || lead.status_dashboard === true) 
+          : true
       }))
     } catch (err) {
       console.error(err)

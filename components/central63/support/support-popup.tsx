@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 const ATENDENTES = [
-  { id: 'marketing_1', nome: 'Equipa Marketing', cargo: 'Marketing' },
+  { id: 'marketing_1', nome: 'Equipe Marketing', cargo: 'Marketing' },
   { id: 'gestor_1', nome: 'Gestor de Suporte', cargo: 'Gestão' },
 ]
 

@@ -225,7 +225,7 @@ export default function App() {
                 <h2 className="text-lg font-bold tracking-tight text-slate-900">Atendimento Hub</h2>
                 <div className="flex items-center gap-2 mt-0.5">
                    <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                   <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Equipa Online</span>
+                   <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Equipe Online</span>
                 </div>
               </div>
             </div>

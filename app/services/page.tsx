@@ -465,8 +465,10 @@ export default function Central63App() {
         const rawPhase = item.etapa || item.fase || item.situacao;
         const matchedPhase = PHASES.find(p => p.label === rawPhase) || PHASES[0];
 
-        const rawDate = item.created_at || item.data_cadastro || new Date().toISOString();
+        const rawDate = item.datahoraultimainteracao || item.created_at || new Date().toISOString();
         const formattedDate = new Date(rawDate).toLocaleDateString("pt-BR");
+
+        console.log("Item:", item)
 
         return {
           id: item.safeId, 
@@ -507,6 +509,7 @@ export default function Central63App() {
           
           raw_codigo: item.codigo,
           raw_midia: item.midia,
+          raw_data: item.datahoraultimainteracao,
           
           visibleOnDashboard: !!saleInfo, 
           valueLaunched: saleInfo?.valorVenda || 0, 
@@ -594,6 +597,10 @@ export default function Central63App() {
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
         const newId = `${prefix}_${lead.id}`
 
+        console.log('Lead: ', lead)
+        console.log('data: ', data)
+        console.log('RawData: ', lead.raw_data)
+
         const payload = {
           id: newId, 
           id_origem: lead.id,
@@ -605,11 +612,12 @@ export default function Central63App() {
           midia: lead.raw_midia,
           nome_cliente: data.clientName,
           valor_venda: data.valor_venda,
-          data_venda: data.data_venda,
+          data_venda: data.data_venda ? new Date(data.data_venda).toISOString() : new Date().toISOString(),
           comissao: data.comissao,
           obs_venda: data.obs_venda,
           status_dashboard: data.status_dashboard ? "Visível" : "Oculto",
           imagem_corretor: lead.broker.avatar,
+          nome_corretor: lead.broker.name,
           lista_imoveis: data.lista_imoveis,
           created_at: new Date().toISOString()
         }

@@ -5,6 +5,7 @@ import { MapPin, LayoutDashboard, PlusCircle, RefreshCw, UserCheck, CheckCircle2
 import { Button } from "@/components/ui/button"
 
 interface Lead {
+  raw_data: string
   id: number
   sourceTable: string 
   clientName: string
@@ -130,7 +131,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
         <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
           <StatusBadge status={lead.status} />
           <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[10px] font-medium border border-white/10">
-            {lead.history[0]?.date || lead.updatedAt}
+            {lead.raw_data || lead.updatedAt}
           </span>
         </div>
       </div>
