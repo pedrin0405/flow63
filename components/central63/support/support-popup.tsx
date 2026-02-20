@@ -124,82 +124,91 @@ export function SuportePopup() {
   }
 
   async function iniciarEEnviar() {
-  if (!mensagem.trim() || isLoading) return;
+    if (!mensagem.trim() || isLoading) return;
 
-  // 1. Tenta recuperar o ID do localStorage caso o estado esteja vazio
-  let currentChamadoId = chamadoId || localStorage.getItem('flow63_chamado_id');
+    // Tenta obter o ID do estado ou do localStorage para garantir persistência
+    let currentChamadoId = chamadoId || localStorage.getItem('flow63_chamado_id');
 
-  // 2. Se não houver chamado e não estiver identificado...
-  if (!currentChamadoId && !isIdentifying && (!userData.nome || !userData.email || !atendenteSelecionado)) {
-    setIsIdentifying(true);
-    return;
-  }
+    // Se não houver ID e não estiver identificando, abre o formulário
+    if (!currentChamadoId && !isIdentifying && (!userData.nome || !userData.email || !atendenteSelecionado)) {
+      setIsIdentifying(true);
+      return;
+    }
 
-  setIsLoading(true);
+    // Se estiver identificando, valida os campos
+    if (isIdentifying && (!userData.nome || !userData.email || !atendenteSelecionado)) {
+      alert("Por favor, preencha o seu nome, e-mail e selecione um atendente.");
+      return;
+    }
 
-  try {
-    // 3. Só cria um NOVO chamado se REALMENTE não houver currentChamadoId
-    if (!currentChamadoId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
+    setIsLoading(true);
 
-      const { data: novoChamado, error: errorChamado } = await supabase
-        .from('suporte_chamados')
-        .insert({ 
-          usuario_id: user?.id || null,
-          status: 'aberto',
-          tag: 'novo',
-          metadados: {
-            nome: userData.nome || user?.user_metadata?.full_name,
-            email: userData.email || user?.email,
-            avatar_url: avatarUrl,
-            atendente_preferencia: atendenteSelecionado?.nome,
-            atendente_cargo: atendenteSelecionado?.cargo,
-            plataforma: window.navigator.platform,
+    try {
+      // 1. CRIAÇÃO DO CHAMADO (Se não existir um ID ativo)
+      if (!currentChamadoId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
+
+        const { data: novoChamado, error: errorChamado } = await supabase
+          .from('suporte_chamados')
+          .insert({ 
+            usuario_id: user?.id || null,
+            status: 'aberto',
+            tag: 'novo',
+            metadados: {
+              nome: userData.nome || user?.user_metadata?.full_name,
+              email: userData.email || user?.email,
+              avatar_url: avatarUrl,
+              atendente_preferencia: atendenteSelecionado?.nome,
+              atendente_cargo: atendenteSelecionado?.cargo,
+              plataforma: window.navigator.platform,
+            }
+          })
+          .select()
+          .single();
+
+        if (errorChamado) throw errorChamado;
+
+        if (novoChamado) {
+          currentChamadoId = novoChamado.id; // Define o ID para a mensagem abaixo
+          setChamadoId(novoChamado.id);
+          setIsConcluido(false);
+          localStorage.setItem('flow63_chamado_id', novoChamado.id);
+        }
+      }
+
+      // 2. ENVIO DA MENSAGEM (Sempre usando o currentChamadoId do passo anterior)
+      if (currentChamadoId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const { error: errorMsg } = await supabase.from('suporte_mensagens').insert({
+          chamado_id: currentChamadoId, // Vinculação garantida com o ID da tabela suporte_chamados
+          remetente_id: user?.id || null,
+          conteudo: mensagem,
+          eh_admin: false
+        });
+        
+        if (errorMsg) {
+          // Se o chamado foi removido do banco, limpa local e reinicia
+          if (errorMsg.code === '23503') {
+            localStorage.removeItem('flow63_chamado_id');
+            setChamadoId(null);
+            setIsLoading(false);
+            return iniciarEEnviar();
           }
-        })
-        .select()
-        .single();
+          throw errorMsg;
+        }
 
-      if (errorChamado) throw errorChamado;
-
-      if (novoChamado) {
-        currentChamadoId = novoChamado.id;
-        setChamadoId(novoChamado.id);
-        setIsConcluido(false);
-        localStorage.setItem('flow63_chamado_id', novoChamado.id);
+        setMensagem("");
+        setIsIdentifying(false); 
+        scrollToBottom();
       }
+    } catch (error) {
+      console.error("Erro no fluxo de suporte:", error);
+    } finally {
+      setIsLoading(false);
     }
-
-    // 4. Envio da mensagem usando o ID garantido
-    if (currentChamadoId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const { error: errorMsg } = await supabase.from('suporte_mensagens').insert({
-        chamado_id: currentChamadoId,
-        remetente_id: user?.id || null,
-        conteudo: mensagem,
-        eh_admin: false
-      });
-      
-      // Se o erro for de chave estrangeira (chamado excluído no banco), limpa e reinicia
-      if (errorMsg && errorMsg.code === '23503') {
-        localStorage.removeItem('flow63_chamado_id');
-        setChamadoId(null);
-        setIsLoading(false);
-        return iniciarEEnviar(); // Tenta criar um novo de verdade agora
-      }
-
-      setMensagem("");
-      setIsIdentifying(false);
-      scrollToBottom();
-    }
-  } catch (error) {
-    console.error("Erro ao processar suporte:", error);
-  } finally {
-    setIsLoading(false);
   }
-}
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
