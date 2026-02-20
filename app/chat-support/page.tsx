@@ -55,9 +55,7 @@ export default function App() {
     carregarChamados()
   }, [])
 
-  // EFEITO REALTIME CORRIGIDO: Foca na vinculação correta entre chamado e mensagens
   useEffect(() => {
-    // 1. Canal para a lista de chamados: Atualiza apenas metadados e status
     const canalLista = supabase
       .channel('lista-tickets-realtime')
       .on('postgres_changes', { 
@@ -69,7 +67,6 @@ export default function App() {
       })
       .subscribe();
 
-    // 2. Canal para mensagens do chat aberto: Filtra rigorosamente pelo ID do chamado
     let canalChat: any;
     if (chamadoSelecionado?.id) {
       canalChat = supabase
@@ -81,7 +78,6 @@ export default function App() {
           filter: `chamado_id=eq.${chamadoSelecionado.id}` 
         }, (payload) => {
           setMensagens((prev) => {
-            // Prevenção de duplicados na UI
             if (prev.some(m => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
           });
@@ -115,8 +111,10 @@ export default function App() {
     if (data) setChamados(data)
   }
 
-  async function carregarMensagens(id: string) {
-    const { data } = await supabase.from('suporte_mensagens').select('*').eq('chamado_id', id).order('criado_em', { ascending: true })
+  async function carregarMensagens(chamado: any) {
+    // Sincroniza a nota interna ao carregar o chat
+    setNotaInterna(chamado.notas_internas || "")
+    const { data } = await supabase.from('suporte_mensagens').select('*').eq('chamado_id', chamado.id).order('criado_em', { ascending: true })
     setMensagens(data || [])
     scrollToBottom()
   }
@@ -141,7 +139,6 @@ export default function App() {
     if (!confirm("Tem certeza que deseja apagar este atendimento permanentemente?")) return;
 
     try {
-      // Deleta mensagens vinculadas primeiro para evitar erro de FK
       await supabase.from('suporte_mensagens').delete().eq('chamado_id', idParaExcluir);
       const { error: errorChamado } = await supabase.from('suporte_chamados').delete().eq('id', idParaExcluir);
 
@@ -161,19 +158,24 @@ export default function App() {
   async function guardarNota() {
     if (!chamadoSelecionado || isSavingNote) return
     setIsSavingNote(true)
-    const { error } = await supabase.from('suporte_chamados').update({ 
-      notas_internas: notaInterna,
-      atualizado_em: new Date().toISOString()
-    }).eq('id', chamadoSelecionado.id)
     
-    setTimeout(() => {
-      setIsSavingNote(false)
-      if (!error) {
-        setNoteSaved(true)
-        toast({ title: "Notas guardadas" })
-        setTimeout(() => setNoteSaved(false), 3000)
-      }
-    }, 600)
+    const { error } = await supabase
+      .from('suporte_chamados')
+      .update({ 
+        notas_internas: notaInterna,
+        atualizado_em: new Date().toISOString()
+      })
+      .eq('id', chamadoSelecionado.id)
+    
+    setIsSavingNote(false)
+    if (!error) {
+      setNoteSaved(true)
+      toast({ title: "Notas guardadas" })
+      carregarChamadosSilencioso() // Atualiza a lista lateral para refletir a mudança
+      setTimeout(() => setNoteSaved(false), 3000)
+    } else {
+      toast({ title: "Erro ao salvar nota", variant: "destructive" })
+    }
   }
 
   async function enviarResposta() {
@@ -192,7 +194,6 @@ export default function App() {
     })
     
     if (!error) {
-      // Atualiza o timestamp do chamado para ele subir na lista
       await supabase.from('suporte_chamados').update({ atualizado_em: new Date().toISOString() }).eq('id', chamadoSelecionado.id)
       setNovaResposta("")
       scrollToBottom()
@@ -250,7 +251,7 @@ export default function App() {
                 {chamados.map((c) => (
                   <div 
                     key={c.id} 
-                    onClick={() => { setChamadoSelecionado(c); carregarMensagens(c.id); }}
+                    onClick={() => { setChamadoSelecionado(c); carregarMensagens(c); }}
                     className={`group flex flex-col p-4 rounded-[1rem] cursor-pointer transition-all duration-200 relative ${
                       chamadoSelecionado?.id === c.id 
                       ? 'bg-[#E8F0FE] shadow-md shadow-blue-600/20 ring-1 ring-blue-500/30' 
@@ -447,7 +448,6 @@ export default function App() {
                           className="flex-1 resize-none border-none bg-transparent shadow-none focus-visible:ring-0 p-0 text-[15px] font-normal leading-relaxed text-slate-800 placeholder:text-slate-300"
                           value={notaInterna}
                           onChange={(e) => { setNotaInterna(e.target.value); setNoteSaved(false); }}
-                          onBlur={guardarNota}
                         />
                         {isSavingNote && (
                           <div className="absolute top-2 right-2 bg-white/50 backdrop-blur-sm rounded-full p-1">
