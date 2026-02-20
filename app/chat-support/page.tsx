@@ -55,9 +55,9 @@ export default function App() {
     carregarChamados()
   }, [])
 
-  // EFEITO REALTIME PARA LISTA E CHAT
+  // EFEITO REALTIME CORRIGIDO: Foca na vinculação correta entre chamado e mensagens
   useEffect(() => {
-    // 1. Canal para a lista de chamados (Garante que novos tickets apareçam na hora)
+    // 1. Canal para a lista de chamados: Atualiza apenas metadados e status
     const canalLista = supabase
       .channel('lista-tickets-realtime')
       .on('postgres_changes', { 
@@ -65,13 +65,13 @@ export default function App() {
         schema: 'public', 
         table: 'suporte_chamados' 
       }, () => {
-        carregarChamadosSilencioso(); // Atualiza a lista sem o Loading global
+        carregarChamadosSilencioso(); 
       })
       .subscribe();
 
-    // 2. Canal para mensagens do chat aberto
+    // 2. Canal para mensagens do chat aberto: Filtra rigorosamente pelo ID do chamado
     let canalChat: any;
-    if (chamadoSelecionado) {
+    if (chamadoSelecionado?.id) {
       canalChat = supabase
         .channel(`chat-ativo-${chamadoSelecionado.id}`)
         .on('postgres_changes', { 
@@ -81,7 +81,8 @@ export default function App() {
           filter: `chamado_id=eq.${chamadoSelecionado.id}` 
         }, (payload) => {
           setMensagens((prev) => {
-            if (prev.find(m => m.id === payload.new.id)) return prev;
+            // Prevenção de duplicados na UI
+            if (prev.some(m => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
           });
           scrollToBottom();
@@ -109,7 +110,6 @@ export default function App() {
     setIsLoading(false)
   }
 
-  // Função auxiliar para atualizar a lista sem disparar o skeleton/loading
   async function carregarChamadosSilencioso() {
     const { data } = await supabase.from('suporte_chamados').select('*').order('atualizado_em', { ascending: false })
     if (data) setChamados(data)
@@ -121,11 +121,8 @@ export default function App() {
     scrollToBottom()
   }
 
-  // CORREÇÃO DO SELETOR DE STATUS: Atualiza localmente e no banco
   async function atualizarStatusKanban(tag: string) {
     if (!chamadoSelecionado) return
-    
-    // Atualiza o estado local para resposta imediata na UI
     setChamadoSelecionado(prev => ({ ...prev, tag }));
     
     const { error } = await supabase
@@ -144,15 +141,9 @@ export default function App() {
     if (!confirm("Tem certeza que deseja apagar este atendimento permanentemente?")) return;
 
     try {
-      const { error: errorMsgs } = await supabase
-        .from('suporte_mensagens')
-        .delete()
-        .eq('id', idParaExcluir);
-
-      const { error: errorChamado } = await supabase
-        .from('suporte_chamados')
-        .delete()
-        .eq('id', idParaExcluir);
+      // Deleta mensagens vinculadas primeiro para evitar erro de FK
+      await supabase.from('suporte_mensagens').delete().eq('chamado_id', idParaExcluir);
+      const { error: errorChamado } = await supabase.from('suporte_chamados').delete().eq('id', idParaExcluir);
 
       if (!errorChamado) {
         setChamados(prev => prev.filter(c => c.id !== idParaExcluir));
@@ -186,30 +177,28 @@ export default function App() {
   }
 
   async function enviarResposta() {
-  if (!novaResposta.trim() || !chamadoSelecionado || isSending) return
-  setIsSending(true)
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  // Busca o nome do admin logado para enviar junto com a mensagem
-  const nomeAdmin = user?.user_metadata?.full_name || "Suporte Central63"
-  
-  const { error } = await supabase.from('suporte_mensagens').insert({
-    chamado_id: chamadoSelecionado.id,
-    remetente_id: user?.id,
-    conteudo: novaResposta,
-    eh_admin: true,
-    // Enviamos o nome de quem responde nos metadados da mensagem
-    metadados: { nome_remetente: nomeAdmin } 
-  })
-  
-  if (!error) {
-    await supabase.from('suporte_chamados').update({ atualizado_em: new Date().toISOString() }).eq('id', chamadoSelecionado.id)
-    setNovaResposta("")
-    scrollToBottom()
+    if (!novaResposta.trim() || !chamadoSelecionado || isSending) return
+    setIsSending(true)
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    const nomeAdmin = user?.user_metadata?.full_name || "Suporte Central63"
+    
+    const { error } = await supabase.from('suporte_mensagens').insert({
+      chamado_id: chamadoSelecionado.id,
+      remetente_id: user?.id,
+      conteudo: novaResposta,
+      eh_admin: true,
+      metadados: { nome_remetente: nomeAdmin } 
+    })
+    
+    if (!error) {
+      // Atualiza o timestamp do chamado para ele subir na lista
+      await supabase.from('suporte_chamados').update({ atualizado_em: new Date().toISOString() }).eq('id', chamadoSelecionado.id)
+      setNovaResposta("")
+      scrollToBottom()
+    }
+    setIsSending(false)
   }
-  setIsSending(false)
-}
 
   if (isLoading) return <Loading />
 
@@ -249,7 +238,6 @@ export default function App() {
         </header>
 
         <div className="flex-1 overflow-hidden p-6 lg:p-8 flex gap-6">
-          
           <div className="w-[320px] flex flex-col bg-white rounded-[1.5rem] border border-slate-200/60 shadow-lg shadow-slate-200/40 overflow-hidden shrink-0">
             <div className="p-4 border-b border-slate-100">
               <div className="relative group">
@@ -272,15 +260,9 @@ export default function App() {
                     <div className="flex items-center gap-3 mb-3">
                       <Avatar className="h-9 w-9 border border-slate-100 shadow-sm">
                         {c.metadados?.avatar_url ? (
-                          <img 
-                            src={c.metadados.avatar_url} 
-                            alt="Foto" 
-                            className="h-full w-full object-cover rounded-full"
-                          />
+                          <img src={c.metadados.avatar_url} alt="Foto" className="h-full w-full object-cover rounded-full" />
                         ) : (
-                          <AvatarFallback>
-                            {c.metadados?.nome?.substring(0, 1).toUpperCase() || 'V'}
-                          </AvatarFallback>
+                          <AvatarFallback>{c.metadados?.nome?.substring(0, 1).toUpperCase() || 'V'}</AvatarFallback>
                         )}
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -340,13 +322,7 @@ export default function App() {
                         ))}
                       </SelectContent>
                     </Select>
-                    
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => excluirChamado(e, chamadoSelecionado.id)}
-                      className="h-9 w-9 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                    >
+                    <Button variant="ghost" size="icon" onClick={(e) => excluirChamado(e, chamadoSelecionado.id)} className="h-9 w-9 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                       <Trash2 size={16} />
                     </Button>
                   </div>
@@ -421,15 +397,12 @@ export default function App() {
                             {chamadoSelecionado.metadados?.avatar_url ? (
                               <img src={chamadoSelecionado.metadados.avatar_url} className="rounded-full object-cover" />
                             ) : (
-                              <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-xl">
-                                {chamadoSelecionado.metadados?.nome?.substring(0, 1) || 'V'}
-                              </AvatarFallback>
+                              <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-xl">{chamadoSelecionado.metadados?.nome?.substring(0, 1) || 'V'}</AvatarFallback>
                             )}
                           </Avatar>
                           <h4 className="font-semibold text-slate-900 text-[15px]">{chamadoSelecionado.metadados?.nome || 'Informações do Ticket'}</h4>
                           <span className="text-[11px] font-medium text-blue-600 mt-1">{chamadoSelecionado.metadados?.email || `ID: ${chamadoSelecionado.id.substring(0, 12)}`}</span>
                         </div>
-
                         <div className="space-y-6">
                           <div className="space-y-3">
                             <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Contato</h5>
@@ -442,7 +415,6 @@ export default function App() {
                               <span className="font-semibold text-slate-800">{chamadoSelecionado.metadados?.plataforma || 'Desconhecida'}</span>
                             </div>
                           </div>
-
                           <div className="space-y-3">
                              <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Atividade</h5>
                              <div className="pl-3 border-l-[3px] border-slate-200 space-y-4 ml-1">
@@ -469,16 +441,12 @@ export default function App() {
                          </span>
                          {noteSaved && <CheckCircle2 size={14} className="text-emerald-500 absolute right-0 animate-in fade-in zoom-in duration-300" />}
                       </div>
-
                       <div className="flex-1 flex flex-col relative">
                         <Textarea 
                           placeholder="Toque para adicionar notas..." 
                           className="flex-1 resize-none border-none bg-transparent shadow-none focus-visible:ring-0 p-0 text-[15px] font-normal leading-relaxed text-slate-800 placeholder:text-slate-300"
                           value={notaInterna}
-                          onChange={(e) => {
-                            setNotaInterna(e.target.value)
-                            setNoteSaved(false)
-                          }}
+                          onChange={(e) => { setNotaInterna(e.target.value); setNoteSaved(false); }}
                           onBlur={guardarNota}
                         />
                         {isSavingNote && (
@@ -487,14 +455,8 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      
                       <div className="pt-4 border-t border-slate-50 mt-auto">
-                        <Button 
-                          onClick={guardarNota} 
-                          disabled={isSavingNote}
-                          variant="ghost"
-                          className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium text-sm"
-                        >
+                        <Button onClick={guardarNota} disabled={isSavingNote} variant="ghost" className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium text-sm">
                           {isSavingNote ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
                           {noteSaved ? 'Guardado' : 'Guardar Manualmente'}
                         </Button>

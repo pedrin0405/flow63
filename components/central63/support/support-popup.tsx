@@ -57,7 +57,10 @@ export function SuportePopup() {
           table: 'suporte_mensagens',
           filter: `chamado_id=eq.${chamadoId}` 
         }, (payload) => {
-          setMensagens((prev) => [...prev, payload.new])
+          setMensagens((prev) => {
+            if (prev.some(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          })
           scrollToBottom()
         })
         .on('postgres_changes', {
@@ -79,7 +82,7 @@ export function SuportePopup() {
   }, [chamadoId, isOpen])
 
   const scrollToBottom = () => {
-    if (isConcluido) return // Não scrolla se estiver finalizado
+    if (isConcluido) return 
     setTimeout(() => {
       if (scrollAreaRef.current) {
         const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
@@ -123,26 +126,21 @@ export function SuportePopup() {
   async function iniciarEEnviar() {
   if (!mensagem.trim() || isLoading) return;
 
-  // 1. Se não houver chamado e não estiver identificado, abre o formulário
-  if (!chamadoId && !isIdentifying && (!userData.nome || !userData.email || !atendenteSelecionado)) {
+  // 1. Tenta recuperar o ID do localStorage caso o estado esteja vazio
+  let currentChamadoId = chamadoId || localStorage.getItem('flow63_chamado_id');
+
+  // 2. Se não houver chamado e não estiver identificado...
+  if (!currentChamadoId && !isIdentifying && (!userData.nome || !userData.email || !atendenteSelecionado)) {
     setIsIdentifying(true);
     return;
   }
 
-  // 2. Validação: Impede o clique se os campos estiverem vazios durante a identificação
-  if (isIdentifying && (!userData.nome || !userData.email || !atendenteSelecionado)) {
-    alert("Por favor, preencha o seu nome, e-mail e selecione um atendente.");
-    return;
-  }
-
   setIsLoading(true);
-  let currentChamadoId = chamadoId;
 
   try {
+    // 3. Só cria um NOVO chamado se REALMENTE não houver currentChamadoId
     if (!currentChamadoId) {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      // Captura a foto do metadado se existir
       const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
 
       const { data: novoChamado, error: errorChamado } = await supabase
@@ -173,6 +171,7 @@ export function SuportePopup() {
       }
     }
 
+    // 4. Envio da mensagem usando o ID garantido
     if (currentChamadoId) {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -183,22 +182,20 @@ export function SuportePopup() {
         eh_admin: false
       });
       
-      if (errorMsg) {
-        if (errorMsg.code === '23503') {
-          localStorage.removeItem('flow63_chamado_id');
-          setChamadoId(null);
-          setIsLoading(false);
-          return iniciarEEnviar();
-        }
-        throw errorMsg;
+      // Se o erro for de chave estrangeira (chamado excluído no banco), limpa e reinicia
+      if (errorMsg && errorMsg.code === '23503') {
+        localStorage.removeItem('flow63_chamado_id');
+        setChamadoId(null);
+        setIsLoading(false);
+        return iniciarEEnviar(); // Tenta criar um novo de verdade agora
       }
 
       setMensagem("");
-      setIsIdentifying(false); // Fecha o formulário e mostra o chat
+      setIsIdentifying(false);
       scrollToBottom();
     }
   } catch (error) {
-    console.error("Erro ao iniciar chat:", error);
+    console.error("Erro ao processar suporte:", error);
   } finally {
     setIsLoading(false);
   }
@@ -224,7 +221,6 @@ export function SuportePopup() {
           </div>
           
           <div className="flex-1 relative overflow-hidden">
-            {/* O container de mensagens fica ao fundo */}
             <ScrollArea 
               ref={scrollAreaRef} 
               className={`h-full p-4 bg-slate-50/50 dark:bg-slate-900/50 transition-all ${isConcluido ? 'blur-[2px] pointer-events-none' : ''}`}
@@ -275,7 +271,7 @@ export function SuportePopup() {
                   </div>
 
                   <Button 
-                    type="button" // Garante que não faça submit de form
+                    type="button" 
                     onClick={(e) => {
                       e.preventDefault();
                       iniciarEEnviar();
@@ -291,13 +287,11 @@ export function SuportePopup() {
                 <div className="flex flex-col gap-4">
                   {mensagens.map((msg) => (
                     <div key={msg.id} className={`flex flex-col ${msg.eh_admin ? 'items-start' : 'items-end'} gap-1`}>
-                      {/* Mostra o nome apenas se for admin e houver um nome salvo */}
                       {msg.eh_admin && (
                         <span className="text-[10px] font-bold text-slate-500 ml-1 uppercase tracking-tight">
                           {msg.metadados?.nome_remetente || "Suporte"}
                         </span>
                       )}
-                      
                       <div className={`max-w-[85%] p-3.5 rounded-2xl text-[13px] shadow-sm leading-relaxed ${
                         msg.eh_admin 
                         ? 'bg-white text-slate-800 rounded-tl-none border border-slate-100' 
@@ -311,7 +305,6 @@ export function SuportePopup() {
               )}
             </ScrollArea>
 
-            {/* Card de Finalizado - Sobreposto ao ScrollArea */}
             {isConcluido && (
               <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-white/20 backdrop-blur-[2px] animate-in fade-in duration-500">
                 <div className="w-full p-6 bg-white border border-blue-100 rounded-[2.5rem] text-center shadow-2xl shadow-blue-900/20 animate-in zoom-in slide-in-from-bottom-8 duration-500 relative overflow-hidden">
