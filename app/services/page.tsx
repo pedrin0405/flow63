@@ -180,6 +180,7 @@ export default function Central63App() {
   }, []);
 
   // --- FUNÇÃO DE BUSCA COMPLEXA ---
+  // --- FUNÇÃO DE BUSCA COMPLEXA CORRIGIDA ---
   const fetchLeads = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -203,9 +204,11 @@ export default function Central63App() {
       let searchTerm = "";
       let isNumericSearch = false;
 
+      // CORREÇÃO: Capturando o termo de busca corretamente
       if (filters.search) {
           searchTerm = filters.search.trim();
           isNumericSearch = /^\d+$/.test(searchTerm);
+          // Se for busca por nome, força o inner join para filtrar o resultado
           if (!isNumericSearch) {
               selectString = `*, ${tableLead}!inner (*)`;
           }
@@ -219,10 +222,13 @@ export default function Central63App() {
       if (filters.status) query = query.eq('situacao', filters.status)
       if (filters.purpose !== "Todos") query = query.eq('finalidade', filters.purpose)
       
-      if (filters.search) {
+      // CORREÇÃO: Resolvendo o erro "operator does not exist: integer ~~* unknown"
+      if (searchTerm) {
           if (isNumericSearch) {
-              query = query.ilike('codigo', `${searchTerm}%`);
+              // Para colunas INTEGER (codigo), usamos 'eq' (igualdade exata)
+              query = query.eq('codigo', parseInt(searchTerm, 10));
           } else {
+              // Para colunas TEXT (nome), usamos 'ilike'
               query = query.ilike(`${tableLead}.nome`, `%${searchTerm}%`);
           }
       }
@@ -267,7 +273,6 @@ export default function Central63App() {
 
       // ---------------------------------------------------------
       // ETAPA 1.5: Busca Dados dos Corretores
-      // Aqui sim buscamos os avatares, mas APENAS dos corretores desta página
       // ---------------------------------------------------------
       const uniqueBrokerNames = Array.from(new Set(
         allAtendimentos
@@ -468,49 +473,39 @@ export default function Central63App() {
         const rawDate = item.datahoraultimainteracao || item.created_at || new Date().toISOString();
         const formattedDate = new Date(rawDate).toLocaleDateString("pt-BR");
 
-        console.log("Item:", item)
-
         return {
           id: item.safeId, 
           sourceTable: isPmw ? "atendimento_pmw" : "atendimento_aux",
-          
           clientName: clientName,
           clientAvatar: linkedLead.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=0D8ABC&color=fff&bold=true`,
-
           history: resolvedHistory,
-          
           broker: {
             id: 0, 
             name: brokerName,
-            avatar: brokerAvatar
+            avatar: brokerAvatar,
+            team: teamName
           },
-
           phase: matchedPhase, 
           team: teamName, 
           city: filters.city || (isPmw ? "Palmas" : "Outra"),
           purpose: item.finalidade || "Indefinido",
           status: item.situacao || "Novo",
-          
           propertyTitle: item.codigo ? `Atendimento: ${item.codigo}` : "Imóvel sem código",
           propertyAddress: resolvedAddress,
           propertyLocation: resolvedCodeImovel || "----", 
           value: resolvedValue, 
           image: resolvedImage, 
-          
           updatedAt: new Date().toLocaleDateString("pt-BR"),
           lastUpdateISO: new Date().toISOString(),
-          
           leadData: {
             email: linkedLead.email || "",
             phone: linkedLead.telefone1 || "",
             origin: item.midia || "Desconhecido",
             createdAt: formattedDate
           },
-          
           raw_codigo: item.codigo,
           raw_midia: item.midia,
           raw_data: item.datahoraultimainteracao,
-          
           visibleOnDashboard: !!saleInfo, 
           valueLaunched: saleInfo?.valorVenda || 0, 
         }
@@ -524,7 +519,7 @@ export default function Central63App() {
     } finally {
       setIsLoading(false)
     }
-  }, [filters, currentPage, toast, listaCorretores]) 
+  }, [filters, currentPage, toast, listaCorretores])
 
   useEffect(() => {
     fetchLeads()
