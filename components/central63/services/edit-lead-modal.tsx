@@ -26,7 +26,7 @@ export interface EditableLeadData {
   comissao?: number
   data_venda?: string
   obs_venda?: string
-  status_dashboard?: boolean 
+  status_dashboard?: boolean | string // true/false or "Visível"/"Oculto"
 }
 
 interface EditLeadModalProps {
@@ -56,6 +56,9 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
   const [valorVisual, setValorVisual] = useState("");
   const [imoveisVendidosDb, setImoveisVendidosDb] = useState<string[]>([])
 
+  const isDashboardVisible = formData.status_dashboard === true || formData.status_dashboard === "Visível";
+  console.log("Renderizando EditLeadModal - Status do Dashboard:", formData.status_dashboard, "=> isDashboardVisible:", isDashboardVisible);
+
   const formatToBRL = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -77,24 +80,29 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
     try {
       const { data: vendasData } = await supabase
         .from('vendas')
-        .select('codigo_imovel, valor_venda, lista_imoveis')
+        .select('valor_venda, lista_imoveis, status_dashboard')
         .eq('id_origem', lead.raw_codigo || lead.id)
 
-      const codigosVendidos = vendasData?.map(v => String(v.codigo_imovel)) || []
-      setImoveisVendidosDb(codigosVendidos)
+      const codigosVendidos = vendasData?.flatMap(v => 
+          Array.isArray(v.lista_imoveis) 
+            ? v.lista_imoveis.map(imovel => String(imovel.codigo)) 
+            : []
+        ) || [];
+
+      setImoveisVendidosDb(codigosVendidos);
 
       let imoveisMap = new Map<string, ImovelVendido>();
 
       const { data: vinculados } = await supabase
         .from(negocioTable)
-        .select('codigo_imovel, valor_venda')
-        .eq('codigo_atendimento', lead.raw_codigo || lead.id)
+        .select('imovel_codigo, valornegocio')
+        .eq('atendimento_codigo', lead.raw_codigo || lead.id)
 
       if (vinculados && vinculados.length > 0) {
         vinculados.forEach(v => {
-          imoveisMap.set(String(v.codigo_imovel), {
-            codigo: String(v.codigo_imovel),
-            valor: v.valor_venda || 0
+          imoveisMap.set(String(v.imovel_codigo), {
+            codigo: String(v.imovel_codigo),
+            valor: v.valornegocio || 0
           });
         });
       } else if (lead.propertyLocation && lead.propertyLocation !== "----") {
@@ -119,15 +127,18 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                   origemVendas: !imoveisMap.has(cod)
                 });
               });
+
+              // Extrai o código do primeiro item da lista de forma segura
+              const codPrincipal = lista.length > 0 ? String(lista[0].codigo) : null;
+              
+              if (codPrincipal && !imoveisMap.has(codPrincipal)) {
+                imoveisMap.set(codPrincipal, {
+                  codigo: codPrincipal,
+                  valor: Number(venda.valor_venda) || 0,
+                  origemVendas: true
+                });
+              }
             } catch (e) { console.error(e) }
-          }
-          const codPrincipal = String(venda.codigo_imovel);
-          if (!imoveisMap.has(codPrincipal)) {
-            imoveisMap.set(codPrincipal, {
-              codigo: codPrincipal,
-              valor: Number(venda.valor_venda) || 0,
-              origemVendas: true
-            });
           }
         });
       }
@@ -141,6 +152,8 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
           if (detail) imovel.imagem = detail.urlfotoprincipal;
         });
       }
+
+      const vendaExistente = vendasData && vendasData.length > 0 ? vendasData[0] : null;
 
       setFormData(prev => ({
         ...prev,
@@ -166,12 +179,20 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
           }
         })(),
         obs_venda: lead.obs_venda || "",
-        status_dashboard: lead.status_dashboard !== undefined 
-          ? (lead.status_dashboard === "Visível" || lead.status_dashboard === true) 
-          : true
+        status_dashboard: (() => {
+            // 1. Se já existe uma venda no banco para este lead, usamos o status dela
+            if (vendaExistente && vendaExistente.status_dashboard !== undefined) {
+              return vendaExistente.status_dashboard === "Visível" || vendaExistente.status_dashboard === true;
+            }
+            // 2. Fallback para o que veio do componente pai
+            if (lead.visibleOnDashboard !== undefined) return !!lead.visibleOnDashboard;
+            
+            // 3. Fallback final
+            return lead.status_dashboard === "Visível" || lead.status_dashboard === true;
+          })()
       }))
     } catch (err) {
-      console.error(err)
+      console.error(err) 
     } finally {
       setLoadingImoveis(false)
     }
@@ -185,6 +206,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
           email: lead.leadData?.email || "",
           phone: lead.leadData?.phone || "",
           lista_imoveis: [],
+          status_dashboard: true
         })
       } else {
         loadImoveis()
@@ -243,12 +265,20 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
     setFormData(prev => ({ ...prev, lista_imoveis: prev.lista_imoveis?.filter((_, i) => i !== index) }))
   }
 
-  const handleConfirmSave = () => {
+  const handleConfirmSave = async () => {
     if (lead) {
+      // Calculamos o VGV Total
+      const vgvCalculado = mode === "sale" 
+        ? formData.lista_imoveis?.reduce((acc, curr) => acc + curr.valor, 0) 
+        : formData.valor_venda;
+
       const dataToSave: EditableLeadData = {
         ...formData,
-        valor_venda: mode === "sale" ? formData.lista_imoveis?.reduce((acc, curr) => acc + curr.valor, 0) : formData.valor_venda
+        valor_venda: vgvCalculado,
+        // CONVERSÃO CRUCIAL: Transforma o boolean em string para o banco de dados
+        status_dashboard: formData.status_dashboard === true || formData.status_dashboard === "Visível"
       }
+
       onSave(lead.id, dataToSave)
       onClose()
     }
@@ -326,13 +356,30 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                     <Textarea placeholder="Forma de pagamento..." className="min-h-[80px]" value={formData.obs_venda || ""} onChange={(e) => setFormData({ ...formData, obs_venda: e.target.value })} />
                   </div>
 
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md transition-colors ${formData.status_dashboard ? 'bg-emerald-50 border-emerald-100' : 'bg-muted/50'}`}>
-                    <Checkbox id="status_dashboard" checked={formData.status_dashboard} onCheckedChange={(checked) => setFormData({ ...formData, status_dashboard: checked as boolean })} />
-                    <Label htmlFor="status_dashboard" className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                      {formData.status_dashboard ? <Eye size={14} className="text-emerald-600"/> : <EyeOff size={14} className="text-muted-foreground"/>}
-                      {formData.status_dashboard ? "Visível no Dashboard" : "Oculto no Dashboard"}
-                    </Label>
-                  </div>
+                  <div className={`flex items-center space-x-2 border p-3 rounded-md transition-all duration-300 ${
+                      isDashboardVisible ? 'bg-emerald-50 border-emerald-100' : 'bg-muted/50 border-transparent'
+                    }`}>
+                      <Checkbox 
+                        id="status_dashboard" 
+                        checked={isDashboardVisible} // Usa a constante de verificação rigorosa
+                        onCheckedChange={(checked) => {
+                          setFormData({ ...formData, status_dashboard: checked as boolean });
+                        }} 
+                      />
+                      <Label htmlFor="status_dashboard" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                        {isDashboardVisible ? (
+                          <div className="flex items-center gap-2 animate-in fade-in duration-300">
+                            <Eye size={14} className="text-emerald-600"/>
+                            <span>Visível no Dashboard</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 animate-in fade-in duration-300">
+                            <EyeOff size={14} className="text-muted-foreground"/>
+                            <span>Oculto no Dashboard</span>
+                          </div>
+                        )}
+                      </Label>
+                    </div>
                 </>
               )}
             </div>

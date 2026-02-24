@@ -72,6 +72,10 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
     const cities = Array.from(new Set(allData.map(d => d.cidade_origem).filter(Boolean))) as string[]
     const units = Array.from(new Set(allData.map(d => d.unidade).filter(Boolean))) as string[]
     const departments = Array.from(new Set(allData.map(d => d.departamento).filter(Boolean))) as string[]
+    // Se a lista vier vazia, garanta que o departamento atual do corretor esteja nela
+    if (broker.departamento && !departments.includes(broker.departamento)) {
+      departments.push(broker.departamento)
+    }
     
     setOptions({ cities, units, departments })
   }
@@ -223,7 +227,9 @@ export default function BrokerEditModal({ broker, isOpen, onClose, onUpdate }: B
                   <Plus size={10} strokeWidth={4} />
                 </button>
               </div>
-              <Select value={formData.departamento} onValueChange={(v) => setFormData({...formData, departamento: v})}>
+              <Select value={formData.departamento || ""} 
+                onValueChange={(v) => setFormData({...formData, departamento: v})}
+              >
                 <SelectTrigger className="rounded-2xl h-11 bg-muted/40 border-none font-bold text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-2xl">{options.departments.map(d => <SelectItem key={d} value={d} className="font-bold text-xs">{d}</SelectItem>)}</SelectContent>
               </Select>

@@ -36,6 +36,7 @@ interface Lead {
     status?: string
     type: "action" | "visit" | "system"
   }>
+  status_dashboard?: string //
   visibleOnDashboard?: boolean
   valueLaunched: number
 }
@@ -66,17 +67,19 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
   
   // Define se o card está "ativo" no dashboard para estilização
   const isActive = lead.visibleOnDashboard;
+  const isHidden = lead.status_dashboard === "Oculto";
 
   return (
     <div 
       className={`
         bg-card rounded-2xl border transition-all duration-300 overflow-hidden group relative
         ${isActive 
-            ? "border-emerald-500 ring-1 ring-emerald-400/50 shadow-lg shadow-black-200/10" // Estilo quando está no Dashboard
-            : "border-border shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30" // Estilo padrão
+            ? isHidden 
+              ? "border-orange-200 ring-1 ring-orange-400/30 shadow-lg shadow-black-200/10" // Laranja Premium
+              : "border-emerald-500 ring-1 ring-emerald-400/50 shadow-lg shadow-black-200/10" // Estilo Verde padrão
+            : "border-border shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30"
         }
       `}
-      // REMOVIDO: onClick={onClick} do elemento pai para evitar cliques acidentais
     >
       
       {/* --- CABEÇALHO: DADOS DO CORRETOR E BOTÃO DE DETALHES À DIREITA --- */}
@@ -116,14 +119,20 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
       <div className="relative aspect-3/2 bg-accent group-hover:opacity-95 transition-opacity">
         <img src={lead.image || "/placeholder.svg"} alt="Imóvel" className="w-full h-full object-cover" />
         
-        {/* BADGE "NO DASHBOARD" */}
+        
+        {/* --- BADGE "NO DASHBOARD" --- */}
         {isActive && (
           <div className="absolute top-3 left-3 z-20 animate-in fade-in zoom-in duration-300">
-
-             <span className="flex items-center gap-1.5 bg-emerald-600/90 text-white text-[10px] uppercase font-bold px-2.5 py-1 rounded-full shadow-lg backdrop-blur-sm border border-emerald-400/30">
-               <LayoutDashboard size={12} className="text-white" />
-               No Dashboard
-             </span>
+            <span className={`
+              flex items-center gap-1.5 text-white text-[10px] uppercase font-bold px-2.5 py-1 rounded-full shadow-lg backdrop-blur-sm border
+              ${isHidden 
+                ? "bg-orange-600/90 border-orange-400/30" // Badge Laranja
+                : "bg-emerald-600/90 border-emerald-400/30" // Badge Verde
+              }
+            `}>
+              <LayoutDashboard size={12} className="text-white" />
+              {isHidden ? "Oculto no Dash" : "No Dashboard"}
+            </span>
           </div>
         )}
       
@@ -139,23 +148,26 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
       {/* --- RODAPÉ DO CARD --- */}
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <span className={`font-bold text-lg ${isActive ? "text-emerald-700" : "text-foreground"}`}>
+          <span className={`font-bold text-lg ${isActive ? "text-black-700" : "text-foreground"}`}>
             {formatCurrency(lead.valueLaunched > 0 ? lead.valueLaunched : lead.value)}
           </span>
         </div>
 
-        {/* Valor Lançado no Dashboard */}
-        <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
-
-          lead.visibleOnDashboard && lead.valueLaunched > 0 
-            ? "bg-slate-50 shadow-sm" 
-            : "bg-slate-50 shadow-sm"
-        }`}>
-          <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600" : "text-slate-500"} font-medium`}>
+        {/* Campo de Valor Lançado */}
+        <div className="flex items-center justify-between text-sm px-3 py-2 rounded-md border bg-slate-50 shadow-sm">
+          <span className={`${
+            isActive && lead.valueLaunched > 0 
+              ? isHidden ? "text-orange-600" : "text-emerald-600" 
+              : "text-slate-500"
+          } font-medium`}>
             No Dashboard:
           </span>
-          <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-800" : "text-slate-400"} font-semibold`}>
-            {lead.visibleOnDashboard && lead.valueLaunched > 0 
+          <span className={`${
+            isActive && lead.valueLaunched > 0 
+              ? isHidden ? "text-orange-800" : "text-emerald-800" 
+              : "text-slate-400"
+          } font-semibold`}>
+            {isActive && lead.valueLaunched > 0 
               ? formatCurrency(lead.valueLaunched) 
               : "Valor pendente"}
           </span>
@@ -203,7 +215,9 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
               variant={isActive ? "outline" : "default"}
               className={`h-7 text-xs px-3 gap-1.5 transition-all shadow-sm ${
                 isActive 
-                  ? "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300" 
+                  ? isHidden
+                    ? "border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 hover:text-orange-800 hover:border-orange-300" // Cor Laranja se Oculto
+                    : "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300" // Cor Verde se Visível
                   : "bg-primary hover:bg-primary/90"
               }`}
               onClick={(e) => {

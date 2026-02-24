@@ -9,13 +9,15 @@ import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/central63/sidebar"
 import { StatCard } from "@/components/central63/services/stat-card"
 import { Filters } from "@/components/central63/filters"
-import { LeadCard } from "@/components/central63/lead-card"
+import { LeadCard } from "@/components/central63/services/lead-card"
 import { Pagination } from "@/components/central63/pagination"
 import { DetailsDrawer } from "@/components/central63/services/details-drawer"
+import { UpdateLeadModal } from "@/components/central63/services/update-lead-modal"
 import { EditLeadModal, type EditableLeadData } from "@/components/central63/services/edit-lead-modal"
 import { useToast } from "@/hooks/use-toast"
 import Loading from "../loading"
 import { supabase } from "@/lib/supabase"
+
 
 // --- CONSTANTES ---
 const CITIES = ["Palmas", "Araguaina"]
@@ -42,6 +44,7 @@ export default function Central63App() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [updateModalOpen, setUpdateModalOpen] = useState(false)
   const itemsPerPage = 16
 
   // Estado para Equipes Dinâmicas (Departamentos dos Corretores)
@@ -365,7 +368,7 @@ export default function Central63App() {
       // ---------------------------------------------------------
       // ETAPA 3: Verificação de Dashboard
       // ---------------------------------------------------------
-      let salesDataMap = new Map<string, { visible: boolean, valorVenda: number }>();
+      let salesDataMap = new Map<string, { visible: boolean, valorVenda: number, statusDashboard: string }>();
 
       if (itemsWithSafeIds.length > 0) {
         const idsToVerify = itemsWithSafeIds.map(item => `${currentPrefix}_${item.safeId}`)
@@ -375,14 +378,15 @@ export default function Central63App() {
             const chunk = idsToVerify.slice(i, i + verifyBatchSize);
             const { data: vendasMatches, error: errVendas } = await supabase
                 .from('vendas')
-                .select('id, valor_venda') 
+                .select('id, valor_venda, status_dashboard') 
                 .in('id', chunk)
             
             if (!errVendas && vendasMatches) {
                 vendasMatches.forEach((match: any) => {
                     salesDataMap.set(match.id, {
                       visible: true,
-                      valorVenda: match.valor_venda || 0
+                      valorVenda: match.valor_venda || 0,
+                      statusDashboard: match.status_dashboard
                     });
                 })
             }
@@ -508,6 +512,7 @@ export default function Central63App() {
           raw_data: item.datahoraultimainteracao,
           visibleOnDashboard: !!saleInfo, 
           valueLaunched: saleInfo?.valorVenda || 0, 
+          status_dashboard: saleInfo?.statusDashboard || "Visível",
         }
       })
 
@@ -581,27 +586,35 @@ export default function Central63App() {
         if (!lead) return
 
         // CASO DE REMOÇÃO: Se o valor vier como 0 ou status_dashboard falso via modal
-        if (data.valor_venda === 0 || data.status_dashboard === false) {
-          setLeadsData(prev => prev.map(l => 
-            l.id === leadId ? { ...l, visibleOnDashboard: false, valueLaunched: 0 } : l
-          ))
-          toast({ title: "Venda Removida", description: "O card foi atualizado automaticamente." })
-          return
-        }
+        if (data.valor_venda === 0) {
+        setLeadsData(prev => prev.map(l => 
+          l.id === leadId 
+          ? { 
+              ...l, 
+              clientName: data.clientName, // Atualiza o nome do cliente no card
+              visibleOnDashboard: true, 
+              valueLaunched: data.valor_venda || 0,
+              status_dashboard: data.status_dashboard || "Visível"
+            } 
+          : l
+      ))
+        return
+      }
 
         const prefix = lead.sourceTable.includes("pmw") ? "pmw" : "aux"
         const newId = `${prefix}_${lead.id}`
 
-        console.log('Lead: ', lead)
+        console.log('Tean: ', lead)
         console.log('data: ', data)
         console.log('RawData: ', lead.raw_data)
+
+        const dashboardStatusString = data.status_dashboard ? "Visível" : "Oculto"
 
         const payload = {
           id: newId, 
           id_origem: lead.id,
           tabela_origem: lead.sourceTable,
           codigo: lead.raw_codigo,
-          codigo_imovel: lead.propertyLocation,
           finalidade: lead.purpose,
           situacao: lead.status, 
           midia: lead.raw_midia,
@@ -610,9 +623,10 @@ export default function Central63App() {
           data_venda: data.data_venda ? new Date(data.data_venda).toISOString() : new Date().toISOString(),
           comissao: data.comissao,
           obs_venda: data.obs_venda,
-          status_dashboard: data.status_dashboard ? "Visível" : "Oculto",
+          status_dashboard: dashboardStatusString,
           imagem_corretor: lead.broker.avatar,
           nome_corretor: lead.broker.name,
+          equipe: lead.team,
           lista_imoveis: data.lista_imoveis,
           created_at: new Date().toISOString()
         }
@@ -620,17 +634,37 @@ export default function Central63App() {
         const { error } = await supabase.from('vendas').upsert([payload])
         if (error) throw error
         
-        setLeadsData(prev => prev.map(l => l.id === leadId ? { ...l, visibleOnDashboard: true, valueLaunched: data.valor_venda || 0 } : l))
-        toast({ title: lead.visibleOnDashboard ? "Venda Atualizada!" : "Venda Lançada!", description: `Sucesso para ${data.clientName}`, className: "bg-emerald-500 text-white border-none" })
+        // ATUALIZAÇÃO DO ESTADO LOCAL PARA RE-RENDERIZAÇÃO IMEDIATA
+        setLeadsData(prev => prev.map(l => 
+          l.id === leadId 
+            ? { 
+                ...l, 
+                clientName: data.clientName, // Atualiza o nome do cliente no card
+                visibleOnDashboard: true, 
+                valueLaunched: data.valor_venda || 0,
+                status_dashboard: dashboardStatusString // ISSO ATUALIZA A COR DO CARD (Laranja/Verde)
+              } 
+            : l
+        ))
+
+        toast({ 
+          title: lead.visibleOnDashboard ? "Venda Atualizada!" : "Venda Lançada!", 
+          description: `Sucesso para ${data.clientName}`, 
+          className: "bg-emerald-500 text-white border-none" 
+        })
       } catch (error: any) {
         console.error("Erro venda:", error)
         toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" })
       }
     } else {
-      setLeadsData(prev => prev.map(lead => lead.id === leadId ? { ...lead, ...data } : lead))
+      // Para edição simples de contato
+      setLeadsData(prev => prev.map(lead => 
+        lead.id === leadId ? { ...lead, ...data } : lead
+      ))
       toast({ title: "Lead Atualizado", description: "Salvo localmente." })
     }
   }
+
 
   return (
     <Suspense fallback={<Loading />}>
@@ -644,20 +678,30 @@ export default function Central63App() {
               <Users className="text-primary hidden lg:block" />
               <h2 className="text-2xl font-bold text-foreground tracking-tight">Gestao de Atendimentos</h2>
             </div>
-            <button 
-              onClick={handleUpdateSupabase}
-              disabled={isUpdating}
-              className={`bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition shadow-sm shadow-primary/20 ${isUpdating ? "opacity-80 cursor-wait" : ""}`}
-            >
-              {isUpdating ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <RefreshCw size={18} />
-              )}
-              <span className="hidden sm:inline">
-                {isUpdating ? "Atualizando..." : "Atualizar Supabase"} 
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+                <Button 
+                variant="outline"
+                onClick={() => setUpdateModalOpen(true)}
+                className="hidden sm:flex items-center gap-2"
+              >
+                <Plus size={18} />
+                Atualizar Individual
+              </Button>
+              <button 
+                onClick={handleUpdateSupabase}
+                disabled={isUpdating}
+                className={`bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition shadow-sm shadow-primary/20 ${isUpdating ? "opacity-80 cursor-wait" : ""}`}
+              >
+                {isUpdating ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={18} />
+                )}
+                <span className="hidden sm:inline">
+                  {isUpdating ? "Atualizando..." : "Atualizar Supabase"} 
+                </span>
+              </button>
+            </div>
           </header>
 
           <div className="flex-1 overflow-y-auto bg-background p-4 lg:p-8 space-y-6">
@@ -732,6 +776,11 @@ export default function Central63App() {
           }} 
           onSave={handleSaveData} 
           mode={modalMode} 
+        />
+
+        <UpdateLeadModal 
+          isOpen={updateModalOpen} 
+          onClose={() => setUpdateModalOpen(false)} 
         />
       </div>
     </Suspense>
