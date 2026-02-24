@@ -55,7 +55,7 @@ export default function CorretoresPage() {
     try {
       const from = (currentPage - 1) * itemsPerPage
       const to = from + itemsPerPage - 1
-      const colunas = 'id, nome, cidade_origem, desativado, imagem_url, unidade'
+      const colunas = 'id, nome, cidade_origem, desativado, imagem_url, unidade, departamento, data_nascimento'
 
       const applyFilters = (tableName: string) => {
         let query = supabase.from(tableName).select(colunas, { count: 'exact' })
@@ -97,7 +97,7 @@ export default function CorretoresPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentPage, filters, toast])
+  }, [currentPage, filters, itemsPerPage, toast])
 
   useEffect(() => {
     fetchBrokers()

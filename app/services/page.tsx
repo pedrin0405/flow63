@@ -69,7 +69,7 @@ export default function Central63App() {
   const handleUpdateSupabase = async () => {
     setIsUpdating(true)
     try {
-      await fetch("https://n8n.srv1207506.hstgr.cloud/webhook/f9908aaf-229a-4df3-a95c-0dba6546305e", { method: "GET", mode: "no-cors" })
+      await fetch("https://n8n.srv1207506.hstgr.cloud/webhook/central63", { method: "GET", mode: "no-cors" })
 
       toast({
         title: "Atualização Disparada",
