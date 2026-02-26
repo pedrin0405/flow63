@@ -3,7 +3,7 @@ import { MapPin, Users, Edit2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Pagination } from "@/components/central63/pagination"
+import { Pagination } from "@/components/central63/services/pagination"
 import BrokerEditModal, { Broker } from "./broker-edit-modal"
 import { BrokerFilters } from "./broker-filters"
 

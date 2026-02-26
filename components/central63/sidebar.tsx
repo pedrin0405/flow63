@@ -11,6 +11,7 @@ import {
   LogOut,
   FileText,
   MessageCircle,
+  ChartSpline,
   ChartPie,
   Settings, 
   HelpCircle, 
@@ -309,6 +310,14 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               label="Planilhas" 
               active={isActive("planilhas", "/spreadsheets")} 
               onClick={() => handleNavigation("planilhas", "/spreadsheets")}
+              collapsed={isCollapsed}
+            />
+
+            <SidebarItem 
+              icon={ChartSpline} 
+              label="Dashboard Customizável" 
+              active={isActive("dashboard-customizavel", "/custom-dashboard")} 
+              onClick={() => handleNavigation("dashboard-customizavel", "/custom-dashboard")}
               collapsed={isCollapsed}
             />
 

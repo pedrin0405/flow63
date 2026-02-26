@@ -42,9 +42,9 @@ export async function middleware(request: NextRequest) {
   const isPublicFormRoute = path.startsWith('/forms/') && path !== '/forms'
 
   // Proteção usando a sessão (mais rápido que getUser)
-  if (!session && !isAuthRoute && !isPublicFormRoute) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
+  // if (!session && !isAuthRoute && !isPublicFormRoute) {
+  //   return NextResponse.redirect(new URL('/login', request.url))
+  // }
 
   if (session && path === '/login') {
     return NextResponse.redirect(new URL('/', request.url))

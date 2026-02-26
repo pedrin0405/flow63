@@ -2,15 +2,22 @@
 
 import { useState, useMemo, useEffect, Suspense, useCallback } from "react"
 import { 
-  Menu, Users, DollarSign, Plus, Search, Briefcase, RefreshCw, Loader2,
+  Menu,
+  Users,
+  DollarSign, 
+  Plus, 
+  Search, 
+  Briefcase,
+  RefreshCw,
+  Loader2,
   Building2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/central63/sidebar"
 import { StatCard } from "@/components/central63/services/stat-card"
-import { Filters } from "@/components/central63/filters"
+import { Filters } from "@/components/central63/services/filters"
 import { LeadCard } from "@/components/central63/services/lead-card"
-import { Pagination } from "@/components/central63/pagination"
+import { Pagination } from "@/components/central63/services/pagination"
 import { DetailsDrawer } from "@/components/central63/services/details-drawer"
 import { UpdateLeadModal } from "@/components/central63/services/update-lead-modal"
 import { EditLeadModal, type EditableLeadData } from "@/components/central63/services/edit-lead-modal"
