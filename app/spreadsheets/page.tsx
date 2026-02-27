@@ -176,7 +176,7 @@ export default function SpreadsheetsPage() {
               secretaria: data.secretaria || "Geral",
               modelo_tabela: data.nome_modelo,
               dados: data.dados, 
-              criado_por: data.criado_por
+              criado_por: user.id
             }
           ]);
 
