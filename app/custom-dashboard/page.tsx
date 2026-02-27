@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { Sidebar } from "@/components/central63/sidebar";
-import { 
-  LayoutDashboard, Search, Plus, BarChart3, Loader2, 
-  MoreHorizontal, Trash2, Eye, Calendar, Database, 
+import {
+  LayoutDashboard, Search, Plus, BarChart3, Loader2,
+  MoreHorizontal, Trash2, Eye, Calendar, Database,
   Layers, User, ArrowUpRight, LayoutGrid, List as ListIcon,
   Filter, Activity, TrendingUp, Briefcase,
   LayoutPanelLeft,
@@ -13,13 +13,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator 
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import {
   Table,
@@ -50,7 +50,7 @@ export default function DashboardsPage() {
     try {
       const { data, error } = await supabase
         .from('dashboard_data')
-        .select('*')
+        .select('*, profiles:criado_por (full_name) ') // Faz um join para pegar o nome do criador
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -68,7 +68,7 @@ export default function DashboardsPage() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if(!confirm("Deseja excluir permanentemente este dashboard?")) return;
+    if (!confirm("Deseja excluir permanentemente este dashboard?")) return;
     try {
       const { error } = await supabase.from('dashboard_data').delete().eq('id', id);
       if (error) throw error;
@@ -82,7 +82,7 @@ export default function DashboardsPage() {
   const filteredDashboards = useMemo(() => {
     return dashboards.filter(d => {
       const matchesSearch = d.nome?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          d.unidade?.toLowerCase().includes(searchQuery.toLowerCase());
+        d.unidade?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesUnit = unitFilter === "all" || d.unidade === unitFilter;
       return matchesSearch && matchesUnit;
     });
@@ -101,28 +101,28 @@ export default function DashboardsPage() {
 
   return (
     <div className="flex h-screen bg-[#FAFAFA] dark:bg-background overflow-hidden font-sans text-foreground">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab="dashboards" onTabChange={() => {}} />
-      
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab="dashboards" onTabChange={() => { }} />
+
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
           <div className="flex items-center gap-4">
             <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}>
               <LayoutDashboard size={20} />
             </button>
-                <ChartSpline className="text-primary hidden lg:block" size={24} />
-                <h2 className="text-2xl font-bold text-foreground tracking-tight">Dashboards</h2>
-                <p className="text-primary hidden sm:block">| Gerador de Gráficos</p>
+            <ChartSpline className="text-primary hidden lg:block" size={24} />
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Dashboards</h2>
+            <p className="text-primary hidden sm:block">| Gerador de Gráficos</p>
           </div>
-          
+
           <Button onClick={() => setIsModalOpen(true)} className="h-11 px-6 font-bold bg-primary text-white shadow-lg hover:bg-primary/90 rounded-xl transition-all active:scale-95">
-            <Plus size={18} className="mr-2" /> 
+            <Plus size={18} className="mr-2" />
             <span>Novo Painel</span>
           </Button>
         </header>
 
         <main className="flex-1 overflow-y-auto custom-scrollbar">
           <div className="max-w-[1600px] mx-auto p-6 md:p-8 space-y-8 pb-20">
-            
+
             {/* Stats Header */}
             <div className="bg-white dark:bg-card rounded-2xl border shadow-sm p-1 grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-800">
               <div className="p-4 flex items-center gap-4">
@@ -158,49 +158,49 @@ export default function DashboardsPage() {
             {/* Toolbar */}
             <div className="flex flex-col md:flex-row gap-4 justify-between items-center w-full">
               <div className="flex items-center gap-2 w-full md:flex-1 bg-white dark:bg-card p-1 rounded-xl border shadow-sm">
-                 <div className="relative flex-1">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                   <Input 
-                     placeholder="Buscar por nome ou unidade..." 
-                     className="pl-9 h-10 border-0 bg-transparent focus-visible:ring-0 w-full"
-                     value={searchQuery}
-                     onChange={(e) => setSearchQuery(e.target.value)}
-                   />
-                 </div>
-                 
-                 <div className="h-6 w-px bg-border mx-1" />
-                 
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                       <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground">
-                         <Filter size={14} />
-                         <span className="text-xs font-medium hidden sm:inline-block">
-                           {unitFilter === 'all' ? 'Unidades' : unitFilter}
-                         </span>
-                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => setUnitFilter('all')}>Todas Unidades</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {units.map(unit => (
-                        <DropdownMenuItem key={unit} onClick={() => setUnitFilter(unit)}>{unit}</DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                 </DropdownMenu>
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                  <Input
+                    placeholder="Buscar por nome ou unidade..."
+                    className="pl-9 h-10 border-0 bg-transparent focus-visible:ring-0 w-full"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+
+                <div className="h-6 w-px bg-border mx-1" />
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground">
+                      <Filter size={14} />
+                      <span className="text-xs font-medium hidden sm:inline-block">
+                        {unitFilter === 'all' ? 'Unidades' : unitFilter}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => setUnitFilter('all')}>Todas Unidades</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {units.map(unit => (
+                      <DropdownMenuItem key={unit} onClick={() => setUnitFilter(unit)}>{unit}</DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="flex items-center bg-white dark:bg-card border rounded-xl p-1 shadow-sm">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setViewMode('grid')}
                   className={`h-9 w-9 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-gray-100 text-foreground' : 'text-muted-foreground'}`}
                 >
                   <LayoutGrid size={18} />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setViewMode('list')}
                   className={`h-9 w-9 rounded-lg transition-all ${viewMode === 'list' ? 'bg-gray-100 text-foreground' : 'text-muted-foreground'}`}
                 >
@@ -223,31 +223,39 @@ export default function DashboardsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {filteredDashboards.map((item) => {
                       const hasWidgets = item.widgets_config?.length > 0;
-                      
+
                       return (
-                        <Card 
-                          key={item.id} 
+                        <Card
+                          key={item.id}
                           className="group relative border-0 shadow-sm hover:shadow-2xl transition-all duration-300 bg-white dark:bg-card overflow-hidden rounded-[1.5rem] ring-1 ring-slate-100 dark:ring-slate-800 hover:-translate-y-1"
                         >
                           {/* Efeito de Topo Colorido */}
-                          <div className={`absolute top-0 left-0 right-0 h-24 opacity-30 bg-gradient-to-b ${
-                            hasWidgets ? 'from-blue-100 to-transparent' : 'from-amber-100 to-transparent'
-                          }`} />
+                          <div className={`absolute top-0 left-0 right-0 h-24 opacity-30 bg-gradient-to-b ${hasWidgets ? 'from-blue-100 to-transparent' : 'from-amber-100 to-transparent'
+                            }`} />
 
                           <CardContent className="p-0 flex flex-col h-full relative z-10">
                             {/* Cabeçalho */}
                             <div className="p-6 pb-2 flex justify-between items-start">
                               <div className="flex gap-4">
                                 <Avatar className={`h-14 w-14 ring-4 ring-white dark:ring-card shadow-sm ${hasWidgets ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                                  {/* Tentativa de carregar a foto do perfil */}
+                                  <AvatarImage
+                                    src={item.profiles?.avatar_url}
+                                    alt={item.profiles?.full_name || "Anônimo"}
+                                    className="object-cover"
+                                  />
+
+                                  {/* Fallback caso a foto não exista ou falhe ao carregar */}
                                   <AvatarFallback className="font-bold text-lg uppercase">
-                                    {/* {item.nome?.substring(0, 2)} */}
-                                    <LayoutPanelLeft />
+                                    {item.profiles?.full_name
+                                      ? item.profiles.full_name.substring(0, 2)
+                                      : item.criado_por?.substring(0, 2) || "AN"}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
                                   <div className="flex items-center gap-2 mb-1">
                                     <Badge variant="secondary" className="font-mono text-[10px] px-1.5 h-5 bg-white/80 backdrop-blur border border-slate-200 text-slate-500 rounded-md">
-                                      {item.id.substring(0,6).toUpperCase()}
+                                      {item.id.substring(0, 6).toUpperCase()}
                                     </Badge>
                                     <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${hasWidgets ? 'text-blue-600' : 'text-amber-600'}`}>
                                       <span className={`w-1.5 h-1.5 rounded-full ${hasWidgets ? 'bg-blue-500' : 'bg-amber-500'}`} />
@@ -268,11 +276,11 @@ export default function DashboardsPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="rounded-xl border-slate-100 shadow-xl w-48 p-1">
                                   <DropdownMenuItem onClick={() => router.push(`/custom-dashboard/${item.id}`)} className="rounded-lg py-2">
-                                    <Eye size={16} className="mr-2 text-slate-500"/> Visualizar
+                                    <Eye size={16} className="mr-2 text-slate-500" /> Visualizar
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem onClick={(e) => handleDelete(item.id, e)} className="text-red-600 focus:text-red-700 rounded-lg py-2">
-                                    <Trash2 size={16} className="mr-2"/> Excluir
+                                    <Trash2 size={16} className="mr-2" /> Excluir
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -299,20 +307,20 @@ export default function DashboardsPage() {
                                 </div>
                                 <div className="col-span-2 pt-2 border-t border-slate-200/50 flex items-center justify-between">
                                   <p className="text-[10px] font-medium text-slate-400 flex items-center gap-1.5">
-                                    <Calendar size={10} /> 
+                                    <Calendar size={10} />
                                     {new Date(item.created_at).toLocaleDateString('pt-BR')}
                                   </p>
                                   <p className="text-[10px] font-bold text-indigo-500 flex items-center gap-1">
-                                    <User size={10} /> 
+                                    <User size={10} />
                                     {/* ALTERAÇÃO SOLICITADA: Nome do Criador */}
-                                    {item.criado_por || "Anônimo"}
+                                    {item.profiles?.full_name || "Anônimo"}
                                   </p>
                                 </div>
                               </div>
                             </div>
 
                             <div className="mt-auto px-6 pb-6 pt-0 flex flex-col gap-3">
-                              <Button 
+                              <Button
                                 onClick={() => router.push(`/custom-dashboard/${item.id}`)}
                                 className="w-full h-11 rounded-xl font-bold text-xs bg-blue-600 text-white hover:bg-blue-800 shadow-lg transition-all group/btn"
                               >
@@ -385,10 +393,10 @@ export default function DashboardsPage() {
         </main>
       </div>
 
-      <NewDashboardModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSave={fetchDashboards} 
+      <NewDashboardModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={fetchDashboards}
       />
     </div>
   );
