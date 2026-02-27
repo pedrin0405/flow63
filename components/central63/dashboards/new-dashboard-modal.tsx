@@ -14,7 +14,9 @@ import {
   BarChart3, Plus, ArrowLeft, LayoutTemplate, Trash2, Save,
   Database, Settings2, LineChart, PieChart, Sigma, Type,
   Filter, Clock, Hash, Table as TableIcon, Eye, SlidersHorizontal,
-  Pencil, AlertTriangle, CircleFadingPlus
+  Pencil, AlertTriangle, CircleFadingPlus,
+  Heading1, SplitSquareHorizontal, MoveLeft, MoveRight, Expand, Shrink, Columns, Maximize2,
+  StretchHorizontal, AlignLeft, AlignCenter, AlignRight, Target, Zap, Star, Flame, TrendingUp, Users, Wallet, Briefcase
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -38,7 +40,7 @@ import {
 import { CreateDashboardFromModelModal } from "./create-from-model-modal";
 
 // ─────────────────────────────────────────────
-// Types
+// Types & Constants
 // ─────────────────────────────────────────────
 type DataType = "text" | "number" | "date" | "currency";
 
@@ -51,7 +53,10 @@ interface WidgetFilter {
 
 interface WidgetConfig {
   title: string;
-  type: "bar" | "line" | "pie" | "value" | "table";
+  type: "bar" | "line" | "pie" | "value" | "table" | "title" | "divider";
+  size: "small" | "wide" | "tall" | "large" | "full";
+  icon?: string;
+  align?: "left" | "center" | "right";
   spreadsheet_ref: string;
   column_x: string;
   column_y: string;
@@ -60,6 +65,17 @@ interface WidgetConfig {
   dataType: DataType;
   filters: WidgetFilter[];
 }
+
+const TITLE_ICONS: Record<string, { icon: React.ElementType, label: string }> = {
+  target: { icon: Target, label: "Alvo" },
+  zap: { icon: Zap, label: "Raio" },
+  star: { icon: Star, label: "Estrela" },
+  flame: { icon: Flame, label: "Fogo" },
+  trending: { icon: TrendingUp, label: "Crescimento" },
+  users: { icon: Users, label: "Usuários" },
+  wallet: { icon: Wallet, label: "Carteira" },
+  briefcase: { icon: Briefcase, label: "Maleta" },
+};
 
 // ─────────────────────────────────────────────
 // Helpers — defined once outside any component
@@ -161,13 +177,16 @@ const WidgetPreview = memo(function WidgetPreview({
   sheetData,
   compact = false,
 }: WidgetPreviewProps) {
-  const hasData =
+  const isLayoutViz = widget.type === 'title' || widget.type === 'divider';
+  
+  const hasData = isLayoutViz || (
     sheetData !== null &&
     (widget.type === 'value' || widget.column_x) &&
-    widget.column_y;
+    widget.column_y
+  );
 
   const aggregatedData = useMemo(() => {
-    if (!hasData) return [];
+    if (!hasData || isLayoutViz) return [];
     return computeAggregatedData(widget, sheetData!);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -178,16 +197,52 @@ const WidgetPreview = memo(function WidgetPreview({
     widget.column_y,
     widget.aggregation,
     widget.dataType,
+    isLayoutViz,
     JSON.stringify(widget.filters),
   ]);
 
   if (!hasData) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-2">
+      <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-2 bg-white">
         <BarChart3 size={compact ? 22 : 36} className="text-slate-200" />
         <p className={cn("font-bold uppercase tracking-widest text-slate-400", compact ? "text-[8px]" : "text-xs")}>
           Aguardando Configuração
         </p>
+      </div>
+    );
+  }
+
+  if (widget.type === "title") {
+    const SelectedIcon = widget.icon && TITLE_ICONS[widget.icon] ? TITLE_ICONS[widget.icon].icon : null;
+    const justifyClass = widget.align === 'center' ? 'justify-center' : widget.align === 'right' ? 'justify-end' : 'justify-start';
+
+    return (
+      <div className={cn("h-full w-full flex items-center p-6 bg-white", justifyClass)}>
+        <div className="flex items-center gap-4">
+          {SelectedIcon && (
+            <div className={cn("flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-2xl shadow-sm", compact ? "w-10 h-10" : "w-14 h-14")}>
+              <SelectedIcon size={compact ? 20 : 28} strokeWidth={2.5} />
+            </div>
+          )}
+          <h2 className={cn("font-black text-slate-800 tracking-tight", compact ? "text-2xl" : "text-4xl")}>
+            {widget.title || "Novo Título"}
+          </h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (widget.type === "divider") {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center bg-white p-6 relative">
+        <div className="w-full absolute inset-0 flex items-center justify-center px-8">
+           <div className="w-full border-t-2 border-dashed border-slate-200"></div>
+        </div>
+        {widget.title && (
+          <span className="relative z-10 bg-white px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+            {widget.title}
+          </span>
+        )}
       </div>
     );
   }
@@ -406,8 +461,13 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
     setEditingModelId(model.id);
     setNome(model.nome || "");
     setUnidade(model.unidade || "");
-    // Deep clone widgets to avoid mutating the cached model
-    setWidgets(JSON.parse(JSON.stringify(model.widgets || [])));
+    // Default size protection on legacy widgets
+    const parsedWidgets = JSON.parse(JSON.stringify(model.widgets || [])).map((w: any) => ({
+      ...w,
+      size: w.size || "small",
+      align: w.align || "left",
+    }));
+    setWidgets(parsedWidgets);
     setSelectedWidgetIndex(null);
     setView("form");
   };
@@ -435,6 +495,8 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
         {
           title: "",
           type: "bar",
+          size: "small",
+          align: "left",
           spreadsheet_ref: "",
           column_x: "",
           column_y: "",
@@ -466,6 +528,20 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
         if (sel > index) return sel - 1;
         return sel;
       });
+      return next;
+    });
+  }, []);
+
+  const moveWidget = useCallback((index: number, direction: 'left' | 'right') => {
+    setWidgets(prev => {
+      const next = [...prev];
+      if (direction === 'left' && index > 0) {
+        [next[index - 1], next[index]] = [next[index], next[index - 1]];
+        setSelectedWidgetIndex(index - 1);
+      } else if (direction === 'right' && index < next.length - 1) {
+        [next[index + 1], next[index]] = [next[index], next[index + 1]];
+        setSelectedWidgetIndex(index + 1);
+      }
       return next;
     });
   }, []);
@@ -513,7 +589,7 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
   // ── Save (create or update) ──
   const handleSaveModel = async () => {
     if (!nome.trim()) return toast.error("Nome do dashboard é obrigatório");
-    if (widgets.length === 0) return toast.error("Adicione pelo menos um gráfico");
+    if (widgets.length === 0) return toast.error("Adicione pelo menos um elemento");
 
     setIsSaving(true);
 
@@ -701,7 +777,7 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                         {/* Widget count badge */}
                         <div className="flex items-center gap-1.5 mb-4">
                           <div className="px-2 py-0.5 bg-slate-50 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                            {(model.widgets || []).length} widget{(model.widgets || []).length !== 1 ? 's' : ''}
+                            {(model.widgets || []).length} elemento{(model.widgets || []).length !== 1 ? 's' : ''}
                           </div>
                           {model.updated_at && (
                             <div className="px-2 py-0.5 bg-slate-50 rounded-full text-[10px] font-medium text-slate-400">
@@ -772,7 +848,7 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                       onClick={addWidget}
                       className="rounded-lg gap-1.5 h-8 px-3 text-xs bg-indigo-600 text-white hover:bg-indigo-700 font-bold shadow-sm flex-shrink-0"
                     >
-                      <Plus size={13} /> Adicionar Gráfico
+                      <Plus size={13} /> Adicionar Elemento
                     </Button>
                   </div>
 
@@ -784,69 +860,99 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                           <BarChart3 size={28} className="text-slate-300" />
                         </div>
                         <div className="text-center">
-                          <p className="font-black uppercase tracking-widest text-xs text-slate-400">Nenhum widget adicionado</p>
-                          <p className="text-[11px] text-slate-300 mt-1">Clique em "Adicionar Gráfico" para começar</p>
+                          <p className="font-black uppercase tracking-widest text-xs text-slate-400">Nenhum elemento adicionado</p>
+                          <p className="text-[11px] text-slate-300 mt-1">Clique em "Adicionar Elemento" para começar</p>
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-[220px]">
-                        {widgets.map((widget, index) => (
-                          <div
-                            key={index}
-                            onClick={() => setSelectedWidgetIndex(index)}
-                            className={cn(
-                              "relative bg-white rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 group",
-                              selectedWidgetIndex === index
-                                ? "ring-2 ring-indigo-500 shadow-lg shadow-indigo-100"
-                                : "ring-1 ring-slate-100 shadow-sm hover:ring-2 hover:ring-indigo-300 hover:shadow-md"
-                            )}
-                          >
-                            {/* Badge */}
-                            <div className="absolute top-2.5 left-3 z-10">
-                              <div className={cn(
-                                "flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
-                                selectedWidgetIndex === index ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400"
-                              )}>
-                                {widget.type === 'bar'   ? <BarChart3 size={9} /> :
-                                 widget.type === 'line'  ? <LineChart size={9} /> :
-                                 widget.type === 'pie'   ? <PieChart size={9} /> :
-                                 widget.type === 'value' ? <Hash size={9} /> :
-                                 <TableIcon size={9} />}
-                                {widget.title || `Widget ${index + 1}`}
-                              </div>
-                            </div>
+                      <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-[220px] grid-flow-dense">
+                        {widgets.map((widget, index) => {
+                          const sizeClass = {
+                            small: "col-span-1 row-span-1",
+                            wide: "col-span-2 xl:col-span-2 row-span-1",
+                            tall: "col-span-1 row-span-2",
+                            large: "col-span-2 xl:col-span-2 row-span-2",
+                            full: "col-span-full row-span-1",
+                          }[widget.size || "small"];
 
-                            {/* Delete */}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); removeWidget(index); }}
-                              className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-white shadow text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                          return (
+                            <div
+                              key={index}
+                              onClick={() => setSelectedWidgetIndex(index)}
+                              className={cn(
+                                "relative bg-white rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 group",
+                                sizeClass,
+                                selectedWidgetIndex === index
+                                  ? "ring-2 ring-indigo-500 shadow-lg shadow-indigo-100"
+                                  : "ring-1 ring-slate-100 shadow-sm hover:ring-2 hover:ring-indigo-300 hover:shadow-md"
+                              )}
                             >
-                              <Trash2 size={11} />
-                            </button>
-
-                            {/* Editing pill */}
-                            {selectedWidgetIndex === index && (
-                              <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 bg-indigo-600 text-white rounded-full px-2 py-0.5">
-                                <SlidersHorizontal size={9} />
-                                <span className="text-[8px] font-black uppercase">Editando</span>
+                              {/* Badge */}
+                              <div className="absolute top-2.5 left-3 z-10">
+                                <div className={cn(
+                                  "flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm",
+                                  selectedWidgetIndex === index ? "bg-indigo-600 text-white" : "bg-white/90 text-slate-500 backdrop-blur"
+                                )}>
+                                  {widget.type === 'bar'   ? <BarChart3 size={9} /> :
+                                   widget.type === 'line'  ? <LineChart size={9} /> :
+                                   widget.type === 'pie'   ? <PieChart size={9} /> :
+                                   widget.type === 'value' ? <Hash size={9} /> :
+                                   widget.type === 'table' ? <TableIcon size={9} /> :
+                                   widget.type === 'title' ? <Heading1 size={9} /> :
+                                   <SplitSquareHorizontal size={9} />}
+                                  {widget.title || `Elemento ${index + 1}`}
+                                </div>
                               </div>
-                            )}
 
-                            <WidgetPreview
-                              widget={widget}
-                              sheetData={sheetDataMap[widget.spreadsheet_ref] ?? null}
-                              compact
-                            />
-                          </div>
-                        ))}
+                              {/* Action Buttons (Move Left/Right & Delete) */}
+                              <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveWidget(index, 'left'); }}
+                                  className="w-6 h-6 rounded-full bg-white shadow text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-colors"
+                                  title="Mover para Esquerda/Cima"
+                                >
+                                  <MoveLeft size={11} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveWidget(index, 'right'); }}
+                                  className="w-6 h-6 rounded-full bg-white shadow text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-colors"
+                                  title="Mover para Direita/Baixo"
+                                >
+                                  <MoveRight size={11} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); removeWidget(index); }}
+                                  className="w-6 h-6 rounded-full bg-white shadow text-slate-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors ml-1"
+                                  title="Excluir"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+
+                              {/* Editing pill */}
+                              {selectedWidgetIndex === index && (
+                                <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 bg-indigo-600 text-white rounded-full px-2 py-0.5 shadow-sm">
+                                  <SlidersHorizontal size={9} />
+                                  <span className="text-[8px] font-black uppercase">Editando</span>
+                                </div>
+                              )}
+
+                              <WidgetPreview
+                                widget={widget}
+                                sheetData={sheetDataMap[widget.spreadsheet_ref] ?? null}
+                                compact
+                              />
+                            </div>
+                          );
+                        })}
 
                         {/* Add tile */}
                         <div
                           onClick={addWidget}
-                          className="border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:bg-white hover:border-indigo-400 hover:text-indigo-600 cursor-pointer transition-all"
+                          className="col-span-1 row-span-1 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:bg-white hover:border-indigo-400 hover:text-indigo-600 cursor-pointer transition-all min-h-[220px]"
                         >
                           <Plus size={28} strokeWidth={1.5} />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Novo Widget</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">Novo Elemento</span>
                         </div>
                       </div>
                     )}
@@ -861,8 +967,8 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                         <Settings2 size={20} className="text-slate-300" />
                       </div>
                       <div>
-                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Nenhum widget selecionado</p>
-                        <p className="text-[11px] text-slate-300 mt-1">Clique em um widget para editar suas propriedades</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Nenhum elemento selecionado</p>
+                        <p className="text-[11px] text-slate-300 mt-1">Clique em um elemento para editar suas propriedades</p>
                       </div>
                     </div>
                   ) : (
@@ -876,7 +982,7 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                           <div>
                             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Propriedades</p>
                             <p className="text-xs font-black text-slate-800 truncate max-w-[160px]">
-                              {selectedWidget.title || `Widget ${(selectedWidgetIndex ?? 0) + 1}`}
+                              {selectedWidget.title || `Elemento ${(selectedWidgetIndex ?? 0) + 1}`}
                             </p>
                           </div>
                         </div>
@@ -886,9 +992,9 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                               key={i}
                               onClick={() => setSelectedWidgetIndex(i)}
                               className={cn(
-                                "w-5 h-5 rounded-full text-[9px] font-black transition-all",
+                                "w-5 h-5 rounded-full text-[9px] font-black transition-all flex items-center justify-center",
                                 i === selectedWidgetIndex
-                                  ? "bg-indigo-600 text-white"
+                                  ? "bg-indigo-600 text-white shadow-sm"
                                   : "bg-slate-100 text-slate-400 hover:bg-indigo-100"
                               )}
                             >
@@ -904,29 +1010,40 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
 
                           {/* Title */}
                           <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Título do Widget</Label>
+                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                              {selectedWidget.type === 'divider' ? 'Texto do Divisor' : selectedWidget.type === 'title' ? 'Texto do Título' : 'Título do Gráfico'}
+                            </Label>
                             <Input
                               value={selectedWidget.title}
                               onChange={e => updateWidget(selectedWidgetIndex!, { title: e.target.value })}
                               className="h-9 bg-slate-50/50 rounded-xl font-bold border-slate-100 text-sm"
+                              placeholder="Digite o título..."
                             />
                           </div>
 
                           {/* Viz type */}
                           <div className="space-y-1.5">
                             <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Tipo de Visualização</Label>
-                            <div className="grid grid-cols-5 gap-1">
+                            <div className="grid grid-cols-4 gap-1 mb-1">
                               {([
                                 { t: 'bar',   icon: <BarChart3 size={14} />,  label: 'Barra'  },
                                 { t: 'line',  icon: <LineChart size={14} />,  label: 'Linha'  },
                                 { t: 'pie',   icon: <PieChart size={14} />,   label: 'Pizza'  },
                                 { t: 'value', icon: <Hash size={14} />,       label: 'Valor'  },
                                 { t: 'table', icon: <TableIcon size={14} />,  label: 'Tabela' },
+                                { t: 'title', icon: <Heading1 size={14} />,   label: 'Título' },
+                                { t: 'divider', icon: <SplitSquareHorizontal size={14} />, label: 'Divisor' },
                               ] as any[]).map(({ t, icon, label }) => (
                                 <Button
                                   key={t}
                                   variant="outline"
-                                  onClick={() => updateWidget(selectedWidgetIndex!, { type: t })}
+                                  onClick={() => {
+                                    const isLayout = t === 'title' || t === 'divider';
+                                    updateWidget(selectedWidgetIndex!, { 
+                                      type: t,
+                                      ...(isLayout && selectedWidget.type !== t ? { size: 'full' } : {}) 
+                                    });
+                                  }}
                                   className={cn(
                                     "h-11 rounded-xl flex-col gap-0.5 text-[8px] font-black",
                                     selectedWidget.type === t && "bg-indigo-600 text-white border-indigo-600 shadow-md"
@@ -938,210 +1055,294 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                             </div>
                           </div>
 
-                          <div className="border-t border-slate-100" />
-
-                          {/* Data source */}
-                          <div className="space-y-3">
-                            <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest flex items-center gap-1.5">
-                              <Database size={10} /> Fonte de Dados
-                            </Label>
-
-                            <Select
-                              value={selectedWidget.spreadsheet_ref}
-                              onValueChange={(v) => updateWidget(selectedWidgetIndex!, { spreadsheet_ref: v, column_x: '', column_y: '', time_column: '' })}
-                            >
-                              <SelectTrigger className="h-9 bg-white rounded-xl font-bold border-slate-100 text-xs">
-                                <SelectValue placeholder="Selecione a planilha..." />
-                              </SelectTrigger>
-                              <SelectContent className="z-[100] rounded-xl">
-                                {availableSpreadsheets.map((s) => (
-                                  <SelectItem key={s.id} value={s.id}>{s.nome_tabela || s.modelo_tabela}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="space-y-1">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Eixo X</Label>
-                                <Select
-                                  value={selectedWidget.column_x}
-                                  onValueChange={(v) => updateWidget(selectedWidgetIndex!, { column_x: v })}
-                                  disabled={!selectedWidget.spreadsheet_ref || selectedWidget.type === 'value'}
+                          {/* Sizing options */}
+                          <div className="space-y-1.5 pt-3 border-t border-slate-100">
+                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Tamanho de Exibição</Label>
+                            <div className="grid grid-cols-5 gap-1">
+                              {[
+                                { s: 'small', label: 'Pequeno', icon: <Shrink size={12} /> },
+                                { s: 'wide',  label: 'Largo',   icon: <Columns size={12} /> },
+                                { s: 'tall',  label: 'Alto',    icon: <Maximize2 size={12} className="rotate-90" /> },
+                                { s: 'large', label: 'Grande',  icon: <Expand size={12} /> },
+                                { s: 'full',  label: '100%',    icon: <StretchHorizontal size={12} /> },
+                              ].map(({ s, label, icon }) => (
+                                <Button
+                                  key={s}
+                                  variant="outline"
+                                  onClick={() => updateWidget(selectedWidgetIndex!, { size: s as any })}
+                                  className={cn(
+                                    "h-10 rounded-xl flex-col gap-0.5 text-[8px] font-black transition-all",
+                                    (selectedWidget.size || 'small') === s
+                                      ? "bg-slate-800 text-white border-slate-800 shadow-md"
+                                      : "text-slate-500 hover:bg-slate-50"
+                                  )}
                                 >
-                                  <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100">
-                                    <SelectValue placeholder="Coluna..." />
-                                  </SelectTrigger>
-                                  <SelectContent className="z-[100] rounded-xl">
-                                    {(spreadsheetColumnsMap[selectedWidget.spreadsheet_ref] || []).map((col) => (
-                                      <SelectItem key={col} value={col}>{col}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Eixo Y</Label>
-                                <Select
-                                  value={selectedWidget.column_y}
-                                  onValueChange={(v) => updateWidget(selectedWidgetIndex!, { column_y: v })}
-                                  disabled={!selectedWidget.spreadsheet_ref}
-                                >
-                                  <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100">
-                                    <SelectValue placeholder="Coluna..." />
-                                  </SelectTrigger>
-                                  <SelectContent className="z-[100] rounded-xl">
-                                    {(spreadsheetColumnsMap[selectedWidget.spreadsheet_ref] || []).map((col) => (
-                                      <SelectItem key={col} value={col}>{col}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-
-                            <div className="space-y-1">
-                              <Label className="text-[9px] font-black uppercase text-indigo-600 tracking-widest flex items-center gap-1.5">
-                                <Clock size={9} /> Coluna de Período
-                              </Label>
-                              <Select
-                                value={selectedWidget.time_column}
-                                onValueChange={(v) => updateWidget(selectedWidgetIndex!, { time_column: v })}
-                                disabled={!selectedWidget.spreadsheet_ref}
-                              >
-                                <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100">
-                                  <SelectValue placeholder="Data/Hora..." />
-                                </SelectTrigger>
-                                <SelectContent className="z-[100] rounded-xl">
-                                  {(spreadsheetColumnsMap[selectedWidget.spreadsheet_ref] || []).map((col) => (
-                                    <SelectItem key={col} value={col}>{col}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="space-y-1">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
-                                  <Sigma size={9} /> Agregação
-                                </Label>
-                                <Select
-                                  value={selectedWidget.aggregation}
-                                  onValueChange={(v) => updateWidget(selectedWidgetIndex!, { aggregation: v as any })}
-                                  disabled={!selectedWidget.spreadsheet_ref}
-                                >
-                                  <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent className="z-[100] rounded-xl">
-                                    <SelectItem value="sum">Soma</SelectItem>
-                                    <SelectItem value="avg">Média</SelectItem>
-                                    <SelectItem value="count">Contagem</SelectItem>
-                                    <SelectItem value="max">Máximo</SelectItem>
-                                    <SelectItem value="min">Mínimo</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
-                                  <Type size={9} /> Formato
-                                </Label>
-                                <Select
-                                  value={selectedWidget.dataType}
-                                  onValueChange={(v) => updateWidget(selectedWidgetIndex!, { dataType: v as any })}
-                                >
-                                  <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent className="z-[100] rounded-xl">
-                                    <SelectItem value="text">Texto</SelectItem>
-                                    <SelectItem value="number">Número</SelectItem>
-                                    <SelectItem value="date">Data</SelectItem>
-                                    <SelectItem value="currency">Moeda (R$)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                                  {icon}{label}
+                                </Button>
+                              ))}
                             </div>
                           </div>
 
-                          <div className="border-t border-slate-100" />
+                          {/* ── Title Specific Options ── */}
+                          {selectedWidget.type === 'title' && (
+                            <div className="space-y-4 pt-3 border-t border-slate-100">
+                              <div className="space-y-1.5">
+                                <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Alinhamento</Label>
+                                <div className="grid grid-cols-3 gap-1">
+                                  {[
+                                    { a: 'left', icon: <AlignLeft size={14} /> },
+                                    { a: 'center', icon: <AlignCenter size={14} /> },
+                                    { a: 'right', icon: <AlignRight size={14} /> },
+                                  ].map(({ a, icon }) => (
+                                    <Button
+                                      key={a}
+                                      variant="outline"
+                                      onClick={() => updateWidget(selectedWidgetIndex!, { align: a as any })}
+                                      className={cn(
+                                        "h-9 rounded-xl text-slate-500 hover:bg-slate-50",
+                                        (selectedWidget.align || 'left') === a && "bg-slate-800 text-white border-slate-800 shadow-md"
+                                      )}
+                                    >
+                                      {icon}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </div>
 
-                          {/* Filters */}
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-1.5">
-                                <Filter size={10} /> Filtros de Dados
-                              </Label>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addFilter(selectedWidgetIndex!)}
-                                className="h-6 rounded-lg text-[9px] font-bold border-indigo-100 text-indigo-600 px-2"
-                              >
-                                <Plus size={10} className="mr-1" /> Add Filtro
-                              </Button>
+                              <div className="space-y-1.5">
+                                <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ícone do Título</Label>
+                                <Select
+                                  value={selectedWidget.icon || "none"}
+                                  onValueChange={(v) => updateWidget(selectedWidgetIndex!, { icon: v === "none" ? undefined : v })}
+                                >
+                                  <SelectTrigger className="h-9 bg-slate-50/50 rounded-xl font-bold border-slate-100 text-sm">
+                                    <SelectValue placeholder="Nenhum ícone" />
+                                  </SelectTrigger>
+                                  <SelectContent className="z-[100] rounded-xl">
+                                    <SelectItem value="none">Sem ícone</SelectItem>
+                                    {Object.entries(TITLE_ICONS).map(([key, { icon: IconCmp, label }]) => (
+                                      <SelectItem key={key} value={key}>
+                                        <div className="flex items-center gap-2">
+                                          <IconCmp size={14} className="text-indigo-600" />
+                                          <span>{label}</span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
-                            <div className="space-y-2">
-                              {selectedWidget.filters.map((filter, fIndex) => (
-                                <div key={fIndex} className="p-2.5 bg-slate-50 rounded-xl grid grid-cols-12 gap-1.5 items-end ring-1 ring-slate-100">
-                                  <div className="col-span-3">
-                                    <Select value={filter.type} onValueChange={(v) => updateFilter(selectedWidgetIndex!, fIndex, 'type', v as any)}>
-                                      <SelectTrigger className="h-7 bg-white text-[9px] rounded-lg border-0 shadow-sm"><SelectValue /></SelectTrigger>
-                                      <SelectContent className="z-[100]">
-                                        <SelectItem value="include">Incluir</SelectItem>
-                                        <SelectItem value="exclude">Excluir</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="col-span-3">
-                                    <Select value={filter.field} onValueChange={(v) => updateFilter(selectedWidgetIndex!, fIndex, 'field', v)}>
-                                      <SelectTrigger className="h-7 bg-white text-[9px] rounded-lg border-0 shadow-sm"><SelectValue placeholder="Campo..." /></SelectTrigger>
-                                      <SelectContent className="z-[100]">
-                                        {(spreadsheetColumnsMap[selectedWidget.spreadsheet_ref] || []).map(col => (
+                          )}
+
+                          {/* Conditional rendering for Data / Filters (Only show if not layout types) */}
+                          {selectedWidget.type !== 'title' && selectedWidget.type !== 'divider' && (
+                            <>
+                              <div className="border-t border-slate-100" />
+
+                              {/* Data source */}
+                              <div className="space-y-3">
+                                <Label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest flex items-center gap-1.5">
+                                  <Database size={10} /> Fonte de Dados
+                                </Label>
+
+                                <Select
+                                  value={selectedWidget.spreadsheet_ref}
+                                  onValueChange={(v) => updateWidget(selectedWidgetIndex!, { spreadsheet_ref: v, column_x: '', column_y: '', time_column: '' })}
+                                >
+                                  <SelectTrigger className="h-9 bg-white rounded-xl font-bold border-slate-100 text-xs shadow-sm">
+                                    <SelectValue placeholder="Selecione a planilha..." />
+                                  </SelectTrigger>
+                                  <SelectContent className="z-[100] rounded-xl">
+                                    {availableSpreadsheets.map((s) => (
+                                      <SelectItem key={s.id} value={s.id}>{s.nome_tabela || s.modelo_tabela}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Eixo X</Label>
+                                    <Select
+                                      value={selectedWidget.column_x}
+                                      onValueChange={(v) => updateWidget(selectedWidgetIndex!, { column_x: v })}
+                                      disabled={!selectedWidget.spreadsheet_ref || selectedWidget.type === 'value'}
+                                    >
+                                      <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100 shadow-sm">
+                                        <SelectValue placeholder="Coluna..." />
+                                      </SelectTrigger>
+                                      <SelectContent className="z-[100] rounded-xl">
+                                        {(spreadsheetColumnsMap[selectedWidget.spreadsheet_ref] || []).map((col) => (
                                           <SelectItem key={col} value={col}>{col}</SelectItem>
                                         ))}
                                       </SelectContent>
                                     </Select>
                                   </div>
-                                  <div className="col-span-3">
-                                    <Select value={filter.condition} onValueChange={(v) => updateFilter(selectedWidgetIndex!, fIndex, 'condition', v as any)}>
-                                      <SelectTrigger className="h-7 bg-white text-[9px] rounded-lg border-0 shadow-sm"><SelectValue /></SelectTrigger>
-                                      <SelectContent className="z-[100]">
-                                        <SelectItem value="equal">Igual a</SelectItem>
-                                        <SelectItem value="contains">Contém</SelectItem>
-                                        <SelectItem value="starts_with">Começa com</SelectItem>
-                                        <SelectItem value="null">Nulo</SelectItem>
+                                  <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Eixo Y</Label>
+                                    <Select
+                                      value={selectedWidget.column_y}
+                                      onValueChange={(v) => updateWidget(selectedWidgetIndex!, { column_y: v })}
+                                      disabled={!selectedWidget.spreadsheet_ref}
+                                    >
+                                      <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100 shadow-sm">
+                                        <SelectValue placeholder="Coluna..." />
+                                      </SelectTrigger>
+                                      <SelectContent className="z-[100] rounded-xl">
+                                        {(spreadsheetColumnsMap[selectedWidget.spreadsheet_ref] || []).map((col) => (
+                                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                                        ))}
                                       </SelectContent>
                                     </Select>
                                   </div>
-                                  <div className="col-span-2">
-                                    <Input
-                                      disabled={filter.condition === 'null'}
-                                      value={filter.value}
-                                      onChange={(e) => updateFilter(selectedWidgetIndex!, fIndex, 'value', e.target.value)}
-                                      className="h-7 bg-white text-[9px] rounded-lg border-0 shadow-sm"
-                                    />
-                                  </div>
-                                  <div className="col-span-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => removeFilter(selectedWidgetIndex!, fIndex)}
-                                      className="h-7 w-7 text-slate-300 hover:text-red-500 rounded-lg"
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label className="text-[9px] font-black uppercase text-indigo-600 tracking-widest flex items-center gap-1.5">
+                                    <Clock size={9} /> Coluna de Período
+                                  </Label>
+                                  <Select
+                                    value={selectedWidget.time_column}
+                                    onValueChange={(v) => updateWidget(selectedWidgetIndex!, { time_column: v })}
+                                    disabled={!selectedWidget.spreadsheet_ref}
+                                  >
+                                    <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100 shadow-sm">
+                                      <SelectValue placeholder="Data/Hora..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="z-[100] rounded-xl">
+                                      {(spreadsheetColumnsMap[selectedWidget.spreadsheet_ref] || []).map((col) => (
+                                        <SelectItem key={col} value={col}>{col}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
+                                      <Sigma size={9} /> Agregação
+                                    </Label>
+                                    <Select
+                                      value={selectedWidget.aggregation}
+                                      onValueChange={(v) => updateWidget(selectedWidgetIndex!, { aggregation: v as any })}
+                                      disabled={!selectedWidget.spreadsheet_ref}
                                     >
-                                      <Trash2 size={11} />
-                                    </Button>
+                                      <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100 shadow-sm">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="z-[100] rounded-xl">
+                                        <SelectItem value="sum">Soma</SelectItem>
+                                        <SelectItem value="avg">Média</SelectItem>
+                                        <SelectItem value="count">Contagem</SelectItem>
+                                        <SelectItem value="max">Máximo</SelectItem>
+                                        <SelectItem value="min">Mínimo</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
+                                      <Type size={9} /> Formato
+                                    </Label>
+                                    <Select
+                                      value={selectedWidget.dataType}
+                                      onValueChange={(v) => updateWidget(selectedWidgetIndex!, { dataType: v as any })}
+                                    >
+                                      <SelectTrigger className="h-8 bg-white rounded-lg text-[10px] font-bold border-slate-100 shadow-sm">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="z-[100] rounded-xl">
+                                        <SelectItem value="text">Texto</SelectItem>
+                                        <SelectItem value="number">Número</SelectItem>
+                                        <SelectItem value="date">Data</SelectItem>
+                                        <SelectItem value="currency">Moeda (R$)</SelectItem>
+                                      </SelectContent>
+                                    </Select>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
+                              </div>
+
+                              <div className="border-t border-slate-100" />
+
+                              {/* Filters */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-1.5">
+                                    <Filter size={10} /> Filtros de Dados
+                                  </Label>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addFilter(selectedWidgetIndex!)}
+                                    className="h-6 rounded-lg text-[9px] font-bold border-indigo-100 text-indigo-600 px-2"
+                                  >
+                                    <Plus size={10} className="mr-1" /> Add Filtro
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  {selectedWidget.filters.map((filter, fIndex) => (
+                                    <div key={fIndex} className="p-2.5 bg-slate-50 rounded-xl grid grid-cols-12 gap-1.5 items-end ring-1 ring-slate-100">
+                                      <div className="col-span-3">
+                                        <Select value={filter.type} onValueChange={(v) => updateFilter(selectedWidgetIndex!, fIndex, 'type', v as any)}>
+                                          <SelectTrigger className="h-7 bg-white text-[9px] rounded-lg border-0 shadow-sm"><SelectValue /></SelectTrigger>
+                                          <SelectContent className="z-[100]">
+                                            <SelectItem value="include">Incluir</SelectItem>
+                                            <SelectItem value="exclude">Excluir</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="col-span-3">
+                                        <Select value={filter.field} onValueChange={(v) => updateFilter(selectedWidgetIndex!, fIndex, 'field', v)}>
+                                          <SelectTrigger className="h-7 bg-white text-[9px] rounded-lg border-0 shadow-sm"><SelectValue placeholder="Campo..." /></SelectTrigger>
+                                          <SelectContent className="z-[100]">
+                                            {(spreadsheetColumnsMap[selectedWidget.spreadsheet_ref] || []).map(col => (
+                                              <SelectItem key={col} value={col}>{col}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="col-span-3">
+                                        <Select value={filter.condition} onValueChange={(v) => updateFilter(selectedWidgetIndex!, fIndex, 'condition', v as any)}>
+                                          <SelectTrigger className="h-7 bg-white text-[9px] rounded-lg border-0 shadow-sm"><SelectValue /></SelectTrigger>
+                                          <SelectContent className="z-[100]">
+                                            <SelectItem value="equal">Igual a</SelectItem>
+                                            <SelectItem value="contains">Contém</SelectItem>
+                                            <SelectItem value="starts_with">Começa com</SelectItem>
+                                            <SelectItem value="null">Nulo</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="col-span-2">
+                                        <Input
+                                          disabled={filter.condition === 'null'}
+                                          value={filter.value}
+                                          onChange={(e) => updateFilter(selectedWidgetIndex!, fIndex, 'value', e.target.value)}
+                                          className="h-7 bg-white text-[9px] rounded-lg border-0 shadow-sm px-2"
+                                        />
+                                      </div>
+                                      <div className="col-span-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => removeFilter(selectedWidgetIndex!, fIndex)}
+                                          className="h-7 w-7 text-slate-300 hover:text-red-500 rounded-lg"
+                                        >
+                                          <Trash2 size={11} />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </>
+                          )}
 
                           {/* Delete widget */}
-                          <div className="pt-2">
+                          <div className={cn("pt-2", selectedWidget.type === 'title' || selectedWidget.type === 'divider' ? "mt-4" : "")}>
                             <Button
                               variant="ghost"
                               onClick={() => removeWidget(selectedWidgetIndex!)}
-                              className="w-full h-9 rounded-xl text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 border border-dashed border-red-100"
+                              className="w-full h-9 rounded-xl text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 border border-dashed border-red-100 transition-colors"
                             >
-                              <Trash2 size={13} className="mr-2" /> Remover Widget
+                              <Trash2 size={13} className="mr-2" /> Remover Elemento
                             </Button>
                           </div>
                         </div>
@@ -1151,10 +1352,10 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                       <div className="flex-shrink-0 border-t border-slate-100 p-3 bg-slate-50/60">
                         <div className="flex items-center gap-1.5 mb-2">
                           <Eye size={10} className="text-slate-400" />
-                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Preview</span>
+                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Preview Rápido</span>
                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-auto" />
                         </div>
-                        <div className="h-[140px] bg-white rounded-xl ring-1 ring-slate-100 overflow-hidden">
+                        <div className="h-[140px] bg-white rounded-xl ring-1 ring-slate-100 overflow-hidden shadow-sm">
                           <WidgetPreview
                             widget={selectedWidget}
                             sheetData={sheetDataMap[selectedWidget.spreadsheet_ref] ?? null}
@@ -1174,7 +1375,7 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
             <Button
               variant="ghost"
               onClick={onClose}
-              className="rounded-xl h-10 px-5 font-bold text-slate-400 text-sm"
+              className="rounded-xl h-10 px-5 font-bold text-slate-400 text-sm hover:bg-slate-50"
             >
               Cancelar
             </Button>
@@ -1185,8 +1386,8 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                 className={cn(
                   "h-10 px-6 rounded-xl text-white font-black uppercase tracking-widest text-xs shadow-lg transition-all hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100",
                   isEditing
-                    ? "bg-amber-500 hover:bg-amber-600"
-                    : "bg-indigo-600 hover:bg-indigo-700"
+                    ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
+                    : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20"
                 )}
               >
                 {isSaving ? (

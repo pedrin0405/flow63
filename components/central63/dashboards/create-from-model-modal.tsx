@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   BarChart3, LineChart, PieChart, Hash, Table as TableIcon, Save,
-  Loader2, ArrowLeft, LayoutDashboard, Database, ArrowRight
+  Loader2, ArrowLeft, LayoutDashboard, Database, ArrowRight,
+  Target, Zap, Star, Flame, TrendingUp, Users, Wallet, Briefcase
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -44,7 +45,10 @@ interface WidgetFilter {
 
 interface WidgetConfig {
   title: string;
-  type: "bar" | "line" | "pie" | "value" | "table";
+  type: "bar" | "line" | "pie" | "value" | "table" | "title" | "divider";
+  size: "small" | "wide" | "tall" | "large" | "full";
+  icon?: string;
+  align?: "left" | "center" | "right";
   spreadsheet_ref: string;
   column_x: string;
   column_y: string;
@@ -53,6 +57,17 @@ interface WidgetConfig {
   dataType: DataType;
   filters: WidgetFilter[];
 }
+
+const TITLE_ICONS: Record<string, { icon: React.ElementType }> = {
+  target: { icon: Target },
+  zap: { icon: Zap },
+  star: { icon: Star },
+  flame: { icon: Flame },
+  trending: { icon: TrendingUp },
+  users: { icon: Users },
+  wallet: { icon: Wallet },
+  briefcase: { icon: Briefcase },
+};
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -75,7 +90,10 @@ function formatXAxis(value: any, type: DataType): string {
 }
 
 function computeAggregatedData(widget: WidgetConfig, sheetData: any[]): { name: string; value: number }[] {
+  // Ignora componentes puramente visuais para evitar erros de cálculo
+  if (widget.type === 'title' || widget.type === 'divider') return [];
   if (!sheetData || sheetData.length === 0) return [];
+  
   let filtered = [...sheetData];
 
   if (widget.filters?.length > 0) {
@@ -141,36 +159,37 @@ function computeAggregatedData(widget: WidgetConfig, sheetData: any[]): { name: 
 // Components based on indicators/page.tsx design
 // ─────────────────────────────────────────────
 
-const StatCard = ({ title, value, icon: Icon, color, subValue }: any) => (
-  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden hover:translate-y-[-2px] transition-all">
+const StatCard = memo(({ title, value, icon: Icon, color, subValue, className }: any) => (
+  <div className={cn("bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden hover:translate-y-[-2px] transition-all h-full min-h-[140px] flex flex-col justify-center", className)}>
     <div className="relative z-10 flex flex-col">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-gray-500 text-sm font-medium">{title}</span>
-        <Icon className="w-5 h-5" style={{ color }} />
+        <span className="text-gray-500 text-sm font-medium truncate pr-2">{title}</span>
+        <Icon className="w-5 h-5 flex-shrink-0" style={{ color }} />
       </div>
-      <span className="text-3xl font-extrabold text-gray-900">{value}</span>
-      {subValue && <span className="text-xs text-gray-400 mt-1">{subValue}</span>}
+      <span className="text-3xl font-extrabold text-gray-900 truncate">{value}</span>
+      {subValue && <span className="text-xs text-gray-400 mt-1 truncate">{subValue}</span>}
     </div>
     <div
-      className="absolute bottom-[-20px] right-[-20px] w-24 h-24 rounded-full opacity-5"
+      className="absolute bottom-[-20px] right-[-20px] w-24 h-24 rounded-full opacity-5 pointer-events-none"
       style={{ backgroundColor: color }}
     />
   </div>
-);
+));
+StatCard.displayName = "StatCard";
 
-const ChartCard = memo(({ widget, sheetData }: { widget: WidgetConfig; sheetData: any[] }) => {
+const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig; sheetData: any[], className?: string }) => {
   const aggregatedData = useMemo(() => computeAggregatedData(widget, sheetData), [widget, sheetData]);
   const Icon = widget.type === 'bar' ? BarChart3 : widget.type === 'line' ? LineChart : PieChart;
 
   return (
-    <Card className="rounded-2xl border-none shadow-sm flex flex-col h-[400px]">
-      <CardHeader className="border-b border-gray-50 pb-4">
-        <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
-          <Icon className="w-5 h-5 text-indigo-600" />
-          {widget.title || "Visualização de Dados"}
+    <Card className={cn("rounded-2xl border-none shadow-sm flex flex-col h-full min-h-[320px]", className)}>
+      <CardHeader className="border-b border-gray-50 pb-4 flex-shrink-0">
+        <CardTitle className="text-gray-700 flex items-center gap-2 font-bold text-base truncate">
+          <Icon className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+          <span className="truncate">{widget.title || "Visualização de Dados"}</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 p-6">
+      <CardContent className="flex-1 p-6 min-h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
           {widget.type === "bar" ? (
             <ReBarChart data={aggregatedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -205,20 +224,20 @@ const ChartCard = memo(({ widget, sheetData }: { widget: WidgetConfig; sheetData
 });
 ChartCard.displayName = "ChartCard";
 
-const TableCard = memo(({ widget, sheetData }: { widget: WidgetConfig; sheetData: any[] }) => {
+const TableCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig; sheetData: any[], className?: string }) => {
   const aggregatedData = useMemo(() => computeAggregatedData(widget, sheetData), [widget, sheetData]);
 
   return (
-    <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden">
-      <CardHeader className="px-6 py-5 border-b border-gray-100 bg-white flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-bold text-gray-800 flex items-center gap-2">
-          <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+    <Card className={cn("rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden flex flex-col h-full min-h-[320px]", className)}>
+      <CardHeader className="px-6 py-5 border-b border-gray-100 bg-white flex flex-row items-center justify-between flex-shrink-0">
+        <CardTitle className="text-lg font-bold text-gray-800 flex items-center gap-2 truncate">
+          <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 flex-shrink-0">
             <TableIcon size={18} />
           </div>
-          {widget.title || "Tabela de Dados"}
+          <span className="truncate">{widget.title || "Tabela de Dados"}</span>
         </CardTitle>
       </CardHeader>
-      <div className="overflow-x-auto max-h-[400px]">
+      <div className="flex-1 overflow-auto">
         <table className="w-full text-sm text-left relative">
           <thead className="bg-gray-50/50 text-gray-500 font-medium border-b border-gray-100 sticky top-0 z-10">
             <tr>
@@ -252,6 +271,44 @@ const TableCard = memo(({ widget, sheetData }: { widget: WidgetConfig; sheetData
   );
 });
 TableCard.displayName = "TableCard";
+
+const TitleCard = memo(({ widget, className }: { widget: WidgetConfig; className?: string }) => {
+  const SelectedIcon = widget.icon && TITLE_ICONS[widget.icon] ? TITLE_ICONS[widget.icon].icon : null;
+  const justifyClass = widget.align === 'center' ? 'justify-center' : widget.align === 'right' ? 'justify-end' : 'justify-start';
+
+  return (
+    <div className={cn("w-full flex items-center py-6 bg-transparent h-full", justifyClass, className)}>
+      <div className="flex items-center gap-4">
+        {SelectedIcon && (
+          <div className="flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-2xl shadow-sm w-12 h-12 md:w-14 md:h-14 flex-shrink-0">
+            <SelectedIcon size={28} strokeWidth={2.5} />
+          </div>
+        )}
+        <h2 className="font-black text-slate-800 tracking-tight text-3xl md:text-4xl truncate">
+          {widget.title || "Novo Título"}
+        </h2>
+      </div>
+    </div>
+  );
+});
+TitleCard.displayName = "TitleCard";
+
+const DividerCard = memo(({ widget, className }: { widget: WidgetConfig; className?: string }) => {
+  return (
+    <div className={cn("w-full flex flex-col items-center justify-center relative py-6 h-full min-h-[60px]", className)}>
+      <div className="w-full absolute inset-0 flex items-center justify-center px-2 md:px-8">
+         <div className="w-full border-t-2 border-dashed border-slate-200"></div>
+      </div>
+      {widget.title && (
+        <span className="relative z-10 bg-[#fafafa] px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+          {widget.title}
+        </span>
+      )}
+    </div>
+  );
+});
+DividerCard.displayName = "DividerCard";
+
 
 // ─────────────────────────────────────────────
 // Main Creation Modal Component
@@ -293,8 +350,8 @@ export function CreateDashboardFromModelModal({ isOpen, onClose, onSave, model }
       if (error) throw error;
       setAvailableSheets(data || []);
       
-      // Identifica quais planilhas originais o modelo precisa
-      const requiredSheetIds = [...new Set(widgets.map(w => w.spreadsheet_ref).filter(Boolean))];
+      // Identifica quais planilhas originais o modelo precisa (ignorando os widgets que não usam dados)
+      const requiredSheetIds = [...new Set(widgets.filter(w => w.type !== 'title' && w.type !== 'divider').map(w => w.spreadsheet_ref).filter(Boolean))];
       const initialMapping: Record<string, string> = {};
       requiredSheetIds.forEach(id => {
         initialMapping[id] = id; // Por padrão, a planilha aponta pra si mesma
@@ -349,11 +406,10 @@ export function CreateDashboardFromModelModal({ isOpen, onClose, onSave, model }
       // Substitui as referências antigas (spreadsheet_ref) pelas novas que o usuário selecionou
       const updatedWidgets = (model.widgets || []).map((w: WidgetConfig) => ({
         ...w,
-        spreadsheet_ref: sheetMapping[w.spreadsheet_ref] || w.spreadsheet_ref
+        spreadsheet_ref: (w.type !== 'title' && w.type !== 'divider') ? (sheetMapping[w.spreadsheet_ref] || w.spreadsheet_ref) : w.spreadsheet_ref
       }));
 
       // Cria a instância final do dashboard baseada no modelo e no novo mapeamento
-      // NOTA: 'widgets_config' ao invés de 'widgets' para combinar com o Schema do Banco
       const { error } = await supabase.from('dashboard_data').insert([{
         nome,
         unidade,
@@ -377,9 +433,6 @@ export function CreateDashboardFromModelModal({ isOpen, onClose, onSave, model }
   if (!model) return null;
 
   const widgets: WidgetConfig[] = model.widgets || [];
-  const valueWidgets = widgets.filter(w => w.type === 'value');
-  const chartWidgets = widgets.filter(w => ['bar', 'line', 'pie'].includes(w.type));
-  const tableWidgets = widgets.filter(w => w.type === 'table');
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -480,73 +533,80 @@ export function CreateDashboardFromModelModal({ isOpen, onClose, onSave, model }
         )}
 
         {/* ── Body: Live Dashboard Preview ── */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 w-full">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
               <Loader2 size={32} className="animate-spin text-indigo-500" />
               <p className="font-bold tracking-wide">Compilando dados para visualização...</p>
             </div>
           ) : (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-              
-              {/* KPIs Principais */}
-              {valueWidgets.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {valueWidgets.map((widget, idx) => {
-                    const mappedId = sheetMapping[widget.spreadsheet_ref] || widget.spreadsheet_ref;
-                    const data = computeAggregatedData(widget, sheetDataMap[mappedId] || []);
-                    const val = data[0]?.value || 0;
-                    return (
-                      <StatCard
-                        key={idx}
-                        title={widget.title || 'Métrica'}
-                        value={formatValue(val, widget.dataType)}
-                        icon={Hash}
-                        color={STAT_COLORS[idx % STAT_COLORS.length]}
-                        subValue={widget.aggregation === 'sum' ? 'Soma Total' : widget.aggregation === 'count' ? 'Contagem' : 'Valor'}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* GRÁFICOS */}
-              {chartWidgets.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {chartWidgets.map((widget, idx) => {
-                    const mappedId = sheetMapping[widget.spreadsheet_ref] || widget.spreadsheet_ref;
-                    return (
-                      <ChartCard
-                        key={idx}
-                        widget={widget}
-                        sheetData={sheetDataMap[mappedId] || []}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* TABELAS */}
-              {tableWidgets.length > 0 && (
-                <div className="grid grid-cols-1 gap-6">
-                  {tableWidgets.map((widget, idx) => {
-                    const mappedId = sheetMapping[widget.spreadsheet_ref] || widget.spreadsheet_ref;
-                    return (
-                      <TableCard
-                        key={idx}
-                        widget={widget}
-                        sheetData={sheetDataMap[mappedId] || []}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {widgets.length === 0 && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+              {widgets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-32 text-slate-400 bg-white rounded-3xl border border-dashed border-slate-200">
                   <LayoutDashboard size={48} className="mb-4 text-slate-200" />
                   <p className="font-bold text-lg text-slate-500">Este modelo está vazio.</p>
-                  <p className="text-sm mt-1">Adicione widgets no construtor de modelos antes de gerar um dashboard.</p>
+                  <p className="text-sm mt-1">Adicione elementos no construtor de modelos antes de gerar um dashboard.</p>
+                </div>
+              ) : (
+                /* GRID UNIFICADO: 3 Colunas como no construtor. Isso resolve o problema de espaçamento! */
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 grid-flow-dense">
+                  {widgets.map((widget, idx) => {
+                    // Mapeia o tamanho escolhido para col-span e row-span baseando-se no layout de 3 colunas (xl:grid-cols-3)
+                    const sizeClass = {
+                      small: "col-span-1 row-span-1",
+                      wide:  "col-span-1 md:col-span-2 xl:col-span-2 row-span-1",
+                      tall:  "col-span-1 row-span-2",
+                      large: "col-span-1 md:col-span-2 xl:col-span-2 row-span-2",
+                      full:  "col-span-full row-span-1",
+                    }[widget.size || "small"];
+
+                    // Pega o ID referenciado atualizado (caso o usuário tenha trocado o select no topo)
+                    const mappedId = sheetMapping[widget.spreadsheet_ref] || widget.spreadsheet_ref;
+                    const sheetData = sheetDataMap[mappedId] || [];
+
+                    // Renderiza o componente adequado baseado no tipo
+                    if (widget.type === 'title') {
+                      return <TitleCard key={idx} widget={widget} className={sizeClass} />;
+                    }
+                    
+                    if (widget.type === 'divider') {
+                      return <DividerCard key={idx} widget={widget} className={sizeClass} />;
+                    }
+                    
+                    if (widget.type === 'value') {
+                      const data = computeAggregatedData(widget, sheetData);
+                      const val = data[0]?.value || 0;
+                      return (
+                        <div key={idx} className={sizeClass}>
+                          <StatCard
+                            title={widget.title || 'Métrica'}
+                            value={formatValue(val, widget.dataType)}
+                            icon={Hash}
+                            color={STAT_COLORS[idx % STAT_COLORS.length]}
+                            subValue={widget.aggregation === 'sum' ? 'Soma Total' : widget.aggregation === 'count' ? 'Contagem' : 'Valor'}
+                          />
+                        </div>
+                      );
+                    }
+                    
+                    if (['bar', 'line', 'pie'].includes(widget.type)) {
+                      return (
+                        <div key={idx} className={sizeClass}>
+                          <ChartCard widget={widget} sheetData={sheetData} />
+                        </div>
+                      );
+                    }
+                    
+                    if (widget.type === 'table') {
+                      return (
+                        <div key={idx} className={sizeClass}>
+                          <TableCard widget={widget} sheetData={sheetData} />
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })}
                 </div>
               )}
             </div>
