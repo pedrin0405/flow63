@@ -353,21 +353,35 @@ export default function DashboardsPage() {
                           <TableRow key={item.id} className="group hover:bg-gray-50/50 transition-colors">
                             <TableCell>
                               <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[10px]">
-                                  {item.nome?.substring(0, 2).toUpperCase()}
-                                </div>
+                                <Badge variant="outline" className="font-mono border-slate-200">
+                                {item.id.substring(0, 6).toUpperCase()}
+                                </Badge>
                                 <span className="font-bold text-sm">{item.nome}</span>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="font-bold border-slate-200">{item.unidade || "Geral"}</Badge>
+                              <Badge variant="outline" className="font-bold border-slate-200">
+                                {item.unidade || "Geral"}
+                              </Badge>
                             </TableCell>
+
+                            {/* ── COLUNA ATUALIZADA COM O AVATAR ── */}
                             <TableCell className="text-sm font-medium">
                               <div className="flex items-center gap-2">
-                                <User size={12} className="text-muted-foreground" />
-                                {item.criado_por || "Anônimo"}
+                                <Avatar className="h-6 w-6">
+                                  <AvatarImage
+                                    src={item.profiles?.avatar_url}
+                                    alt={item.profiles?.full_name || "Anônimo"}
+                                    className="object-cover"
+                                  />
+                                  <AvatarFallback className="text-[10px] bg-slate-100 text-slate-600 font-bold">
+                                    {item.profiles?.full_name ? item.profiles.full_name.substring(0, 2).toUpperCase() : "AN"}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span>{item.profiles?.full_name || "Anônimo"}</span>
                               </div>
                             </TableCell>
+
                             <TableCell className="text-sm text-muted-foreground">
                               {new Date(item.created_at).toLocaleDateString('pt-BR')}
                             </TableCell>
