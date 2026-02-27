@@ -147,6 +147,10 @@ export default function SpreadsheetsPage() {
 
   const handleSaveData = async (data: any) => {
     try {
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
       if (editingData) {
         const { error } = await supabase
           .from('spreadsheet_data')
@@ -155,7 +159,7 @@ export default function SpreadsheetsPage() {
             unidade: data.unidade,
             secretaria: data.secretaria || "Geral",
             dados: data.dados, 
-            preenchido_por: data.criado_por
+            criado_por: user.id
           })
           .eq('id', editingData.id);
 
