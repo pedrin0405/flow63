@@ -340,7 +340,7 @@ export default function SpreadsheetsPage() {
                                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> ID-{item.id.substring(0,4)}
                                 </span>
                               </div>
-                              <h3 className="font-bold text-lg text-slate-800 leading-tight truncate w-48">{item.nome_tabela || item.modelo_tabela}</h3>
+                              <h3 className="font-bold text-lg text-slate-800 leading-tight truncate w-68">{item.nome_tabela || item.modelo_tabela}</h3>
                               <p className="text-[10px] font-medium text-slate-400">Por: {item.preenchido_por || "Autor"}</p>
                             </div>
                           </div>
