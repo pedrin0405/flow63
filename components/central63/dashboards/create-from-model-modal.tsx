@@ -401,8 +401,14 @@ export function CreateDashboardFromModelModal({ isOpen, onClose, onSave, model }
   const handleCreateDashboard = async () => {
     if (!nome.trim()) return toast.error("Por favor, dê um nome ao seu novo dashboard.");
     
-    setIsSaving(true);
+    setIsSaving(true)
+
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        throw new Error("Usuário não autenticado.");
+      }
       // Substitui as referências antigas (spreadsheet_ref) pelas novas que o usuário selecionou
       const updatedWidgets = (model.widgets || []).map((w: WidgetConfig) => ({
         ...w,
@@ -414,7 +420,8 @@ export function CreateDashboardFromModelModal({ isOpen, onClose, onSave, model }
         nome,
         unidade,
         modelo_id: model.id,
-        widgets_config: updatedWidgets, 
+        widgets_config: updatedWidgets,
+        criado_por: user.id, // Substitua pelo usuário real se tiver autenticação
         created_at: new Date().toISOString()
       }]);
 
