@@ -204,10 +204,7 @@ const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig
   
   const isNarrow = widget.size === 'small' || widget.size === 'tall';
 
-  // Gerador de ID único robusto para o gradiente SVG
   const gradientId = useMemo(() => `colorValue-${Math.random().toString(36).substr(2, 9)}`, []);
-  
-  // Escolhe uma cor ALEATÓRIA da paleta para este gráfico de linha especificamente
   const lineColor = useMemo(() => CHART_COLORS[Math.floor(Math.random() * CHART_COLORS.length)], []);
 
   return (
@@ -235,140 +232,143 @@ const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig
         </div>
       </CardHeader>
       
-      <CardContent className={cn("flex-1 p-5 lg:p-6 flex gap-6", isNarrow ? "flex-col" : "flex-col lg:flex-row")}>
-        <div className={cn("w-full flex-1 flex items-center justify-center", isNarrow ? "min-h-[200px]" : "min-h-[250px]")}>
-          <ResponsiveContainer width="100%" height="100%">
-            {widget.type === "bar" ? (
-              <ReBarChart data={aggregatedData} margin={{ top: 35, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                <Tooltip 
-                  cursor={{fill: '#f8fafc'}}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
+      <CardContent className={cn("flex-1 p-5 lg:p-6 flex gap-6 min-h-0", isNarrow ? "flex-col" : "flex-col lg:flex-row")}>
+        {/* ISOLAMENTO DA ALTURA COM POSITION ABSOLUTE (Impede o loop infinito do Recharts) */}
+        <div className={cn("w-full flex-1 relative min-h-[250px]", !isNarrow && "lg:min-h-[300px]")}>
+          <div className="absolute inset-0">
+            <ResponsiveContainer width="100%" height="100%">
+              {widget.type === "bar" ? (
+                <ReBarChart data={aggregatedData} margin={{ top: 35, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                  <Tooltip 
+                    cursor={{fill: '#f8fafc'}}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-gray-900 text-white p-3 shadow-2xl rounded-xl border-none">
+                            <p className="text-[10px] font-bold opacity-60 uppercase mb-1">{data.name}</p>
+                            <p className="text-sm font-black">{formatValue(payload[0].value as number, widget.dataType)}</p>
+                            <p className="text-[9px] text-gray-300 font-bold mt-1">{data.percent} do total</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    radius={[6, 6, 0, 0]} 
+                    barSize={isNarrow ? 25 : 35}
+                    isAnimationActive={false}
+                  >
+                      {aggregatedData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                      <LabelList 
+                        dataKey="value" 
+                        position="top" 
+                        offset={10} 
+                        formatter={(val: number) => formatValue(val, widget.dataType)}
+                        style={{ fontSize: '10px', fill: '#475569', fontWeight: 'bold' }} 
+                      />
+                  </Bar>
+                </ReBarChart>
+              ) : widget.type === "line" ? (
+                <ReAreaChart data={aggregatedData} margin={{ top: 35, right: 20, left: 10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={lineColor} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={lineColor} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="text-white p-3 shadow-2xl rounded-xl" style={{ backgroundColor: lineColor }}>
+                            <p className="text-[10px] font-bold opacity-70 uppercase">{payload[0].payload.name}</p>
+                            <p className="text-lg font-black">{formatValue(payload[0].value as number, widget.dataType)}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke={lineColor} 
+                    strokeWidth={4} 
+                    fill={`url(#${gradientId})`}
+                    dot={{ r: 5, fill: '#fff', strokeWidth: 2, stroke: lineColor }} 
+                    activeDot={{ r: 7, strokeWidth: 0, fill: lineColor }}
+                    isAnimationActive={false}
+                  >
+                      <LabelList 
+                        dataKey="value" 
+                        position="top" 
+                        offset={12} 
+                        formatter={(val: number) => formatValue(val, widget.dataType)}
+                        style={{ fontSize: '10px', fill: '#000000', fontWeight: 'bold' }} 
+                      />
+                  </Area>
+                </ReAreaChart>
+              ) : (
+                <RePieChart>
+                  <Pie 
+                    data={aggregatedData} 
+                    dataKey="value" 
+                    nameKey="name" 
+                    cx="50%" cy="50%" 
+                    innerRadius="45%" 
+                    outerRadius="70%" 
+                    paddingAngle={5}
+                    labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
+                    isAnimationActive={false}
+                    label={(props: any) => {
+                      const { x, y, cx, value } = props;
                       return (
-                        <div className="bg-gray-900 text-white p-3 shadow-2xl rounded-xl border-none">
-                          <p className="text-[10px] font-bold opacity-60 uppercase mb-1">{data.name}</p>
-                          <p className="text-sm font-black">{formatValue(payload[0].value as number, widget.dataType)}</p>
-                          <p className="text-[9px] text-gray-300 font-bold mt-1">{data.percent} do total</p>
-                        </div>
+                        <text 
+                          x={x} 
+                          y={y} 
+                          fill="#475569" 
+                          textAnchor={x > cx ? 'start' : 'end'} 
+                          dominantBaseline="central"
+                          style={{ fontSize: '10px', fontWeight: 'bold' }}
+                        >
+                          {formatValue(value, widget.dataType)}
+                        </text>
                       );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar 
-                  dataKey="value" 
-                  radius={[6, 6, 0, 0]} 
-                  barSize={isNarrow ? 25 : 35}
-                  isAnimationActive={false}
-                >
-                    {aggregatedData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    }}
+                  >
+                    {aggregatedData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="#fff" strokeWidth={isNarrow ? 2 : 3} />
                     ))}
-                    <LabelList 
-                      dataKey="value" 
-                      position="top" 
-                      offset={10} 
-                      formatter={(val: number) => formatValue(val, widget.dataType)}
-                      style={{ fontSize: '10px', fill: '#475569', fontWeight: 'bold' }} 
-                    />
-                </Bar>
-              </ReBarChart>
-            ) : widget.type === "line" ? (
-              <ReAreaChart data={aggregatedData} margin={{ top: 35, right: 20, left: 10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={lineColor} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={lineColor} stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                <Tooltip 
-                   content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="text-white p-3 shadow-2xl rounded-xl" style={{ backgroundColor: lineColor }}>
-                          <p className="text-[10px] font-bold opacity-70 uppercase">{payload[0].payload.name}</p>
-                          <p className="text-lg font-black">{formatValue(payload[0].value as number, widget.dataType)}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke={lineColor} 
-                  strokeWidth={4} 
-                  fill={`url(#${gradientId})`}
-                  dot={{ r: 5, fill: '#fff', strokeWidth: 2, stroke: lineColor }} 
-                  activeDot={{ r: 7, strokeWidth: 0, fill: lineColor }}
-                  isAnimationActive={false}
-                >
-                    <LabelList 
-                      dataKey="value" 
-                      position="top" 
-                      offset={12} 
-                      formatter={(val: number) => formatValue(val, widget.dataType)}
-                      style={{ fontSize: '10px', fill: '#000000', fontWeight: 'bold' }} 
-                    />
-                </Area>
-              </ReAreaChart>
-            ) : (
-              <RePieChart>
-                <Pie 
-                  data={aggregatedData} 
-                  dataKey="value" 
-                  nameKey="name" 
-                  cx="50%" cy="50%" 
-                  innerRadius="45%" 
-                  outerRadius="70%" 
-                  paddingAngle={5}
-                  labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                  isAnimationActive={false}
-                  label={(props: any) => {
-                    const { x, y, cx, value } = props;
-                    return (
-                      <text 
-                        x={x} 
-                        y={y} 
-                        fill="#475569" 
-                        textAnchor={x > cx ? 'start' : 'end'} 
-                        dominantBaseline="central"
-                        style={{ fontSize: '10px', fontWeight: 'bold' }}
-                      >
-                        {formatValue(value, widget.dataType)}
-                      </text>
-                    );
-                  }}
-                >
-                  {aggregatedData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="#fff" strokeWidth={isNarrow ? 2 : 3} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                   content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-white p-4 shadow-2xl border border-gray-100 rounded-2xl z-50">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{payload[0].name}</p>
-                          <p className="text-xl font-black text-gray-900">{formatValue(payload[0].value as number, widget.dataType)}</p>
-                          <Badge className="mt-2 bg-indigo-50 text-indigo-600 border-none font-bold">{payload[0].payload.percent}</Badge>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-              </RePieChart>
-            )}
-          </ResponsiveContainer>
+                  </Pie>
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white p-4 shadow-2xl border border-gray-100 rounded-2xl z-50">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{payload[0].name}</p>
+                            <p className="text-xl font-black text-gray-900">{formatValue(payload[0].value as number, widget.dataType)}</p>
+                            <Badge className="mt-2 bg-indigo-50 text-indigo-600 border-none font-bold">{payload[0].payload.percent}</Badge>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </RePieChart>
+              )}
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* LEGENDA ENRIQUECIDA (Pie Chart) */}
@@ -499,7 +499,7 @@ const DividerCard = memo(({ widget, className }: { widget: WidgetConfig; classNa
 DividerCard.displayName = "DividerCard";
 
 // ─────────────────────────────────────────────
-// Export Modal with html-to-image + jsPDF
+// Export Modal with html-to-image + jsPDF (Sem Scrollbars / Full Content)
 // ─────────────────────────────────────────────
 const ExportModal = ({ isOpen, onClose, dashboardName }: { isOpen: boolean, onClose: () => void, dashboardName: string }) => {
   const [isExporting, setIsExporting] = useState(false);
