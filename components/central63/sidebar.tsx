@@ -244,7 +244,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             
             <SidebarItem 
               icon={LayoutDashboard}
-              label="Dashboard" 
+              label="Home" 
               active={isActive("dashboard") && pathname === "/"} 
               onClick={() => handleNavigation("dashboard")}
               badge={atendimentosCount}
@@ -315,7 +315,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
 
             <SidebarItem 
               icon={ChartSpline} 
-              label="Dashboard Customizável" 
+              label="Dashboard" 
               active={isActive("dashboard-customizavel", "/custom-dashboard")} 
               onClick={() => handleNavigation("dashboard-customizavel", "/custom-dashboard")}
               collapsed={isCollapsed}

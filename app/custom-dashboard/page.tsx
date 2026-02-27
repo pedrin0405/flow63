@@ -6,7 +6,9 @@ import {
   LayoutDashboard, Search, Plus, BarChart3, Loader2, 
   MoreHorizontal, Trash2, Eye, Calendar, Database, 
   Layers, User, ArrowUpRight, LayoutGrid, List as ListIcon,
-  Filter, Activity, TrendingUp, Briefcase
+  Filter, Activity, TrendingUp, Briefcase,
+  LayoutPanelLeft,
+  ChartSpline
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -107,13 +109,9 @@ export default function DashboardsPage() {
             <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}>
               <LayoutDashboard size={20} />
             </button>
-            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600 hidden md:block">
-                <BarChart3 size={24} />
-            </div>
-            <div>
+                <ChartSpline className="text-primary hidden lg:block" size={24} />
                 <h2 className="text-2xl font-bold text-foreground tracking-tight">Dashboards</h2>
-                <p className="text-primary hidden sm:block">| Gerenciamento Analítico</p>
-            </div>
+                <p className="text-primary hidden sm:block">| Gerador de Gráficos</p>
           </div>
           
           <Button onClick={() => setIsModalOpen(true)} className="h-11 px-6 font-bold bg-primary text-white shadow-lg hover:bg-primary/90 rounded-xl transition-all active:scale-95">
@@ -242,7 +240,8 @@ export default function DashboardsPage() {
                               <div className="flex gap-4">
                                 <Avatar className={`h-14 w-14 ring-4 ring-white dark:ring-card shadow-sm ${hasWidgets ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
                                   <AvatarFallback className="font-bold text-lg uppercase">
-                                    {item.nome?.substring(0, 2)}
+                                    {/* {item.nome?.substring(0, 2)} */}
+                                    <LayoutPanelLeft />
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
