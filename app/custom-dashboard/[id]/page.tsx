@@ -75,8 +75,6 @@ const CHART_COLORS = [
   '#14b8a6', // Teal 500
 ];
 
-const MAIN_LINE_COLOR = '#14b8a6';
-
 const AGGREGATION_LABELS: Record<string, string> = {
   sum: "Soma Total",
   avg: "Média",
@@ -206,7 +204,11 @@ const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig
   
   const isNarrow = widget.size === 'small' || widget.size === 'tall';
 
+  // Gerador de ID único robusto para o gradiente SVG
   const gradientId = useMemo(() => `colorValue-${Math.random().toString(36).substr(2, 9)}`, []);
+  
+  // Escolhe uma cor ALEATÓRIA da paleta para este gráfico de linha especificamente
+  const lineColor = useMemo(() => CHART_COLORS[Math.floor(Math.random() * CHART_COLORS.length)], []);
 
   return (
     <Card className={cn("rounded-2xl border border-gray-100 shadow-md flex flex-col h-full bg-white overflow-hidden", isNarrow ? "min-h-[400px]" : "lg:min-h-[520px]", className)}>
@@ -261,7 +263,7 @@ const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig
                   dataKey="value" 
                   radius={[6, 6, 0, 0]} 
                   barSize={isNarrow ? 25 : 35}
-                  isAnimationActive={false} // Desativa animação para exportar rótulos perfeitamente
+                  isAnimationActive={false}
                 >
                     {aggregatedData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -279,8 +281,8 @@ const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig
               <ReAreaChart data={aggregatedData} margin={{ top: 35, right: 20, left: 10, bottom: 0 }}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={MAIN_LINE_COLOR} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={MAIN_LINE_COLOR} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={lineColor} stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor={lineColor} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -290,7 +292,7 @@ const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig
                    content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
-                        <div className="text-white p-3 shadow-2xl rounded-xl" style={{ backgroundColor: MAIN_LINE_COLOR }}>
+                        <div className="text-white p-3 shadow-2xl rounded-xl" style={{ backgroundColor: lineColor }}>
                           <p className="text-[10px] font-bold opacity-70 uppercase">{payload[0].payload.name}</p>
                           <p className="text-lg font-black">{formatValue(payload[0].value as number, widget.dataType)}</p>
                         </div>
@@ -302,12 +304,12 @@ const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig
                 <Area 
                   type="monotone" 
                   dataKey="value" 
-                  stroke={MAIN_LINE_COLOR} 
+                  stroke={lineColor} 
                   strokeWidth={4} 
                   fill={`url(#${gradientId})`}
-                  dot={{ r: 5, fill: '#fff', strokeWidth: 2, stroke: MAIN_LINE_COLOR }} 
-                  activeDot={{ r: 7, strokeWidth: 0, fill: MAIN_LINE_COLOR }}
-                  isAnimationActive={false} // Desativa animação para exportar rótulos perfeitamente
+                  dot={{ r: 5, fill: '#fff', strokeWidth: 2, stroke: lineColor }} 
+                  activeDot={{ r: 7, strokeWidth: 0, fill: lineColor }}
+                  isAnimationActive={false}
                 >
                     <LabelList 
                       dataKey="value" 
@@ -329,7 +331,7 @@ const ChartCard = memo(({ widget, sheetData, className }: { widget: WidgetConfig
                   outerRadius="70%" 
                   paddingAngle={5}
                   labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                  isAnimationActive={false} // Desativa animação para exportar rótulos perfeitamente
+                  isAnimationActive={false}
                   label={(props: any) => {
                     const { x, y, cx, value } = props;
                     return (
