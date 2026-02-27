@@ -50,7 +50,7 @@ export default function DashboardsPage() {
     try {
       const { data, error } = await supabase
         .from('dashboard_data')
-        .select('*, profiles:criado_por (full_name) ') // Faz um join para pegar o nome do criador
+        .select('*, profiles:criado_por (full_name, avatar_url) ') // Faz um join para pegar o nome do criador
         .order('created_at', { ascending: false });
 
       if (error) throw error;

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sidebar } from "@/components/central63/sidebar"
 import {
   Table,
@@ -93,7 +93,7 @@ export default function SpreadsheetsPage() {
     try {
       const { data, error } = await supabase
         .from('spreadsheet_data')
-        .select('*')
+        .select('*, profiles:criado_por (full_name, avatar_url)') // Faz um join para pegar o nome do criador
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -155,7 +155,7 @@ export default function SpreadsheetsPage() {
             unidade: data.unidade,
             secretaria: data.secretaria || "Geral",
             dados: data.dados, 
-            preenchido_por: data.criado_por
+            criado_por: data.criado_por
           })
           .eq('id', editingData.id);
 
@@ -172,7 +172,7 @@ export default function SpreadsheetsPage() {
               secretaria: data.secretaria || "Geral",
               modelo_tabela: data.nome_modelo,
               dados: data.dados, 
-              preenchido_por: data.criado_por
+              criado_por: data.criado_por
             }
           ]);
 
@@ -222,7 +222,7 @@ export default function SpreadsheetsPage() {
                 nome: editingData.modelo_tabela, 
                 nome_tabela: editingData.nome_tabela,
                 unidade: editingData.unidade, 
-                criado_por: editingData.preenchido_por,
+                criado_por: editingData.criado_por,
                 dados: editingData.modelStructure 
             }} 
             initialRows={editingData.dados} 
@@ -330,9 +330,21 @@ export default function SpreadsheetsPage() {
                       <CardContent className="p-0 flex flex-col h-full relative z-10">
                         <div className="p-6 pb-2 flex justify-between items-start">
                           <div className="flex gap-4">
-                            <Avatar className="h-14 w-14 ring-4 ring-white shadow-sm bg-blue-50 text-blue-600">
-                              <AvatarFallback className="font-bold"><FileSpreadsheet /></AvatarFallback>
-                            </Avatar>
+                            <Avatar className={`h-14 w-14 ring-4 ring-white dark:ring-card shadow-sm ${item.widgets_config?.length ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                                  {/* Tentativa de carregar a foto do perfil */}
+                                  <AvatarImage
+                                    src={item.profiles?.avatar_url}
+                                    alt={item.profiles?.full_name || "Anônimo"}
+                                    className="object-cover"
+                                  />
+
+                                  {/* Fallback caso a foto não exista ou falhe ao carregar */}
+                                  <AvatarFallback className="font-bold text-lg uppercase">
+                                    {item.profiles?.full_name
+                                      ? item.profiles.full_name.substring(0, 2)
+                                      : item.criado_por?.substring(0, 2) || "AN"}
+                                  </AvatarFallback>
+                                </Avatar>
                             <div>
                               <div className="flex items-center gap-2 mb-1">
                                 {/* <Badge variant="secondary" className="font-mono text-[9px] h-5 bg-white border">ID-{item.id.substring(0,4)}</Badge> */}
@@ -341,7 +353,7 @@ export default function SpreadsheetsPage() {
                                 </span>
                               </div>
                               <h3 className="font-bold text-lg text-slate-800 leading-tight truncate w-68">{item.nome_tabela || item.modelo_tabela}</h3>
-                              <p className="text-[10px] font-medium text-slate-400">Por: {item.preenchido_por || "Autor"}</p>
+                              <p className="text-[10px] font-medium text-slate-400">Por: {item.profiles?.full_name || "Anônimo"}</p>
                             </div>
                           </div>
                           <DropdownMenu>
@@ -399,7 +411,7 @@ export default function SpreadsheetsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-slate-500">{item.dados?.length || 0} linhas</TableCell>
-                          <TableCell className="text-sm text-slate-500">{item.preenchido_por}</TableCell>
+                          <TableCell className="text-sm text-slate-500">{item.criado_por}</TableCell>
                           <TableCell className="text-sm text-slate-400">{new Date(item.created_at).toLocaleDateString('pt-BR')}</TableCell>
                           <TableCell className="text-right">
                              <div className="flex items-center justify-end gap-2">
