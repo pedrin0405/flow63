@@ -93,7 +93,7 @@ export default function SpreadsheetsPage() {
     try {
       const { data, error } = await supabase
         .from('spreadsheet_data')
-        .select('*, profiles:criado_por (full_name, avatar_url)') // Faz um join para pegar o nome do criador
+        .select('*, profiles:criado_por (full_name, avatar_url)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -155,7 +155,7 @@ export default function SpreadsheetsPage() {
             unidade: data.unidade,
             secretaria: data.secretaria || "Geral",
             dados: data.dados, 
-            criado_por: data.criado_por
+            preenchido_por: data.criado_por
           })
           .eq('id', editingData.id);
 
@@ -222,7 +222,7 @@ export default function SpreadsheetsPage() {
                 nome: editingData.modelo_tabela, 
                 nome_tabela: editingData.nome_tabela,
                 unidade: editingData.unidade, 
-                criado_por: editingData.criado_por,
+                criado_por: editingData.preenchido_por,
                 dados: editingData.modelStructure 
             }} 
             initialRows={editingData.dados} 
@@ -411,7 +411,7 @@ export default function SpreadsheetsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-slate-500">{item.dados?.length || 0} linhas</TableCell>
-                          <TableCell className="text-sm text-slate-500">{item.criado_por}</TableCell>
+                          <TableCell className="text-sm text-slate-500">{item.preenchido_por}</TableCell>
                           <TableCell className="text-sm text-slate-400">{new Date(item.created_at).toLocaleDateString('pt-BR')}</TableCell>
                           <TableCell className="text-right">
                              <div className="flex items-center justify-end gap-2">
