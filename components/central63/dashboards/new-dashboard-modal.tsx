@@ -109,13 +109,13 @@ function computeAggregatedData(
       widget.filters.every(f => {
         if (!f.field) return true;
         const val = String(item[f.field] ?? "").toLowerCase();
-        const fv  = String(f.value ?? "").toLowerCase();
+        const fv = String(f.value ?? "").toLowerCase();
         let match = false;
         switch (f.condition) {
-          case "equal":       match = val === fv; break;
-          case "contains":    match = val.includes(fv); break;
+          case "equal": match = val === fv; break;
+          case "contains": match = val.includes(fv); break;
           case "starts_with": match = val.startsWith(fv); break;
-          case "null":        match = !item[f.field] || item[f.field] === ""; break;
+          case "null": match = !item[f.field] || item[f.field] === ""; break;
         }
         return f.type === "include" ? match : !match;
       })
@@ -130,11 +130,11 @@ function computeAggregatedData(
     });
     let total = 0;
     switch (widget.aggregation) {
-      case "avg":   total = values.reduce((a, b) => a + b, 0) / (values.length || 1); break;
+      case "avg": total = values.reduce((a, b) => a + b, 0) / (values.length || 1); break;
       case "count": total = values.length; break;
-      case "max":   total = Math.max(...values, 0); break;
-      case "min":   total = Math.min(...values, 0); break;
-      default:      total = values.reduce((a, b) => a + b, 0);
+      case "max": total = Math.max(...values, 0); break;
+      case "min": total = Math.min(...values, 0); break;
+      default: total = values.reduce((a, b) => a + b, 0);
     }
     return [{ name: "Total", value: total }];
   }
@@ -153,11 +153,11 @@ function computeAggregatedData(
     const vals = groups[key];
     let result = 0;
     switch (widget.aggregation) {
-      case "avg":   result = vals.reduce((a, b) => a + b, 0) / vals.length; break;
+      case "avg": result = vals.reduce((a, b) => a + b, 0) / vals.length; break;
       case "count": result = vals.length; break;
-      case "max":   result = Math.max(...vals); break;
-      case "min":   result = Math.min(...vals); break;
-      default:      result = vals.reduce((a, b) => a + b, 0);
+      case "max": result = Math.max(...vals); break;
+      case "min": result = Math.min(...vals); break;
+      default: result = vals.reduce((a, b) => a + b, 0);
     }
     return { name: formatXAxis(key, widget.dataType), value: result };
   });
@@ -178,7 +178,7 @@ const WidgetPreview = memo(function WidgetPreview({
   compact = false,
 }: WidgetPreviewProps) {
   const isLayoutViz = widget.type === 'title' || widget.type === 'divider';
-  
+
   const hasData = isLayoutViz || (
     sheetData !== null &&
     (widget.type === 'value' || widget.column_x) &&
@@ -188,7 +188,7 @@ const WidgetPreview = memo(function WidgetPreview({
   const aggregatedData = useMemo(() => {
     if (!hasData || isLayoutViz) return [];
     return computeAggregatedData(widget, sheetData!);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     hasData,
     sheetData,
@@ -236,7 +236,7 @@ const WidgetPreview = memo(function WidgetPreview({
     return (
       <div className="h-full w-full flex flex-col items-center justify-center bg-white p-6 relative">
         <div className="w-full absolute inset-0 flex items-center justify-center px-8">
-           <div className="w-full border-t-2 border-dashed border-slate-200"></div>
+          <div className="w-full border-t-2 border-dashed border-slate-200"></div>
         </div>
         {widget.title && (
           <span className="relative z-10 bg-white px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
@@ -368,29 +368,38 @@ function DeleteConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 w-[340px] flex flex-col gap-4">
+    <Dialog open={true} onOpenChange={(open) => { if (!open) onCancel(); }}>
+      <DialogContent className="bg-white rounded-2xl p-6 w-[340px] max-w-[90vw] flex flex-col gap-4 border-none shadow-2xl z-[200]">
         <div className="flex items-start gap-3">
           <div className="p-2 bg-red-50 rounded-xl flex-shrink-0">
             <AlertTriangle size={18} className="text-red-500" />
           </div>
           <div>
-            <p className="font-black text-sm text-slate-800">Excluir modelo?</p>
-            <p className="text-xs text-slate-500 mt-1">
+            <DialogTitle className="font-black text-sm text-slate-800 mb-1">
+              Excluir modelo?
+            </DialogTitle>
+            <p className="text-xs text-slate-500">
               O modelo <span className="font-bold text-slate-700">"{modelName}"</span> será removido permanentemente. Esta ação não pode ser desfeita.
             </p>
           </div>
         </div>
-        <div className="flex gap-2 justify-end">
-          <Button variant="ghost" onClick={onCancel} className="rounded-xl h-9 px-4 text-sm font-bold text-slate-500">
+        <DialogFooter className="flex gap-2 sm:justify-end mt-2">
+          <Button 
+            variant="ghost" 
+            onClick={onCancel} 
+            className="rounded-xl h-9 px-4 text-sm font-bold text-slate-500"
+          >
             Cancelar
           </Button>
-          <Button onClick={onConfirm} className="rounded-xl h-9 px-4 text-sm font-black bg-red-500 hover:bg-red-600 text-white border-0">
+          <Button 
+            onClick={onConfirm} 
+            className="rounded-xl h-9 px-4 text-sm font-black bg-red-500 hover:bg-red-600 text-white border-0"
+          >
             <Trash2 size={13} className="mr-1.5" /> Excluir
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -633,6 +642,7 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
     setDeleteTarget(null);
 
     if (error) {
+      console.error(error); // Log para debug
       toast.error("Erro ao excluir modelo");
       return;
     }
@@ -760,7 +770,10 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             {/* Delete button */}
                             <button
-                              onClick={() => setDeleteTarget({ id: model.id, nome: model.nome })}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Adicione esta linha
+                                setDeleteTarget({ id: model.id, nome: model.nome });
+                              }}
                               className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
                               title="Excluir modelo"
                             >
@@ -893,13 +906,13 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                                   "flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm",
                                   selectedWidgetIndex === index ? "bg-indigo-600 text-white" : "bg-white/90 text-slate-500 backdrop-blur"
                                 )}>
-                                  {widget.type === 'bar'   ? <BarChart3 size={9} /> :
-                                   widget.type === 'line'  ? <LineChart size={9} /> :
-                                   widget.type === 'pie'   ? <PieChart size={9} /> :
-                                   widget.type === 'value' ? <Hash size={9} /> :
-                                   widget.type === 'table' ? <TableIcon size={9} /> :
-                                   widget.type === 'title' ? <Heading1 size={9} /> :
-                                   <SplitSquareHorizontal size={9} />}
+                                  {widget.type === 'bar' ? <BarChart3 size={9} /> :
+                                    widget.type === 'line' ? <LineChart size={9} /> :
+                                      widget.type === 'pie' ? <PieChart size={9} /> :
+                                        widget.type === 'value' ? <Hash size={9} /> :
+                                          widget.type === 'table' ? <TableIcon size={9} /> :
+                                            widget.type === 'title' ? <Heading1 size={9} /> :
+                                              <SplitSquareHorizontal size={9} />}
                                   {widget.title || `Elemento ${index + 1}`}
                                 </div>
                               </div>
@@ -1026,12 +1039,12 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                             <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Tipo de Visualização</Label>
                             <div className="grid grid-cols-4 gap-1 mb-1">
                               {([
-                                { t: 'bar',   icon: <BarChart3 size={14} />,  label: 'Barra'  },
-                                { t: 'line',  icon: <LineChart size={14} />,  label: 'Linha'  },
-                                { t: 'pie',   icon: <PieChart size={14} />,   label: 'Pizza'  },
-                                { t: 'value', icon: <Hash size={14} />,       label: 'Valor'  },
-                                { t: 'table', icon: <TableIcon size={14} />,  label: 'Tabela' },
-                                { t: 'title', icon: <Heading1 size={14} />,   label: 'Título' },
+                                { t: 'bar', icon: <BarChart3 size={14} />, label: 'Barra' },
+                                { t: 'line', icon: <LineChart size={14} />, label: 'Linha' },
+                                { t: 'pie', icon: <PieChart size={14} />, label: 'Pizza' },
+                                { t: 'value', icon: <Hash size={14} />, label: 'Valor' },
+                                { t: 'table', icon: <TableIcon size={14} />, label: 'Tabela' },
+                                { t: 'title', icon: <Heading1 size={14} />, label: 'Título' },
                                 { t: 'divider', icon: <SplitSquareHorizontal size={14} />, label: 'Divisor' },
                               ] as any[]).map(({ t, icon, label }) => (
                                 <Button
@@ -1039,9 +1052,9 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                                   variant="outline"
                                   onClick={() => {
                                     const isLayout = t === 'title' || t === 'divider';
-                                    updateWidget(selectedWidgetIndex!, { 
+                                    updateWidget(selectedWidgetIndex!, {
                                       type: t,
-                                      ...(isLayout && selectedWidget.type !== t ? { size: 'full' } : {}) 
+                                      ...(isLayout && selectedWidget.type !== t ? { size: 'full' } : {})
                                     });
                                   }}
                                   className={cn(
@@ -1061,10 +1074,10 @@ export function NewDashboardModal({ isOpen, onClose, onSave }: any) {
                             <div className="grid grid-cols-5 gap-1">
                               {[
                                 { s: 'small', label: 'Pequeno', icon: <Shrink size={12} /> },
-                                { s: 'wide',  label: 'Largo',   icon: <Columns size={12} /> },
-                                { s: 'tall',  label: 'Alto',    icon: <Maximize2 size={12} className="rotate-90" /> },
-                                { s: 'large', label: 'Grande',  icon: <Expand size={12} /> },
-                                { s: 'full',  label: '100%',    icon: <StretchHorizontal size={12} /> },
+                                { s: 'wide', label: 'Largo', icon: <Columns size={12} /> },
+                                { s: 'tall', label: 'Alto', icon: <Maximize2 size={12} className="rotate-90" /> },
+                                { s: 'large', label: 'Grande', icon: <Expand size={12} /> },
+                                { s: 'full', label: '100%', icon: <StretchHorizontal size={12} /> },
                               ].map(({ s, label, icon }) => (
                                 <Button
                                   key={s}
