@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { fabric } from 'fabric';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import * as fabric from 'fabric'; // Correção do import do fabric
+import { supabase } from '@/lib/supabase'; // Importando o Supabase local (que usa @supabase/ssr)
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,8 +20,8 @@ export default function MagicFillPage({ params, searchParams }: PageProps) {
   const fabricRef = useRef<fabric.Canvas | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const supabase = createClientComponentClient();
   const router = useRouter();
+  
 
   // 1. Função que realiza a "Mágica" da substituição
   const applyMagicFilling = (canvas: fabric.Canvas, data: any) => {
