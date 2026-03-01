@@ -446,8 +446,10 @@ export default function EditorPrincipal() {
                     Aplicar Novo Tamanho
                   </Button>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1080})}>Post IG</Button>
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1080})}>Feed Quad.</Button>
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1350})}>Feed Vert.</Button>
                     <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1920})}>Story</Button>
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1440})}>Capa Reels</Button>
                   </div>
                 </PopoverContent>
               </Popover>
