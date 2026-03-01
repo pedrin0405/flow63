@@ -23,7 +23,9 @@ import {
   Maximize, ArrowUpToLine, ArrowDownToLine, CircleDashed, SquareDashed, ImagePlus,
   LayoutTemplate, Shapes, Palette, UploadCloud, Wand2, FolderHeart, Lock, Crown,
   CornerUpLeft, CornerUpRight, CornerDownLeft, CornerDownRight, Loader2, Share, Menu, Crop,
-  ZoomIn, ZoomOut, Focus, LockOpen, Unlink 
+  ZoomIn, ZoomOut, Focus, LockOpen, Unlink, Move, Scissors, Check, X,
+  Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
+  List, ArrowRightToLine, Type
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
@@ -34,16 +36,13 @@ export default function EditorPrincipal() {
   const [canvasTitle, setCanvasTitle] = useState('Nova Arte Sem Título');
   const [isSaving, setIsSaving] = useState(false);
   
-  // ESTADOS PARA O SIDEBAR GLOBAL E TAMANHO DO CANVAS
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('editor'); 
-  const [canvasSize, setCanvasSize] = useState({ width: 1080, height: 1080 }); // TAMANHO PADRÃO ATUALIZADO
+  const [canvasSize, setCanvasSize] = useState({ width: 1080, height: 1080 });
   const [zoomLevel, setZoomLevel] = useState(1);
 
-  // REFERÊNCIA PARA A ÁREA DE TRABALHO (Para calcular o zoom automático)
   const workspaceRef = useRef<HTMLElement>(null);
 
-  // ESTADOS NOVOS PARA GESTÃO DE PROJETOS E TEMPLATES
   const [savedModels, setSavedModels] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
@@ -53,7 +52,11 @@ export default function EditorPrincipal() {
     canvasRef, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas,
     deleteSelected, setCornerRadii, toggleFlipX, toggleFlipY,
     setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, selectedObject, fabricCanvas,
-    contextMenuInfo, setContextMenuInfo // NOVO ESTADO DO MENU DE CONTEXTO IMPORTADO
+    contextMenuInfo, setContextMenuInfo,
+    isPanMode, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop,
+    // Funções de Texto
+    changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, 
+    setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent
   } = useFabricEditor();
 
   const fetchModels = async () => {
@@ -80,7 +83,6 @@ export default function EditorPrincipal() {
     setIsLoadingModels(false);
   };
 
-  // FUNÇÃO PARA CALCULAR O ZOOM IDEAL ("FIT TO SCREEN")
   const calculateFitZoom = (width: number, height: number) => {
     if (!workspaceRef.current) return 1;
     
@@ -330,6 +332,27 @@ export default function EditorPrincipal() {
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground">
       
+      {/* SOLUÇÃO DEFINITIVA DO BUG DO TEXTAREA */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        body > textarea, .canvas-container textarea {
+          position: fixed !important;
+          top: -100px !important;
+          left: -100px !important;
+          width: 10px !important;
+          height: 10px !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          min-height: 0px !important;
+          min-width: 0px !important;
+          padding: 0px !important;
+          margin: 0px !important;
+          border: none !important;
+          outline: none !important;
+          resize: none !important;
+          background: transparent !important;
+        }
+      `}} />
+
       <Sidebar 
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)} 
@@ -346,12 +369,11 @@ export default function EditorPrincipal() {
           
           <div className="h-14 border-b bg-white flex items-center justify-between px-6 shrink-0 z-20">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text font-bold text-lg cursor-pointer lg:hidden" onClick={() => setSidebarOpen(true)}>
+              <div className="flex items-center gap-2 lg:hidden cursor-pointer" onClick={() => setSidebarOpen(true)}>
                 <Menu className="w-5 h-5 text-blue-600" />
               </div>
               <div className="hidden lg:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text font-bold text-lg">
-                <Layers className="w-6 h-6 text-blue-600" />
-                Flow Design
+                <Layers className="w-6 h-6 text-blue-600" /> Flow Design
               </div>
               <Separator orientation="vertical" className="h-6 mx-2" />
               <Input 
@@ -367,8 +389,7 @@ export default function EditorPrincipal() {
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" className="text-blue-900 hover:text-blue-600 hover:bg-blue-50 font-medium">
-                    <Crop className="w-4 h-4 mr-2" />
-                    Tamanho
+                    <Crop className="w-4 h-4 mr-2" /> Tamanho
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-60 p-4 rounded-xl shadow-xl border-slate-200 bg-white" align="end">
@@ -648,7 +669,7 @@ export default function EditorPrincipal() {
                     }}
                   >
                     <div 
-                      className="absolute top-0 left-0 bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] ring-1 ring-slate-300"
+                      className="absolute top-0 left-0 bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] ring-1 ring-slate-300 overflow-hidden"
                       style={{
                         width: canvasSize.width,
                         height: canvasSize.height,
@@ -662,7 +683,7 @@ export default function EditorPrincipal() {
 
                 </div>
 
-                {/* ---------------- MENU DE CONTEXTO (Botão Direito) ---------------- */}
+                {/* MENU DE CONTEXTO */}
                 {contextMenuInfo.visible && selectedObject && (
                   <>
                     <div 
@@ -672,71 +693,95 @@ export default function EditorPrincipal() {
                     />
                     
                     <div 
-                      className="fixed z-[101] w-48 bg-white border border-slate-200 shadow-2xl rounded-xl py-1.5 flex flex-col text-sm text-slate-700 overflow-hidden"
+                      className="fixed z-[101] w-52 bg-white border border-slate-200 shadow-2xl rounded-xl py-2 flex flex-col text-sm text-slate-700 animate-in fade-in zoom-in duration-100"
                       style={{ 
                         left: Math.min(contextMenuInfo.x, typeof window !== 'undefined' ? window.innerWidth - 200 : contextMenuInfo.x), 
                         top: Math.min(contextMenuInfo.y, typeof window !== 'undefined' ? window.innerHeight - 250 : contextMenuInfo.y) 
                       }}
                     >
+                      <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ações</div>
+                      
                       <button 
-                        className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 w-full text-left disabled:opacity-50"
+                        className="flex items-center px-4 py-2 hover:bg-slate-100 hover:text-blue-600 transition-colors disabled:opacity-50 w-full text-left"
                         disabled={(selectedObject as any).locked}
                         onClick={() => { bringToFront(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
                       >
-                        <ArrowUpToLine className="w-4 h-4 mr-3 text-slate-400" /> Trazer p/ Frente
+                        <ArrowUpToLine className="w-4 h-4 mr-3" /> Trazer para frente
                       </button>
                       <button 
-                        className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 w-full text-left disabled:opacity-50"
+                        className="flex items-center px-4 py-2 hover:bg-slate-100 hover:text-blue-600 transition-colors disabled:opacity-50 w-full text-left"
                         disabled={(selectedObject as any).locked}
                         onClick={() => { sendToBack(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
                       >
-                        <ArrowDownToLine className="w-4 h-4 mr-3 text-slate-400" /> Enviar p/ Trás
+                        <ArrowDownToLine className="w-4 h-4 mr-3" /> Enviar para trás
                       </button>
                       
-                      <Separator className="my-1.5" />
+                      <Separator className="my-1.5 opacity-50" />
                       
                       <button 
-                        className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 w-full text-left disabled:opacity-50"
+                        className="flex items-center px-4 py-2 hover:bg-slate-100 hover:text-blue-600 transition-colors disabled:opacity-50 w-full text-left"
                         disabled={(selectedObject as any).locked}
                         onClick={() => { centerObject(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
                       >
-                        <Maximize className="w-4 h-4 mr-3 text-slate-400" /> Centralizar
+                        <Maximize className="w-4 h-4 mr-3" /> Centralizar na Arte
                       </button>
 
-                      {selectedObject.type === 'image' && (selectedObject as any).isFrame && (
-                        <button 
-                          className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 w-full text-left disabled:opacity-50"
-                          disabled={(selectedObject as any).locked}
-                          onClick={() => { detachImageFromFrame(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
-                        >
-                          <Unlink className="w-4 h-4 mr-3 text-slate-400" /> Desanexar Moldura
-                        </button>
+                      {selectedObject.type === 'image' && (
+                        <>
+                          <Separator className="my-1.5 opacity-50" />
+                          <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Imagem</div>
+                          
+                          {(selectedObject as any).isFrame ? (
+                            <button 
+                              className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors w-full text-left disabled:opacity-50"
+                              onClick={() => { detachImageFromFrame(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                            >
+                              <Unlink className="w-4 h-4 mr-3" /> Desanexar da moldura
+                            </button>
+                          ) : (
+                            <button 
+                              className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors w-full text-left disabled:opacity-50"
+                              disabled={cropBox !== null}
+                              onClick={() => { startCrop(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                            >
+                              <Scissors className="w-4 h-4 mr-3" /> Recortar Imagem
+                            </button>
+                          )}
+
+                          {((selectedObject as any).isFrame || (selectedObject as any).isCropped) && (
+                            <button 
+                              className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors w-full text-left disabled:opacity-50"
+                              onClick={() => { togglePanMode(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                            >
+                              <Move className="w-4 h-4 mr-3" /> {isPanMode ? 'Concluir Ajuste' : 'Ajustar Posição'}
+                            </button>
+                          )}
+                        </>
                       )}
 
-                      <Separator className="my-1.5" />
+                      <Separator className="my-1.5 opacity-50" />
 
                       <button 
-                        className="flex items-center px-4 py-2 hover:bg-slate-50 hover:text-slate-900 w-full text-left"
+                        className="flex items-center px-4 py-2 hover:bg-slate-100 transition-colors w-full text-left"
                         onClick={() => { toggleLock(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
                       >
                         {(selectedObject as any).locked ? (
-                          <><LockOpen className="w-4 h-4 mr-3 text-slate-400" /> Destravar Item</>
+                          <><LockOpen className="w-4 h-4 mr-3 text-amber-500" /> Destravar item</>
                         ) : (
-                          <><Lock className="w-4 h-4 mr-3 text-slate-400" /> Travar Item</>
+                          <><Lock className="w-4 h-4 mr-3 text-slate-400" /> Travar item</>
                         )}
                       </button>
 
                       <button 
-                        className="flex items-center px-4 py-2 hover:bg-red-50 text-red-600 w-full text-left disabled:opacity-50"
+                        className="flex items-center px-4 py-2 hover:bg-red-50 text-red-600 transition-colors disabled:opacity-30 w-full text-left"
                         disabled={(selectedObject as any).locked}
                         onClick={() => { deleteSelected(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
                       >
-                        <Trash2 className="w-4 h-4 mr-3 text-red-500" /> Excluir
+                        <Trash2 className="w-4 h-4 mr-3" /> Excluir
                       </button>
                     </div>
                   </>
                 )}
-                {/* ------------------------------------------------------------------ */}
               </main>
 
               <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-white p-1.5 rounded-xl shadow-lg border border-slate-200 z-10">
@@ -757,23 +802,58 @@ export default function EditorPrincipal() {
             </div>
 
             <aside className="w-80 bg-white border-l p-5 flex flex-col gap-6 overflow-y-auto shrink-0 z-10 shadow-[inset_-10px_0_15px_-10px_rgba(0,0,0,0.05)]">
-              {selectedObject ? (
+              
+              {cropBox ? (
+                <div className="flex flex-col gap-4 bg-blue-50 p-5 rounded-xl border border-blue-200 shadow-sm animate-in slide-in-from-right-4">
+                  <div>
+                    <h3 className="font-bold text-sm text-blue-900 flex items-center gap-2"><Scissors className="w-4 h-4" /> Modo de Recorte</h3>
+                    <p className="text-[11px] text-blue-700 mt-1 leading-relaxed">Ajuste os cantos azuis da caixa sobre a imagem e clique em aplicar.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={applyCrop} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm h-10"><Check className="w-4 h-4 mr-2" /> Aplicar</Button>
+                    <Button variant="outline" onClick={cancelCrop} className="w-full border-blue-200 text-blue-700 hover:bg-blue-100 h-10"><X className="w-4 h-4 mr-2" /> Cancelar</Button>
+                  </div>
+                </div>
+              ) : isPanMode ? (
+                <div className="flex flex-col gap-4 bg-amber-50 p-5 rounded-xl border border-amber-200 shadow-sm animate-in slide-in-from-right-4">
+                  <div>
+                    <h3 className="font-bold text-sm text-amber-900 flex items-center gap-2"><Move className="w-4 h-4" /> Ajustar Imagem</h3>
+                    <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">Clique e arraste a imagem dentro da área da moldura para encontrar a melhor posição.</p>
+                  </div>
+                  <Button onClick={togglePanMode} className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-sm h-10"><Check className="w-4 h-4 mr-2" /> Concluir Ajuste</Button>
+                </div>
+              ) : selectedObject ? (
                 <>
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-sm text-slate-800">Propriedades</h3>
                     <div className="flex items-center gap-1">
                       
-                      {selectedObject.type === 'image' && (selectedObject as any).isFrame && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg disabled:opacity-50" 
-                          onClick={detachImageFromFrame}
-                          disabled={(selectedObject as any).locked}
-                          title="Desanexar Imagem da Moldura"
-                        >
-                          <Unlink className="w-4 h-4" />
-                        </Button>
+                      {selectedObject.type === 'image' && (
+                        <>
+                          {((selectedObject as any).isFrame || (selectedObject as any).isCropped) && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-blue-50 hover:text-blue-600 rounded-lg disabled:opacity-50" onClick={togglePanMode} title="Ajustar posição na moldura">
+                              <Move className="w-4 h-4" />
+                            </Button>
+                          )}
+
+                          {(selectedObject as any).isFrame ? (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg disabled:opacity-50" onClick={detachImageFromFrame} title="Desanexar Imagem">
+                              <Unlink className="w-4 h-4" />
+                            </Button>
+                          ) : (
+                            <>
+                              {(selectedObject as any).isCropped ? (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg disabled:opacity-50" onClick={removeCrop} title="Remover Recorte">
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              ) : (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-blue-50 hover:text-blue-600 rounded-lg disabled:opacity-50" onClick={startCrop} title="Recortar Imagem">
+                                  <Scissors className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </>
                       )}
 
                       <Button 
@@ -822,7 +902,153 @@ export default function EditorPrincipal() {
 
                   <Separator className="bg-slate-100" />
 
-                  {(selectedObject.type === 'image' || ((selectedObject as any).isFrame && (selectedObject as any).frameType === 'rect') || selectedObject.type === 'rect') && (
+                  {/* PROPRIEDADES DE TEXTO - NOVO PAINEL */}
+                  {(selectedObject.type === 'i-text' || selectedObject.type === 'text') && (
+                    <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
+                      
+                      {/* Cor e Tamanho da Fonte */}
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Texto</Label>
+                        <div className="flex gap-2">
+                          <div className="relative shrink-0">
+                            <div 
+                              className="w-10 h-10 rounded-lg border border-slate-200 shadow-sm" 
+                              style={{ backgroundColor: selectedObject.fill as string }} 
+                            />
+                            <input 
+                              type="color" 
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              value={selectedObject.fill as string}
+                              onChange={(e) => changeTextColor(e.target.value)}
+                              disabled={(selectedObject as any).locked}
+                            />
+                          </div>
+                          <div className="relative flex-1">
+                            <Type className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                            <Input 
+                              type="number" 
+                              value={Math.round(selectedObject.fontSize || 24)} 
+                              onChange={(e) => setFontSize(parseInt(e.target.value))} 
+                              className="pl-9 rounded-lg border-slate-200 focus:border-blue-400 focus:ring-blue-100" 
+                              disabled={(selectedObject as any).locked}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Estilos de Fonte */}
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Estilo</Label>
+                        <div className="flex flex-wrap gap-1">
+                          <Button 
+                            variant="outline" size="icon" className={`h-9 w-9 rounded-md ${(selectedObject as any).fontWeight === 'bold' ? 'bg-blue-50 border-blue-200 text-blue-600' : ''}`}
+                            onClick={toggleBold} title="Negrito"
+                          >
+                            <Bold className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" size="icon" className={`h-9 w-9 rounded-md ${(selectedObject as any).fontStyle === 'italic' ? 'bg-blue-50 border-blue-200 text-blue-600' : ''}`}
+                            onClick={toggleItalic} title="Itálico"
+                          >
+                            <Italic className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" size="icon" className={`h-9 w-9 rounded-md ${(selectedObject as any).underline ? 'bg-blue-50 border-blue-200 text-blue-600' : ''}`}
+                            onClick={toggleUnderline} title="Sublinhado"
+                          >
+                            <Underline className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" size="icon" className={`h-9 w-9 rounded-md ${(selectedObject as any).linethrough ? 'bg-blue-50 border-blue-200 text-blue-600' : ''}`}
+                            onClick={toggleLinethrough} title="Tachado"
+                          >
+                            <Strikethrough className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Alinhamento */}
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Alinhamento</Label>
+                        <div className="flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                          {[
+                            { val: 'left', icon: AlignLeft },
+                            { val: 'center', icon: AlignCenter },
+                            { val: 'right', icon: AlignRight },
+                            { val: 'justify', icon: AlignJustify }
+                          ].map((item) => (
+                            <Button 
+                              key={item.val}
+                              variant="ghost" size="icon" 
+                              className={`h-8 flex-1 rounded-md ${(selectedObject as any).textAlign === item.val ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                              onClick={() => setTextAlignment(item.val as any)}
+                            >
+                              <item.icon className="w-4 h-4" />
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Listas e Recuo */}
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Formatação</Label>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" className="flex-1 gap-2 h-9 text-xs"
+                            onClick={toggleList}
+                          >
+                            <List className="w-4 h-4" /> Lista
+                          </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="flex-1 gap-2 h-9 text-xs">
+                                <ArrowRightToLine className="w-4 h-4" /> Recuo
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-4 bg-white shadow-xl rounded-xl">
+                               <Label className="text-[10px] font-bold uppercase text-slate-400 mb-3 block">Espaçamento Entre Letras</Label>
+                               <Slider 
+                                 max={200} step={1} 
+                                 value={[(selectedObject as any).charSpacing || 0]} 
+                                 onValueChange={(v) => setTextIndent(v[0])} 
+                               />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+
+                      {/* Espaçamento de Linha */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold text-slate-800">Espaçamento entre Linhas</Label>
+                          <span className="text-[10px] font-bold text-blue-600">{(selectedObject as any).lineHeight?.toFixed(2)}</span>
+                        </div>
+                        <Slider 
+                          min={0.5} max={3} step={0.05} 
+                          value={[(selectedObject as any).lineHeight || 1.16]} 
+                          onValueChange={(v) => setLineHeight(v[0])} 
+                        />
+                      </div>
+
+                      <Separator className="bg-slate-100" />
+                      
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Fonte</Label>
+                        <Select value={(selectedObject as any).fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)} disabled={(selectedObject as any).locked}>
+                          <SelectTrigger className="text-sm rounded-lg border-slate-200 focus:ring-blue-100"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Arial">Arial</SelectItem>
+                            <SelectItem value="Inter">Inter</SelectItem>
+                            <SelectItem value="Montserrat">Montserrat</SelectItem>
+                            <SelectItem value="Playfair Display">Playfair Display</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PROPRIEDADES DE IMAGENS/MOLDURAS (Mantidas) */}
+                  {(selectedObject.type === 'image' || ((selectedObject as any).isFrame && (selectedObject as any).frameType === 'rect') || selectedObject.type === 'rect') && selectedObject.type !== 'i-text' && (
                     <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                       {selectedObject.type !== 'circle' && (
                         <div className="space-y-3">
@@ -840,37 +1066,38 @@ export default function EditorPrincipal() {
                         <div className="flex items-center justify-between"><Label className="text-xs font-semibold text-slate-800">Transparência</Label><span className="text-xs text-slate-500 font-medium">{Math.round((selectedObject.opacity || 1) * 100)}%</span></div>
                         <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" disabled={(selectedObject as any).locked} />
                       </div>
+
+                      {selectedObject.type === 'image' && (
+                        <>
+                          <Separator className="bg-slate-100" />
+                          <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <Label className="text-xs font-semibold text-slate-800">Inverter Imagem</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipX ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipX} disabled={(selectedObject as any).locked}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
+                              <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipY ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipY} disabled={(selectedObject as any).locked}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {(selectedObject.type === 'rect' || selectedObject.type === 'circle' || selectedObject.type === 'triangle' || selectedObject.type === 'line') && !(selectedObject as any).isFrame && (
+                        <>
+                          <Separator className="bg-slate-100" />
+                          <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <Label className="text-xs font-semibold text-slate-800">Cor Principal</Label>
+                            <div className="flex gap-3">
+                              <div className="w-10 h-10 rounded-lg shadow-sm shrink-0 border border-slate-200" style={{ backgroundColor: (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string }} />
+                              <Input type="color" className="w-full h-10 p-1 cursor-pointer rounded-lg border-slate-200" value={(selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string} onChange={(e) => updateProperty(selectedObject.type === 'line' ? 'stroke' : 'fill', e.target.value)} disabled={(selectedObject as any).locked} />
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  )}
-
-                  {selectedObject.type === 'image' && (
-                    <>
-                      <Separator className="bg-slate-100" />
-                      <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <Label className="text-xs font-semibold text-slate-800">Inverter Imagem</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipX ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipX} disabled={(selectedObject as any).locked}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
-                          <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipY ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipY} disabled={(selectedObject as any).locked}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {['i-text', 'text', 'rect', 'circle', 'triangle', 'line'].includes(selectedObject.type) && !(selectedObject as any).isFrame && (
-                    <>
-                      <Separator className="bg-slate-100" />
-                      <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <Label className="text-xs font-semibold text-slate-800">Cor Principal</Label>
-                        <div className="flex gap-3">
-                          <div className="w-10 h-10 rounded-lg shadow-sm shrink-0 border border-slate-200" style={{ backgroundColor: (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string }} />
-                          <Input type="color" className="w-full h-10 p-1 cursor-pointer rounded-lg border-slate-200" value={(selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string} onChange={(e) => updateProperty(selectedObject.type === 'line' ? 'stroke' : 'fill', e.target.value)} disabled={(selectedObject as any).locked} />
-                        </div>
-                      </div>
-                    </>
                   )}
 
                   <Separator className="bg-slate-100" />
 
+                  {/* ALINHAMENTO GLOBAL (Para todos os objetos) */}
                   <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                     <Label className="text-xs font-semibold text-slate-800">Alinhamento e Camadas</Label>
                     <div className="grid grid-cols-3 gap-2">
@@ -880,45 +1107,11 @@ export default function EditorPrincipal() {
                     </div>
                   </div>
 
-                  {(selectedObject.type === 'i-text' || selectedObject.type === 'text') && (
-                    <>
-                      <Separator className="bg-slate-100" />
-                      <div className={`space-y-5 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <div className="space-y-3">
-                          <Label className="text-xs font-semibold text-slate-800">Conteúdo do Texto</Label>
-                          <Input value={(selectedObject as any).text} onChange={(e) => updateProperty('text', e.target.value)} className="text-sm rounded-lg border-slate-200 focus:border-blue-400 focus:ring-blue-100" disabled={(selectedObject as any).locked} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-3">
-                            <Label className="text-xs font-semibold text-slate-800">Tamanho</Label>
-                            <Input type="number" value={Math.round((selectedObject as any).fontSize)} onChange={(e) => updateProperty('fontSize', parseInt(e.target.value))} className="rounded-lg border-slate-200 focus:border-blue-400 focus:ring-blue-100" disabled={(selectedObject as any).locked} />
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-xs font-semibold text-slate-800">Fonte</Label>
-                          <Select value={(selectedObject as any).fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)} disabled={(selectedObject as any).locked}>
-                            <SelectTrigger className="text-sm rounded-lg border-slate-200 focus:ring-blue-100"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Arial">Arial</SelectItem>
-                              <SelectItem value="Inter">Inter</SelectItem>
-                              <SelectItem value="Montserrat">Montserrat</SelectItem>
-                              <SelectItem value="Playfair Display">Playfair Display</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </>
-                  )}
                 </>
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
-                  <div className="w-20 h-20 bg-blue-50/50 rounded-full flex items-center justify-center border-2 border-dashed border-blue-200">
-                    <MousePointer2 className="w-8 h-8 text-blue-300" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-600">Nada selecionado</p>
-                    <p className="text-[11px] text-slate-400 mt-1">Clique em algum elemento no canvas para ver as opções de edição.</p>
-                  </div>
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4 opacity-40">
+                  <MousePointer2 className="w-10 h-10 text-slate-300" />
+                  <p className="text-sm font-medium text-slate-600">Nada selecionado</p>
                 </div>
               )}
             </aside>

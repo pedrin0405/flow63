@@ -31,11 +31,130 @@ export const useFabricEditor = () => {
   
   const [contextMenuInfo, setContextMenuInfo] = useState({ visible: false, x: 0, y: 0 });
 
+  const [isPanMode, setIsPanMode] = useState(false);
+  const isPanModeRef = useRef(isPanMode); 
+  
+  const panningImgRef = useRef<fabric.FabricImage | null>(null);
+  const panOverlayRef = useRef<fabric.FabricObject | null>(null);
+
+  const [cropBox, setCropBox] = useState<fabric.Rect | null>(null);
+  const cropBoxRef = useRef(cropBox); 
+
+  useEffect(() => { isPanModeRef.current = isPanMode; }, [isPanMode]);
+  useEffect(() => { cropBoxRef.current = cropBox; }, [cropBox]);
+
   const [, setUpdateTrigger] = useState(0);
 
   const forceUpdate = useCallback(() => {
     setUpdateTrigger((prev) => prev + 1);
   }, []);
+
+  // --- NOVAS FUNÇÕES DE EDIÇÃO DE TEXTO ---
+
+  const changeTextColor = (color: string) => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      selectedObject.set('fill', color);
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const toggleBold = () => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      const isBold = selectedObject.fontWeight === 'bold';
+      selectedObject.set('fontWeight', isBold ? 'normal' : 'bold');
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const toggleItalic = () => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      const isItalic = selectedObject.fontStyle === 'italic';
+      selectedObject.set('fontStyle', isItalic ? 'normal' : 'italic');
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const toggleUnderline = () => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      selectedObject.set('underline', !selectedObject.underline);
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const toggleLinethrough = () => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      selectedObject.set('linethrough', !selectedObject.linethrough);
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const setFontSize = (size: number) => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      selectedObject.set('fontSize', size);
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const setTextAlignment = (align: 'left' | 'center' | 'right' | 'justify') => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      selectedObject.set('textAlign', align);
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const toggleList = () => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      const text = selectedObject.text || '';
+      const lines = text.split('\n');
+      const isList = lines.every(line => line.trim().startsWith('• '));
+
+      const newText = isList 
+        ? lines.map(line => line.replace('• ', '')).join('\n')
+        : lines.map(line => line.trim().startsWith('• ') ? line : `• ${line}`).join('\n');
+
+      selectedObject.set('text', newText);
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const setLineHeight = (height: number) => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      selectedObject.set('lineHeight', height);
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  const setTextIndent = (indent: number) => {
+    if (!fabricCanvas.current || !selectedObject) return;
+    if (selectedObject instanceof fabric.IText) {
+      // No Fabric.js, o recuo (indent) é simulado via charSpacing ou padding dependendo do objetivo,
+      // mas para "Recuo de parágrafo", usamos estilos de parágrafo ou espaços iniciais.
+      // Aqui ajustamos o charSpacing como exemplo de espaçamento entre letras.
+      selectedObject.set('charSpacing', indent);
+      fabricCanvas.current.renderAll();
+      forceUpdate();
+    }
+  };
+
+  // --- FIM DAS FUNÇÕES DE TEXTO ---
 
   const attachImageToFrame = useCallback((img: fabric.FabricImage, frame: fabric.FabricObject) => {
     if (!fabricCanvas.current) return;
@@ -79,6 +198,11 @@ export const useFabricEditor = () => {
     (img as any).frameType = frameType;
     (img as any).variableId = (frame as any).variableId;
     
+    (img as any)._origFrameW = frame.width;
+    (img as any)._origFrameH = frame.height;
+    (img as any)._origFrameScaleX = frame.scaleX;
+    (img as any)._origFrameScaleY = frame.scaleY;
+
     (img as any).locked = isLocked;
     if (isLocked) {
       img.set({ lockMovementX: true, lockMovementY: true, lockRotation: true, lockScalingX: true, lockScalingY: true, hasControls: false });
@@ -91,7 +215,12 @@ export const useFabricEditor = () => {
           frameType: this.frameType,
           variableId: this.variableId,
           customRadii: this.customRadii,
-          locked: this.locked
+          locked: this.locked,
+          isCropped: this.isCropped,
+          _origFrameW: this._origFrameW,
+          _origFrameH: this._origFrameH,
+          _origFrameScaleX: this._origFrameScaleX,
+          _origFrameScaleY: this._origFrameScaleY
         });
       };
     })(img.toObject);
@@ -107,6 +236,73 @@ export const useFabricEditor = () => {
     forceUpdate();
   }, [forceUpdate]);
 
+  const stopPanMode = useCallback(() => {
+    if (panningImgRef.current) {
+      const img = panningImgRef.current;
+      const absX = (img as any)._fixedClipAbsX;
+      const absY = (img as any)._fixedClipAbsY;
+      const fixedScaleX = (img as any)._fixedClipScaleX;
+      const fixedScaleY = (img as any)._fixedClipScaleY;
+      const originalClipPath = (img as any)._originalClipPath;
+      const fixedAngle = (img as any)._fixedAngle || 0;
+
+      if (originalClipPath && absX !== undefined) {
+        const imgAngle = img.angle || 0;
+        const angleRad = -imgAngle * Math.PI / 180;
+        const cosA = Math.cos(angleRad);
+        const sinA = Math.sin(angleRad);
+
+        const dx = absX - img.left!;
+        const dy = absY - img.top!;
+
+        const relX = dx * cosA - dy * sinA;
+        const relY = dx * sinA + dy * cosA;
+
+        originalClipPath.set({
+          left: relX / (img.scaleX || 1),
+          top: relY / (img.scaleY || 1),
+          scaleX: fixedScaleX / (img.scaleX || 1),
+          scaleY: fixedScaleY / (img.scaleY || 1),
+          angle: fixedAngle - imgAngle
+        });
+
+        img.set('clipPath', originalClipPath);
+      }
+
+      if (panOverlayRef.current && fabricCanvas.current) {
+        fabricCanvas.current.remove(panOverlayRef.current);
+        panOverlayRef.current = null;
+      }
+
+      const isLocked = (img as any).locked;
+      img.set({ 
+        hasControls: !isLocked, 
+        lockMovementX: isLocked, 
+        lockMovementY: isLocked, 
+        lockRotation: isLocked, 
+        lockScalingX: isLocked, 
+        lockScalingY: isLocked, 
+        opacity: 1 
+      });
+
+      delete (img as any)._originalClipPath;
+      delete (img as any)._fixedClipAbsX;
+      delete (img as any)._fixedClipAbsY;
+      delete (img as any)._fixedClipScaleX;
+      delete (img as any)._fixedClipScaleY;
+      delete (img as any)._fixedAngle;
+
+      img.setCoords();
+      img.set('dirty', true);
+    }
+    setIsPanMode(false);
+    panningImgRef.current = null;
+
+    if (fabricCanvas.current) {
+       fabricCanvas.current.renderAll();
+    }
+  }, []);
+
   useEffect(() => {
     if (canvasRef.current && !fabricCanvas.current) {
       const canvas = new fabric.Canvas(canvasRef.current, {
@@ -114,15 +310,38 @@ export const useFabricEditor = () => {
         height: 1080,
         backgroundColor: '#ffffff',
         preserveObjectStacking: true,
-        stopContextMenu: true, // Bloqueia o menu padrão do botão direito no canvas
-        fireRightClick: true,  // Habilita a detecção interna do botão direito no Fabric
+        stopContextMenu: true, 
+        fireRightClick: true,  
       });
 
+      if (canvas.wrapperEl) {
+        canvas.wrapperEl.style.overflow = 'hidden';
+      }
+
       fabricCanvas.current = canvas;
+
+      canvas.on('text:editing:entered', (e) => {
+        const target = e.target as any;
+        if (target && target.hiddenTextarea) {
+          const textarea = target.hiddenTextarea;
+          textarea.style.minHeight = '0px';
+          textarea.style.minWidth = '0px';
+          textarea.style.padding = '0px';
+          textarea.style.margin = '0px';
+          textarea.style.resize = 'none';
+          textarea.style.boxSizing = 'content-box';
+          textarea.style.overflow = 'hidden';
+        }
+      });
 
       const handleSelection = () => {
         const active = canvas.getActiveObject();
         setSelectedObject(active || null);
+        
+        if (isPanModeRef.current && active !== panningImgRef.current) {
+          stopPanMode(); 
+        }
+        
         forceUpdate(); 
       };
 
@@ -131,27 +350,35 @@ export const useFabricEditor = () => {
       canvas.on('selection:cleared', () => {
         setSelectedObject(null);
         setContextMenuInfo({ visible: false, x: 0, y: 0 });
+        
+        if (isPanModeRef.current) {
+          stopPanMode();
+        }
+        
         forceUpdate();
       });
 
-      // EVENTO NATIVO DO FABRIC PARA CLIQUE DIREITO (Fim do bug do 't.onSelect')
       canvas.on('contextmenu', (options) => {
         const e = options.e;
         e.preventDefault();
         e.stopPropagation();
 
         const target = options.target;
+        const clientX = e.clientX;
+        const clientY = e.clientY;
 
-        if (target) {
-          // O setTimeout tira a ação do fluxo atual do evento, permitindo 
-          // que o Fabric conclua seus processos internos antes de acionarmos o menu
+        const isSelectableObject = target && target.type && typeof (target as any).onSelect === 'function';
+
+        if (isSelectableObject) {
           setTimeout(() => {
-            canvas.setActiveObject(target);
-            canvas.renderAll();
+            if (canvas.getActiveObject() !== target) {
+              canvas.setActiveObject(target);
+              canvas.renderAll();
+            }
             setContextMenuInfo({ 
               visible: true, 
-              x: e.clientX, 
-              y: e.clientY 
+              x: clientX, 
+              y: clientY 
             });
             forceUpdate();
           }, 0);
@@ -163,20 +390,17 @@ export const useFabricEditor = () => {
         }
       });
 
-      // Fecha o menu ao clicar com o botão esquerdo
       canvas.on('mouse:down', (opt) => {
-        if (opt.e.button !== 2) {
+        const e = opt.e as MouseEvent;
+        if (e.button !== 2) {
           setContextMenuInfo({ visible: false, x: 0, y: 0 });
         }
       });
-      
-      canvas.on('object:moving', () => setContextMenuInfo({ visible: false, x: 0, y: 0 }));
 
-      // Lógica de arrastar e soltar (Drop na moldura)
       canvas.on('object:modified', (e) => {
         handleSelection();
         const obj = e.target;
-        if (obj && obj.type === 'image' && !(obj as any).isFrame) {
+        if (obj && obj.type === 'image' && !(obj as any).isFrame && !cropBoxRef.current && !isPanModeRef.current) {
           const imgCenter = obj.getCenterPoint();
           const frames = canvas.getObjects().filter(o => (o as any).isFrame && o.type !== 'image');
           for (const frame of frames) {
@@ -196,11 +420,18 @@ export const useFabricEditor = () => {
         fabricCanvas.current = null;
       }
     };
-  }, [forceUpdate, attachImageToFrame]);
+  }, [forceUpdate, attachImageToFrame, stopPanMode]);
 
   const addText = (content = 'Novo Texto') => {
     if (!fabricCanvas.current) return;
-    const text = new fabric.IText(content, { left: 100, top: 100, fontFamily: 'Arial', fontSize: 24, fill: '#000000' });
+    const text = new fabric.IText(content, { 
+      left: 100, 
+      top: 100, 
+      fontFamily: 'Arial', 
+      fontSize: 24, 
+      fill: '#000000',
+      lineHeight: 1.16 // valor padrão amigável
+    });
     (text as any).variableId = null;
     (text as any).locked = false;
     
@@ -211,7 +442,8 @@ export const useFabricEditor = () => {
           frameType: this.frameType,
           variableId: this.variableId,
           customRadii: this.customRadii,
-          locked: this.locked
+          locked: this.locked,
+          isCropped: this.isCropped
         });
       };
     })(text.toObject);
@@ -249,7 +481,8 @@ export const useFabricEditor = () => {
           frameType: this.frameType,
           variableId: this.variableId,
           customRadii: this.customRadii,
-          locked: this.locked
+          locked: this.locked,
+          isCropped: this.isCropped
         });
       };
     })(shapeObj.toObject);
@@ -285,7 +518,8 @@ export const useFabricEditor = () => {
           frameType: this.frameType,
           variableId: this.variableId,
           customRadii: this.customRadii,
-          locked: this.locked
+          locked: this.locked,
+          isCropped: this.isCropped
         });
       };
     })(frameObj.toObject);
@@ -318,7 +552,8 @@ export const useFabricEditor = () => {
               frameType: this.frameType,
               variableId: this.variableId,
               customRadii: this.customRadii,
-              locked: this.locked
+              locked: this.locked,
+              isCropped: this.isCropped
             });
           };
         })(img.toObject);
@@ -350,34 +585,29 @@ export const useFabricEditor = () => {
     const clipPath = img.clipPath;
     if (!clipPath) return;
 
-    let frameWidth = 0;
-    let frameHeight = 0;
-
-    if (frameType === 'circle') {
-      const radius = (clipPath as fabric.Circle).radius || 0;
-      frameWidth = radius * 2 * img.scaleX!;
-      frameHeight = radius * 2 * img.scaleY!;
-    } else {
-      frameWidth = clipPath.width! * img.scaleX!;
-      frameHeight = clipPath.height! * img.scaleY!;
-    }
+    const frameW = (img as any)._origFrameW || clipPath.width;
+    const frameH = (img as any)._origFrameH || clipPath.height;
+    const frameScaleX = (img as any)._origFrameScaleX || 1;
+    const frameScaleY = (img as any)._origFrameScaleY || 1;
     
     let frameObj: fabric.FabricObject;
 
     if (frameType === 'circle') {
       frameObj = new fabric.Circle({
-        radius: frameWidth / 2,
-        fill: '#f1f5f9', stroke: '#cbd5e1', strokeWidth: 2, strokeDashArray: [8, 8],
-        originX: 'center', originY: 'center',
-        left: img.left, top: img.top, angle: img.angle
-      });
-    } else {
-      frameObj = new fabric.Rect({
-        width: frameWidth, height: frameHeight,
+        radius: frameW / 2,
         fill: '#f1f5f9', stroke: '#cbd5e1', strokeWidth: 2, strokeDashArray: [8, 8],
         originX: 'center', originY: 'center',
         left: img.left, top: img.top, angle: img.angle,
-        rx: customRadii?.tl || 16, ry: customRadii?.tl || 16
+        scaleX: frameScaleX, scaleY: frameScaleY
+      });
+    } else {
+      frameObj = new fabric.Rect({
+        width: frameW, height: frameH,
+        fill: '#f1f5f9', stroke: '#cbd5e1', strokeWidth: 2, strokeDashArray: [8, 8],
+        originX: 'center', originY: 'center',
+        left: img.left, top: img.top, angle: img.angle,
+        rx: customRadii?.tl || 16, ry: customRadii?.tl || 16,
+        scaleX: frameScaleX, scaleY: frameScaleY
       });
       (frameObj as any).customRadii = customRadii || { tl: 16, tr: 16, br: 16, bl: 16 };
     }
@@ -387,6 +617,10 @@ export const useFabricEditor = () => {
     (frameObj as any).variableId = variableId;
     (frameObj as any).locked = isLocked;
 
+    if (isLocked) {
+        frameObj.set({ lockMovementX: true, lockMovementY: true, lockRotation: true, lockScalingX: true, lockScalingY: true, hasControls: false });
+    }
+
     frameObj.toObject = (function(toObject) {
       return function(this: any, propertiesToInclude?: string[]) {
         return Object.assign(toObject.call(this, propertiesToInclude), {
@@ -394,7 +628,8 @@ export const useFabricEditor = () => {
           frameType: this.frameType,
           variableId: this.variableId,
           customRadii: this.customRadii,
-          locked: this.locked
+          locked: this.locked,
+          isCropped: this.isCropped
         });
       };
     })(frameObj.toObject);
@@ -404,6 +639,8 @@ export const useFabricEditor = () => {
     (img as any).frameType = undefined;
     (img as any).variableId = null;
     (img as any).customRadii = { tl: 0, tr: 0, br: 0, bl: 0 };
+    (img as any).locked = false; 
+    img.set({ lockMovementX: false, lockMovementY: false, lockRotation: false, lockScalingX: false, lockScalingY: false, hasControls: true });
     
     img.toObject = (function(toObject) {
       return function(this: any, propertiesToInclude?: string[]) {
@@ -412,7 +649,8 @@ export const useFabricEditor = () => {
           frameType: this.frameType,
           variableId: this.variableId,
           customRadii: this.customRadii,
-          locked: this.locked
+          locked: this.locked,
+          isCropped: this.isCropped
         });
       };
     })(img.toObject);
@@ -431,13 +669,217 @@ export const useFabricEditor = () => {
     toast.success('Imagem desanexada da moldura!');
   };
 
+  const togglePanMode = () => {
+    if (!fabricCanvas.current || !selectedObject || selectedObject.type !== 'image') return;
+    const img = selectedObject as fabric.FabricImage;
+    
+    if (isPanMode) {
+      stopPanMode();
+      fabricCanvas.current.discardActiveObject();
+      toast.success("Ajuste concluído!");
+    } else {
+      if (!img.clipPath) {
+         toast.info("A imagem precisa estar em uma moldura ou recortada para usar o ajuste.");
+         return;
+      }
+      setIsPanMode(true);
+      panningImgRef.current = img;
+
+      const clipPath = img.clipPath;
+      if (clipPath) {
+         const angleRad = (img.angle || 0) * Math.PI / 180;
+         const cosA = Math.cos(angleRad);
+         const sinA = Math.sin(angleRad);
+         
+         const relX = clipPath.left! * (img.scaleX || 1);
+         const relY = clipPath.top! * (img.scaleY || 1);
+         
+         const absX = img.left! + relX * cosA - relY * sinA;
+         const absY = img.top! + relX * sinA + relY * cosA;
+         
+         const fixedScaleX = (clipPath.scaleX || 1) * (img.scaleX || 1);
+         const fixedScaleY = (clipPath.scaleY || 1) * (img.scaleY || 1);
+         const fixedAngle = img.angle || 0;
+
+         (img as any)._originalClipPath = clipPath;
+         (img as any)._fixedClipAbsX = absX;
+         (img as any)._fixedClipAbsY = absY;
+         (img as any)._fixedClipScaleX = fixedScaleX;
+         (img as any)._fixedClipScaleY = fixedScaleY;
+         (img as any)._fixedAngle = fixedAngle;
+
+         let overlay: fabric.FabricObject;
+         if (clipPath.type === 'circle') {
+           overlay = new fabric.Circle({
+             radius: (clipPath as fabric.Circle).radius,
+             originX: 'center', originY: 'center',
+             left: absX, top: absY,
+             scaleX: fixedScaleX, scaleY: fixedScaleY,
+             angle: fixedAngle,
+             fill: 'transparent',
+             stroke: '#3b82f6', 
+             strokeWidth: 4,
+             strokeDashArray: [8, 8],
+             selectable: false,
+             evented: false,
+             excludeFromExport: true
+           });
+         } else {
+           const pathData = (clipPath as fabric.Path).path;
+           overlay = new fabric.Path(pathData, {
+             originX: 'center', originY: 'center',
+             left: absX, top: absY,
+             scaleX: fixedScaleX, scaleY: fixedScaleY,
+             angle: fixedAngle,
+             fill: 'transparent',
+             stroke: '#3b82f6', 
+             strokeWidth: 4,
+             strokeDashArray: [8, 8],
+             selectable: false,
+             evented: false,
+             excludeFromExport: true
+           });
+         }
+
+         fabricCanvas.current.add(overlay);
+         panOverlayRef.current = overlay;
+         img.set('clipPath', undefined);
+      }
+
+      img.set({ 
+        hasControls: true, 
+        lockMovementX: false, 
+        lockMovementY: false, 
+        lockScalingX: false,
+        lockScalingY: false,
+        opacity: 0.5 
+      });
+      img.set('dirty', true);
+      toast.info("Ajuste a imagem e clique em 'Concluir Ajustes' para aplicar.");
+    }
+    fabricCanvas.current.renderAll();
+    forceUpdate();
+  };
+
+  const startCrop = () => {
+    if (!fabricCanvas.current || !selectedObject || selectedObject.type !== 'image') return;
+    const img = selectedObject as fabric.FabricImage;
+
+    if ((img as any).isFrame || (img as any).isCropped) {
+       toast.info("A imagem já possui recorte ou moldura. Use a ferramenta 'Ajustar Foto'.");
+       return;
+    }
+
+    const rect = new fabric.Rect({
+       left: img.left,
+       top: img.top,
+       width: img.getScaledWidth(),
+       height: img.getScaledHeight(),
+       originX: 'center',
+       originY: 'center',
+       fill: 'rgba(0,0,0,0.5)',
+       stroke: '#3b82f6',
+       strokeWidth: 2,
+       strokeDashArray: [5, 5],
+       cornerColor: '#3b82f6',
+       transparentCorners: false,
+       hasRotatingPoint: false
+    });
+
+    (rect as any).targetImg = img;
+    img.set({ selectable: false, evented: false });
+    
+    fabricCanvas.current.add(rect);
+    fabricCanvas.current.setActiveObject(rect);
+    setCropBox(rect);
+    fabricCanvas.current.renderAll();
+    forceUpdate();
+    toast.info("Ajuste a caixa de corte e clique em 'Aplicar Recorte'.");
+  };
+
+  const applyCrop = () => {
+    if (!fabricCanvas.current || !cropBox) return;
+    const img = (cropBox as any).targetImg as fabric.FabricImage;
+
+    const diffX = cropBox.left! - img.left!;
+    const diffY = cropBox.top! - img.top!;
+    const angleDiff = (cropBox.angle || 0) - (img.angle || 0);
+
+    const angleRad = -(img.angle || 0) * Math.PI / 180;
+    const cosA = Math.cos(angleRad);
+    const sinA = Math.sin(angleRad);
+    
+    const localX = diffX * cosA - diffY * sinA;
+    const localY = diffX * sinA + diffY * cosA;
+
+    const clipPath = new fabric.Rect({
+       width: cropBox.getScaledWidth() / (img.scaleX || 1),
+       height: cropBox.getScaledHeight() / (img.scaleY || 1),
+       originX: 'center',
+       originY: 'center',
+       left: localX / (img.scaleX || 1),
+       top: localY / (img.scaleY || 1),
+       angle: angleDiff
+    });
+
+    img.set('clipPath', clipPath);
+    (img as any).isCropped = true;
+    
+    img.set({ selectable: true, evented: true, dirty: true });
+    
+    img.toObject = (function(toObject) {
+       return function(this: any, propertiesToInclude?: string[]) {
+         return Object.assign(toObject.call(this, propertiesToInclude), {
+           isFrame: this.isFrame,
+           frameType: this.frameType,
+           variableId: this.variableId,
+           customRadii: this.customRadii,
+           locked: this.locked,
+           isCropped: this.isCropped
+         });
+       };
+    })(img.toObject);
+
+    fabricCanvas.current.remove(cropBox);
+    setCropBox(null);
+    fabricCanvas.current.setActiveObject(img);
+    fabricCanvas.current.renderAll();
+    forceUpdate();
+    toast.success("Recorte aplicado!");
+  };
+
+  const cancelCrop = () => {
+    if (!fabricCanvas.current || !cropBox) return;
+    const img = (cropBox as any).targetImg as fabric.FabricImage;
+    img.set({ selectable: true, evented: true });
+    fabricCanvas.current.remove(cropBox);
+    setCropBox(null);
+    fabricCanvas.current.setActiveObject(img);
+    fabricCanvas.current.renderAll();
+    forceUpdate();
+  };
+
+  const removeCrop = () => {
+    if (!fabricCanvas.current || !selectedObject || selectedObject.type !== 'image') return;
+    const img = selectedObject;
+    if (!(img as any).isCropped) return;
+    
+    img.set('clipPath', undefined);
+    (img as any).isCropped = false;
+    img.set('dirty', true);
+    
+    fabricCanvas.current.renderAll();
+    forceUpdate();
+    toast.success("Recorte removido.");
+  };
+
   const exportToImage = () => {
     return fabricCanvas.current?.toDataURL({ format: 'png', quality: 1, multiplier: 2 });
   };
 
   const saveToJson = () => {
     if (!fabricCanvas.current) return null;
-    return JSON.stringify(fabricCanvas.current.toJSON(['variableId', 'isFrame', 'frameType', 'customRadii', 'locked']));
+    return JSON.stringify(fabricCanvas.current.toJSON(['variableId', 'isFrame', 'frameType', 'customRadii', 'locked', 'isCropped', '_origFrameW', '_origFrameH', '_origFrameScaleX', '_origFrameScaleY']));
   };
 
   const loadFromJson = async (json: any) => {
@@ -457,7 +899,13 @@ export const useFabricEditor = () => {
             if (objData.frameType !== undefined) (canvasObj as any).frameType = objData.frameType;
             if (objData.variableId !== undefined) (canvasObj as any).variableId = objData.variableId;
             if (objData.customRadii !== undefined) (canvasObj as any).customRadii = objData.customRadii;
+            if (objData.isCropped !== undefined) (canvasObj as any).isCropped = objData.isCropped;
             
+            if (objData._origFrameW !== undefined) (canvasObj as any)._origFrameW = objData._origFrameW;
+            if (objData._origFrameH !== undefined) (canvasObj as any)._origFrameH = objData._origFrameH;
+            if (objData._origFrameScaleX !== undefined) (canvasObj as any)._origFrameScaleX = objData._origFrameScaleX;
+            if (objData._origFrameScaleY !== undefined) (canvasObj as any)._origFrameScaleY = objData._origFrameScaleY;
+
             if (objData.locked !== undefined) {
               (canvasObj as any).locked = objData.locked;
               if (objData.locked) {
@@ -472,7 +920,12 @@ export const useFabricEditor = () => {
                   frameType: this.frameType,
                   variableId: this.variableId,
                   customRadii: this.customRadii,
-                  locked: this.locked 
+                  locked: this.locked,
+                  isCropped: this.isCropped,
+                  _origFrameW: this._origFrameW,
+                  _origFrameH: this._origFrameH,
+                  _origFrameScaleX: this._origFrameScaleX,
+                  _origFrameScaleY: this._origFrameScaleY
                 });
               };
             })(canvasObj.toObject);
@@ -608,6 +1061,9 @@ export const useFabricEditor = () => {
 
   return { 
     canvasRef, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas, deleteSelected,
-    setCornerRadii, toggleFlipX, toggleFlipY, setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, selectedObject, fabricCanvas, contextMenuInfo, setContextMenuInfo 
+    setCornerRadii, toggleFlipX, toggleFlipY, setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, selectedObject, fabricCanvas, contextMenuInfo, setContextMenuInfo,
+    isPanMode, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop,
+    // Exportando as novas funções de texto
+    changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent
   };
 };
