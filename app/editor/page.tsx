@@ -25,7 +25,7 @@ import {
   CornerUpLeft, CornerUpRight, CornerDownLeft, CornerDownRight, Loader2, Share, Menu, Crop,
   ZoomIn, ZoomOut, Focus, LockOpen, Unlink, Move, Scissors, Check, X,
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ArrowRightToLine, Type
+  List, ArrowRightToLine, Type, Paintbrush, Undo2, Redo2
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
@@ -47,6 +47,9 @@ export default function EditorPrincipal() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+
+  const [gradColor1, setGradColor1] = useState('#3b82f6');
+  const [gradColor2, setGradColor2] = useState('#1d4ed8');
   
   const {
     canvasRef, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas,
@@ -54,9 +57,10 @@ export default function EditorPrincipal() {
     setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, selectedObject, fabricCanvas,
     contextMenuInfo, setContextMenuInfo,
     isPanMode, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop,
-    // Funções de Texto
     changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, 
-    setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent
+    setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient,
+    // NOVAS FUNÇÕES DE HISTÓRICO
+    undo, redo, canUndo, canRedo
   } = useFabricEditor();
 
   const fetchModels = async () => {
@@ -381,6 +385,22 @@ export default function EditorPrincipal() {
                 onChange={(e) => setCanvasTitle(e.target.value)} 
                 className="border-transparent hover:border-blue-200 focus:border-blue-500 w-64 font-medium h-9 text-base transition-colors" 
               />
+              
+              {/* BOTÕES DESFAZER / REFAZER */}
+              <div className="flex items-center gap-1 ml-2">
+                <Button 
+                  variant="ghost" size="icon" className="h-8 w-8 text-slate-600" 
+                  onClick={undo} disabled={!canUndo} title="Desfazer (Ctrl+Z)"
+                >
+                  <Undo2 className="w-4 h-4" />
+                </Button>
+                <Button 
+                  variant="ghost" size="icon" className="h-8 w-8 text-slate-600" 
+                  onClick={redo} disabled={!canRedo} title="Refazer (Ctrl+Y)"
+                >
+                  <Redo2 className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -910,19 +930,50 @@ export default function EditorPrincipal() {
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Texto</Label>
                         <div className="flex gap-2">
-                          <div className="relative shrink-0">
-                            <div 
-                              className="w-10 h-10 rounded-lg border border-slate-200 shadow-sm" 
-                              style={{ backgroundColor: selectedObject.fill as string }} 
-                            />
-                            <input 
-                              type="color" 
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              value={selectedObject.fill as string}
-                              onChange={(e) => changeTextColor(e.target.value)}
-                              disabled={(selectedObject as any).locked}
-                            />
-                          </div>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-10 h-10 p-0 border-slate-200 shadow-sm overflow-hidden rounded-lg">
+                                <div 
+                                  className="w-full h-full" 
+                                  style={{ backgroundColor: typeof selectedObject.fill === 'string' ? selectedObject.fill : '#000000' }} 
+                                />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-4 bg-white shadow-xl rounded-xl">
+                              <Tabs defaultValue="solid">
+                                <TabsList className="grid grid-cols-2 mb-4">
+                                  <TabsTrigger value="solid">Sólido</TabsTrigger>
+                                  <TabsTrigger value="gradient">Degradê</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="solid" className="space-y-3">
+                                  <Label className="text-[10px] font-bold uppercase text-slate-400">Cor Sólida</Label>
+                                  <Input 
+                                    type="color" 
+                                    className="h-10 p-1 cursor-pointer"
+                                    value={typeof selectedObject.fill === 'string' ? selectedObject.fill : '#000000'}
+                                    onChange={(e) => changeTextColor(e.target.value)}
+                                  />
+                                </TabsContent>
+                                <TabsContent value="gradient" className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Cor 1</Label>
+                                      <Input type="color" value={gradColor1} onChange={(e) => setGradColor1(e.target.value)} className="h-8 p-1" />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Cor 2</Label>
+                                      <Input type="color" value={gradColor2} onChange={(e) => setGradColor2(e.target.value)} className="h-8 p-1" />
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <Button size="sm" variant="outline" className="text-[10px] h-7" onClick={() => applyGradient(gradColor1, gradColor2, 'horizontal')}>Horizontal</Button>
+                                    <Button size="sm" variant="outline" className="text-[10px] h-7" onClick={() => applyGradient(gradColor1, gradColor2, 'vertical')}>Vertical</Button>
+                                  </div>
+                                </TabsContent>
+                              </Tabs>
+                            </PopoverContent>
+                          </Popover>
+
                           <div className="relative flex-1">
                             <Type className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                             <Input 
@@ -1047,10 +1098,60 @@ export default function EditorPrincipal() {
                     </div>
                   )}
 
-                  {/* PROPRIEDADES DE IMAGENS/MOLDURAS (Mantidas) */}
-                  {(selectedObject.type === 'image' || ((selectedObject as any).isFrame && (selectedObject as any).frameType === 'rect') || selectedObject.type === 'rect') && selectedObject.type !== 'i-text' && (
+                  {/* PROPRIEDADES DE FORMAS (Adicionado Seletor de degradê) */}
+                  {(selectedObject.type === 'rect' || selectedObject.type === 'circle' || selectedObject.type === 'triangle' || selectedObject.type === 'line') && !(selectedObject as any).isFrame && (
                     <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
-                      {selectedObject.type !== 'circle' && (
+                      
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Cor da Forma</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full h-10 flex gap-3 px-3 border-slate-200 rounded-lg justify-start items-center">
+                              <div 
+                                className="w-5 h-5 rounded-sm border" 
+                                style={{ backgroundColor: typeof (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) === 'string' ? (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string : '#94a3b8' }} 
+                              />
+                              <span className="text-xs font-medium text-slate-600">Escolher Cor / Degradê</span>
+                              <Paintbrush className="w-3 h-3 ml-auto text-slate-400" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-4 bg-white shadow-xl rounded-xl">
+                            <Tabs defaultValue="solid">
+                              <TabsList className="grid grid-cols-2 mb-4">
+                                <TabsTrigger value="solid">Sólido</TabsTrigger>
+                                <TabsTrigger value="gradient">Degradê</TabsTrigger>
+                              </TabsList>
+                              <TabsContent value="solid" className="space-y-3">
+                                <Label className="text-[10px] font-bold uppercase text-slate-400">Cor Sólida</Label>
+                                <Input 
+                                  type="color" 
+                                  className="h-10 p-1 cursor-pointer"
+                                  value={typeof (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) === 'string' ? (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string : '#94a3b8'}
+                                  onChange={(e) => updateProperty(selectedObject.type === 'line' ? 'stroke' : 'fill', e.target.value)}
+                                />
+                              </TabsContent>
+                              <TabsContent value="gradient" className="space-y-4">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px]">Cor 1</Label>
+                                    <Input type="color" value={gradColor1} onChange={(e) => setGradColor1(e.target.value)} className="h-8 p-1" />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px]">Cor 2</Label>
+                                    <Input type="color" value={gradColor2} onChange={(e) => setGradColor2(e.target.value)} className="h-8 p-1" />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <Button size="sm" variant="outline" className="text-[10px] h-7" onClick={() => applyGradient(gradColor1, gradColor2, 'horizontal')}>Horizontal</Button>
+                                  <Button size="sm" variant="outline" className="text-[10px] h-7" onClick={() => applyGradient(gradColor1, gradColor2, 'vertical')}>Vertical</Button>
+                                </div>
+                              </TabsContent>
+                            </Tabs>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {selectedObject.type !== 'circle' && selectedObject.type !== 'line' && (
                         <div className="space-y-3">
                           <Label className="text-xs font-semibold text-slate-800">Arredondar Cantos (px)</Label>
                           <div className="grid grid-cols-2 gap-2">
@@ -1066,38 +1167,30 @@ export default function EditorPrincipal() {
                         <div className="flex items-center justify-between"><Label className="text-xs font-semibold text-slate-800">Transparência</Label><span className="text-xs text-slate-500 font-medium">{Math.round((selectedObject.opacity || 1) * 100)}%</span></div>
                         <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" disabled={(selectedObject as any).locked} />
                       </div>
+                    </div>
+                  )}
 
-                      {selectedObject.type === 'image' && (
-                        <>
-                          <Separator className="bg-slate-100" />
-                          <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <Label className="text-xs font-semibold text-slate-800">Inverter Imagem</Label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipX ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipX} disabled={(selectedObject as any).locked}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
-                              <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipY ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipY} disabled={(selectedObject as any).locked}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {(selectedObject.type === 'rect' || selectedObject.type === 'circle' || selectedObject.type === 'triangle' || selectedObject.type === 'line') && !(selectedObject as any).isFrame && (
-                        <>
-                          <Separator className="bg-slate-100" />
-                          <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <Label className="text-xs font-semibold text-slate-800">Cor Principal</Label>
-                            <div className="flex gap-3">
-                              <div className="w-10 h-10 rounded-lg shadow-sm shrink-0 border border-slate-200" style={{ backgroundColor: (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string }} />
-                              <Input type="color" className="w-full h-10 p-1 cursor-pointer rounded-lg border-slate-200" value={(selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string} onChange={(e) => updateProperty(selectedObject.type === 'line' ? 'stroke' : 'fill', e.target.value)} disabled={(selectedObject as any).locked} />
-                            </div>
-                          </div>
-                        </>
-                      )}
+                  {/* PROPRIEDADES DE IMAGENS */}
+                  {selectedObject.type === 'image' && (
+                    <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Transparência</Label>
+                        <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" disabled={(selectedObject as any).locked} />
+                      </div>
+                      <Separator className="bg-slate-100" />
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Inverter</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button variant="outline" size="sm" className={selectedObject.flipX ? 'border-blue-600 bg-blue-50' : ''} onClick={toggleFlipX} disabled={(selectedObject as any).locked}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
+                          <Button variant="outline" size="sm" className={selectedObject.flipY ? 'border-blue-600 bg-blue-50' : ''} onClick={toggleFlipY} disabled={(selectedObject as any).locked}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
                   <Separator className="bg-slate-100" />
 
-                  {/* ALINHAMENTO GLOBAL (Para todos os objetos) */}
+                  {/* ALINHAMENTO GLOBAL */}
                   <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                     <Label className="text-xs font-semibold text-slate-800">Alinhamento e Camadas</Label>
                     <div className="grid grid-cols-3 gap-2">

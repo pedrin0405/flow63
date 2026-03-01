@@ -31,6 +31,12 @@ export const useFabricEditor = () => {
   
   const [contextMenuInfo, setContextMenuInfo] = useState({ visible: false, x: 0, y: 0 });
 
+  // HISTÓRICO (UNDO/REDO)
+  const undoStack = useRef<string[]>([]);
+  const redoStack = useRef<string[]>([]);
+  const isHistoryProcessing = useRef(false);
+
+  // ESTADOS E REFS PARA MODO DE AJUSTE (PAN) E RECORTE (CROP)
   const [isPanMode, setIsPanMode] = useState(false);
   const isPanModeRef = useRef(isPanMode); 
   
@@ -40,6 +46,7 @@ export const useFabricEditor = () => {
   const [cropBox, setCropBox] = useState<fabric.Rect | null>(null);
   const cropBoxRef = useRef(cropBox); 
 
+  // Sincroniza os estados com as Refs
   useEffect(() => { isPanModeRef.current = isPanMode; }, [isPanMode]);
   useEffect(() => { cropBoxRef.current = cropBox; }, [cropBox]);
 
@@ -49,15 +56,99 @@ export const useFabricEditor = () => {
     setUpdateTrigger((prev) => prev + 1);
   }, []);
 
+  // --- FUNÇÕES DE HISTÓRICO ---
+
+  const saveHistory = useCallback(() => {
+    if (!fabricCanvas.current || isHistoryProcessing.current) return;
+
+    const json = JSON.stringify(fabricCanvas.current.toJSON([
+      'variableId', 'isFrame', 'frameType', 'customRadii', 'locked', 'isCropped', 
+      '_origFrameW', '_origFrameH', '_origFrameScaleX', '_origFrameScaleY',
+      'originX', 'originY' // Crucial para manter a posição correta
+    ]));
+
+    if (undoStack.current.length > 0 && undoStack.current[undoStack.current.length - 1] === json) return;
+
+    undoStack.current.push(json);
+    redoStack.current = []; 
+    
+    if (undoStack.current.length > 50) undoStack.current.shift();
+    
+    forceUpdate();
+  }, [forceUpdate]);
+
+  const undo = useCallback(async () => {
+    if (undoStack.current.length <= 1 || !fabricCanvas.current || isHistoryProcessing.current) return;
+
+    isHistoryProcessing.current = true;
+    const currentState = undoStack.current.pop()!;
+    redoStack.current.push(currentState);
+
+    const previousState = undoStack.current[undoStack.current.length - 1];
+    
+    await fabricCanvas.current.loadFromJSON(JSON.parse(previousState));
+    
+    // CORREÇÃO: Forçar recálculo de coordenadas para evitar pulos para o canto 0,0
+    fabricCanvas.current.getObjects().forEach(obj => obj.setCoords());
+    fabricCanvas.current.renderAll();
+    
+    isHistoryProcessing.current = false;
+    forceUpdate();
+  }, [forceUpdate]);
+
+  const redo = useCallback(async () => {
+    if (redoStack.current.length === 0 || !fabricCanvas.current || isHistoryProcessing.current) return;
+
+    isHistoryProcessing.current = true;
+    const nextState = redoStack.current.pop()!;
+    undoStack.current.push(nextState);
+
+    await fabricCanvas.current.loadFromJSON(JSON.parse(nextState));
+    
+    // CORREÇÃO: Forçar recálculo de coordenadas
+    fabricCanvas.current.getObjects().forEach(obj => obj.setCoords());
+    fabricCanvas.current.renderAll();
+
+    isHistoryProcessing.current = false;
+    forceUpdate();
+  }, [forceUpdate]);
+
   // --- NOVAS FUNÇÕES DE EDIÇÃO DE TEXTO ---
 
   const changeTextColor = (color: string) => {
     if (!fabricCanvas.current || !selectedObject) return;
-    if (selectedObject instanceof fabric.IText) {
-      selectedObject.set('fill', color);
-      fabricCanvas.current.renderAll();
-      forceUpdate();
-    }
+    selectedObject.set('fill', color);
+    fabricCanvas.current.renderAll();
+    saveHistory();
+    forceUpdate();
+  };
+
+  const applyGradient = (color1: string, color2: string, orientation: 'horizontal' | 'vertical' = 'horizontal') => {
+    if (!fabricCanvas.current || !selectedObject) return;
+
+    const isVert = orientation === 'vertical';
+    const width = selectedObject.width || 0;
+    const height = selectedObject.height || 0;
+
+    const gradient = new fabric.Gradient({
+      type: 'linear',
+      gradientUnits: 'pixels',
+      coords: {
+        x1: isVert ? 0 : -width / 2,
+        y1: isVert ? -height / 2 : 0,
+        x2: isVert ? 0 : width / 2,
+        y2: isVert ? height / 2 : 0,
+      },
+      colorStops: [
+        { offset: 0, color: color1 },
+        { offset: 1, color: color2 },
+      ],
+    });
+
+    selectedObject.set('fill', gradient);
+    fabricCanvas.current.renderAll();
+    saveHistory();
+    forceUpdate();
   };
 
   const toggleBold = () => {
@@ -66,6 +157,7 @@ export const useFabricEditor = () => {
       const isBold = selectedObject.fontWeight === 'bold';
       selectedObject.set('fontWeight', isBold ? 'normal' : 'bold');
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -76,6 +168,7 @@ export const useFabricEditor = () => {
       const isItalic = selectedObject.fontStyle === 'italic';
       selectedObject.set('fontStyle', isItalic ? 'normal' : 'italic');
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -85,6 +178,7 @@ export const useFabricEditor = () => {
     if (selectedObject instanceof fabric.IText) {
       selectedObject.set('underline', !selectedObject.underline);
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -94,6 +188,7 @@ export const useFabricEditor = () => {
     if (selectedObject instanceof fabric.IText) {
       selectedObject.set('linethrough', !selectedObject.linethrough);
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -103,6 +198,7 @@ export const useFabricEditor = () => {
     if (selectedObject instanceof fabric.IText) {
       selectedObject.set('fontSize', size);
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -112,6 +208,7 @@ export const useFabricEditor = () => {
     if (selectedObject instanceof fabric.IText) {
       selectedObject.set('textAlign', align);
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -129,6 +226,7 @@ export const useFabricEditor = () => {
 
       selectedObject.set('text', newText);
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -138,6 +236,7 @@ export const useFabricEditor = () => {
     if (selectedObject instanceof fabric.IText) {
       selectedObject.set('lineHeight', height);
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -145,11 +244,9 @@ export const useFabricEditor = () => {
   const setTextIndent = (indent: number) => {
     if (!fabricCanvas.current || !selectedObject) return;
     if (selectedObject instanceof fabric.IText) {
-      // No Fabric.js, o recuo (indent) é simulado via charSpacing ou padding dependendo do objetivo,
-      // mas para "Recuo de parágrafo", usamos estilos de parágrafo ou espaços iniciais.
-      // Aqui ajustamos o charSpacing como exemplo de espaçamento entre letras.
       selectedObject.set('charSpacing', indent);
       fabricCanvas.current.renderAll();
+      saveHistory();
       forceUpdate();
     }
   };
@@ -233,8 +330,9 @@ export const useFabricEditor = () => {
     fabricCanvas.current.moveObjectTo(img, zIndex);
     fabricCanvas.current.setActiveObject(img);
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
-  }, [forceUpdate]);
+  }, [forceUpdate, saveHistory]);
 
   const stopPanMode = useCallback(() => {
     if (panningImgRef.current) {
@@ -294,6 +392,7 @@ export const useFabricEditor = () => {
 
       img.setCoords();
       img.set('dirty', true);
+      saveHistory();
     }
     setIsPanMode(false);
     panningImgRef.current = null;
@@ -301,7 +400,7 @@ export const useFabricEditor = () => {
     if (fabricCanvas.current) {
        fabricCanvas.current.renderAll();
     }
-  }, []);
+  }, [saveHistory]);
 
   useEffect(() => {
     if (canvasRef.current && !fabricCanvas.current) {
@@ -319,6 +418,10 @@ export const useFabricEditor = () => {
       }
 
       fabricCanvas.current = canvas;
+
+      canvas.on('object:modified', saveHistory);
+      canvas.on('object:added', saveHistory);
+      canvas.on('object:removed', saveHistory);
 
       canvas.on('text:editing:entered', (e) => {
         const target = e.target as any;
@@ -412,6 +515,8 @@ export const useFabricEditor = () => {
           }
         }
       });
+
+      saveHistory();
     }
 
     return () => {
@@ -420,7 +525,7 @@ export const useFabricEditor = () => {
         fabricCanvas.current = null;
       }
     };
-  }, [forceUpdate, attachImageToFrame, stopPanMode]);
+  }, [forceUpdate, attachImageToFrame, stopPanMode, saveHistory]);
 
   const addText = (content = 'Novo Texto') => {
     if (!fabricCanvas.current) return;
@@ -430,7 +535,9 @@ export const useFabricEditor = () => {
       fontFamily: 'Arial', 
       fontSize: 24, 
       fill: '#000000',
-      lineHeight: 1.16 // valor padrão amigável
+      lineHeight: 1.16,
+      originX: 'center',
+      originY: 'center'
     });
     (text as any).variableId = null;
     (text as any).locked = false;
@@ -542,6 +649,7 @@ export const useFabricEditor = () => {
       } 
       else {
         img.scaleToWidth(200);
+        img.set({ originX: 'center', originY: 'center' });
         (img as any).customRadii = { tl: 0, tr: 0, br: 0, bl: 0 };
         (img as any).locked = false;
         
@@ -629,7 +737,11 @@ export const useFabricEditor = () => {
           variableId: this.variableId,
           customRadii: this.customRadii,
           locked: this.locked,
-          isCropped: this.isCropped
+          isCropped: this.isCropped,
+          _origFrameW: this._origFrameW,
+          _origFrameH: this._origFrameH,
+          _origFrameScaleX: this._origFrameScaleX,
+          _origFrameScaleY: this._origFrameScaleY
         });
       };
     })(frameObj.toObject);
@@ -664,6 +776,7 @@ export const useFabricEditor = () => {
     fabricCanvas.current.setActiveObject(img);
     
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
     
     toast.success('Imagem desanexada da moldura!');
@@ -844,6 +957,7 @@ export const useFabricEditor = () => {
     setCropBox(null);
     fabricCanvas.current.setActiveObject(img);
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
     toast.success("Recorte aplicado!");
   };
@@ -869,6 +983,7 @@ export const useFabricEditor = () => {
     img.set('dirty', true);
     
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
     toast.success("Recorte removido.");
   };
@@ -935,7 +1050,10 @@ export const useFabricEditor = () => {
         });
       }
 
+      fabricCanvas.current.getObjects().forEach(obj => obj.setCoords());
       fabricCanvas.current.renderAll();
+      undoStack.current = [JSON.stringify(fabricCanvas.current.toJSON())];
+      redoStack.current = [];
       forceUpdate();
     } catch (error) {
       console.error("Erro ao carregar projeto:", error);
@@ -948,6 +1066,7 @@ export const useFabricEditor = () => {
     fabricCanvas.current.backgroundColor = '#ffffff';
     fabricCanvas.current.renderAll();
     setSelectedObject(null);
+    saveHistory();
     forceUpdate();
   };
 
@@ -991,6 +1110,7 @@ export const useFabricEditor = () => {
          obj.set('clipPath', clipPath);
       }
       obj.set('dirty', true);
+      saveHistory();
     } 
 
     fabricCanvas.current.renderAll();
@@ -1001,6 +1121,7 @@ export const useFabricEditor = () => {
     if (!fabricCanvas.current || !selectedObject) return;
     selectedObject.set('flipX', !selectedObject.flipX);
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
   };
 
@@ -1008,6 +1129,7 @@ export const useFabricEditor = () => {
     if (!fabricCanvas.current || !selectedObject) return;
     selectedObject.set('flipY', !selectedObject.flipY);
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
   };
 
@@ -1015,6 +1137,7 @@ export const useFabricEditor = () => {
     if (!fabricCanvas.current || !selectedObject) return;
     selectedObject.set('opacity', opacity);
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
   };
 
@@ -1023,6 +1146,7 @@ export const useFabricEditor = () => {
     fabricCanvas.current.centerObject(selectedObject);
     selectedObject.setCoords(); 
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
   };
 
@@ -1030,6 +1154,7 @@ export const useFabricEditor = () => {
     if (!fabricCanvas.current || !selectedObject) return;
     fabricCanvas.current.bringObjectToFront(selectedObject);
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
   };
 
@@ -1037,6 +1162,7 @@ export const useFabricEditor = () => {
     if (!fabricCanvas.current || !selectedObject) return;
     fabricCanvas.current.sendObjectToBack(selectedObject);
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
   };
 
@@ -1056,6 +1182,7 @@ export const useFabricEditor = () => {
     });
 
     fabricCanvas.current.renderAll();
+    saveHistory();
     forceUpdate();
   };
 
@@ -1063,7 +1190,7 @@ export const useFabricEditor = () => {
     canvasRef, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas, deleteSelected,
     setCornerRadii, toggleFlipX, toggleFlipY, setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, selectedObject, fabricCanvas, contextMenuInfo, setContextMenuInfo,
     isPanMode, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop,
-    // Exportando as novas funções de texto
-    changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent
+    changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient,
+    undo, redo, canUndo: undoStack.current.length > 1, canRedo: redoStack.current.length > 0
   };
 };
