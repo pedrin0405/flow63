@@ -21,7 +21,8 @@ import {
   FileSpreadsheet,
   Library,
   type LucideIcon, 
-  House
+  House,
+  Palette
 } from "lucide-react"
 import {
   Tooltip,
@@ -288,6 +289,14 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               </div>
             )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
+
+            <SidebarItem 
+              icon={Palette} 
+              label="Flow Design" 
+              active={isActive("editor-arte", "/editor")} 
+              onClick={() => handleNavigation("editor-arte", "/editor")}
+              collapsed={isCollapsed}
+            />
 
             <SidebarItem 
               icon={ChartPie} 

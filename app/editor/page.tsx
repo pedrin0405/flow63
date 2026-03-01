@@ -1,27 +1,29 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFabricEditor } from '@/hooks/use-fabric-editor';
 import { ImageUploads } from '@/components/central63/editor/ImageUploads';
 import { supabase } from '@/lib/supabase';
-import { Sidebar } from '@/components/central63/sidebar'; // COMPONENTE DE SIDEBAR ADICIONADO
+import { Sidebar } from '@/components/central63/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Type as TypeIcon, Image as ImageIcon, Download, Save, Trash2,
-  MousePointer2, Layers, Sparkles, ChevronLeft, FlipHorizontal, FlipVertical,
+  MousePointer2, Layers, Sparkles, FlipHorizontal, FlipVertical,
   Maximize, ArrowUpToLine, ArrowDownToLine, CircleDashed, SquareDashed, ImagePlus,
   LayoutTemplate, Shapes, Palette, UploadCloud, Wand2, FolderHeart, Lock, Crown,
-  CornerUpLeft, CornerUpRight, CornerDownLeft, CornerDownRight, Loader2, Plus, Share, Send, Menu, LayoutDashboard // ÍCONES NOVOS IMPORTADOS
+  CornerUpLeft, CornerUpRight, CornerDownLeft, CornerDownRight, Loader2, Share, Menu, Crop,
+  ZoomIn, ZoomOut, Focus, LockOpen, Unlink 
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
@@ -32,9 +34,14 @@ export default function EditorPrincipal() {
   const [canvasTitle, setCanvasTitle] = useState('Nova Arte Sem Título');
   const [isSaving, setIsSaving] = useState(false);
   
-  // ESTADOS PARA O SIDEBAR GLOBAL
+  // ESTADOS PARA O SIDEBAR GLOBAL E TAMANHO DO CANVAS
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('editor'); // Assumindo que 'editor' é a tab atual no seu Sidebar
+  const [activeTab, setActiveTab] = useState('editor'); 
+  const [canvasSize, setCanvasSize] = useState({ width: 1080, height: 1080 }); // TAMANHO PADRÃO ATUALIZADO
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  // REFERÊNCIA PARA A ÁREA DE TRABALHO (Para calcular o zoom automático)
+  const workspaceRef = useRef<HTMLElement>(null);
 
   // ESTADOS NOVOS PARA GESTÃO DE PROJETOS E TEMPLATES
   const [savedModels, setSavedModels] = useState<any[]>([]);
@@ -43,9 +50,10 @@ export default function EditorPrincipal() {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   
   const {
-    canvasRef, addText, addImage, addShape, addFrame, exportToImage, saveToJson, loadFromJson, clearCanvas,
+    canvasRef, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas,
     deleteSelected, setCornerRadii, toggleFlipX, toggleFlipY,
-    setImageOpacity, centerObject, bringToFront, sendToBack, selectedObject, fabricCanvas
+    setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, selectedObject, fabricCanvas,
+    contextMenuInfo, setContextMenuInfo // NOVO ESTADO DO MENU DE CONTEXTO IMPORTADO
   } = useFabricEditor();
 
   const fetchModels = async () => {
@@ -72,9 +80,37 @@ export default function EditorPrincipal() {
     setIsLoadingModels(false);
   };
 
+  // FUNÇÃO PARA CALCULAR O ZOOM IDEAL ("FIT TO SCREEN")
+  const calculateFitZoom = (width: number, height: number) => {
+    if (!workspaceRef.current) return 1;
+    
+    const padding = 100; 
+    const availableWidth = workspaceRef.current.clientWidth - padding;
+    const availableHeight = workspaceRef.current.clientHeight - padding;
+    
+    const scaleX = availableWidth / width;
+    const scaleY = availableHeight / height;
+    
+    let bestScale = Math.min(scaleX, scaleY);
+    if (bestScale > 1) bestScale = 1;
+    if (bestScale < 0.1) bestScale = 0.1;
+    
+    return Number(bestScale.toFixed(2));
+  };
+
   useEffect(() => {
     fetchModels();
+    
+    setTimeout(() => {
+      setZoomLevel(calculateFitZoom(1080, 1080));
+    }, 200);
   }, []);
+
+  useEffect(() => {
+    if (fabricCanvas.current) {
+      fabricCanvas.current.calcOffset();
+    }
+  }, [zoomLevel, canvasSize, sidebarOpen]);
 
   const updateProperty = (key: string, value: any) => {
     if (!selectedObject || !fabricCanvas.current) return;
@@ -102,7 +138,42 @@ export default function EditorPrincipal() {
     clearCanvas();
     setCanvasTitle('Nova Arte Sem Título');
     setCurrentModelId(null);
+    
+    setCanvasSize({ width: 1080, height: 1080 });
+    if (fabricCanvas.current) {
+      fabricCanvas.current.setDimensions({ width: 1080, height: 1080 });
+      fabricCanvas.current.renderAll();
+    }
+    
+    setTimeout(() => {
+      setZoomLevel(calculateFitZoom(1080, 1080));
+    }, 100);
+
     toast.success('Novo canvas em branco criado.');
+  };
+
+  const handleResizeCanvas = () => {
+    if (!fabricCanvas.current) return;
+    const newWidth = Math.max(100, canvasSize.width);
+    const newHeight = Math.max(100, canvasSize.height);
+    
+    fabricCanvas.current.setDimensions({ width: newWidth, height: newHeight });
+    fabricCanvas.current.renderAll();
+    
+    setZoomLevel(calculateFitZoom(newWidth, newHeight));
+    toast.success(`Tamanho alterado para ${newWidth}x${newHeight}px`);
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.15, 4)); 
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.15, 0.1)); 
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(calculateFitZoom(canvasSize.width, canvasSize.height));
   };
 
   const handleSave = async () => {
@@ -129,10 +200,13 @@ export default function EditorPrincipal() {
          }
       }
 
+      const parsedData = JSON.parse(jsonStr);
+      parsedData.customCanvasSize = canvasSize;
+
       const payload = {
         user_id: user.id,
         title: canvasTitle,
-        data: JSON.parse(jsonStr),
+        data: parsedData,
         ...(savedThumbnailUrl && { thumbnail_url: savedThumbnailUrl })
       };
 
@@ -179,10 +253,13 @@ export default function EditorPrincipal() {
          }
       }
 
+      const parsedData = JSON.parse(jsonStr);
+      parsedData.customCanvasSize = canvasSize;
+
       const payload = {
         user_id: user.id,
         title: canvasTitle,
-        data: JSON.parse(jsonStr),
+        data: parsedData,
         ...(savedThumbnailUrl && { thumbnail_url: savedThumbnailUrl })
       };
 
@@ -199,8 +276,19 @@ export default function EditorPrincipal() {
   };
 
   const handleLoadModel = (model: any, isTemplate: boolean = false) => {
+    const loadedSize = model.data.customCanvasSize || { width: 1080, height: 1080 };
+    setCanvasSize(loadedSize);
+
     loadFromJson(model.data);
     
+    setTimeout(() => {
+      if (fabricCanvas.current) {
+        fabricCanvas.current.setDimensions(loadedSize);
+        fabricCanvas.current.renderAll();
+      }
+      setZoomLevel(calculateFitZoom(loadedSize.width, loadedSize.height));
+    }, 50);
+
     if (isTemplate) {
       setCanvasTitle(`${model.title} (Cópia)`);
       setCurrentModelId(null); 
@@ -242,7 +330,6 @@ export default function EditorPrincipal() {
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground">
       
-      {/* SIDEBAR GLOBAL DA APLICAÇÃO */}
       <Sidebar 
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)} 
@@ -250,38 +337,21 @@ export default function EditorPrincipal() {
         onTabChange={(tab: string) => {
           setActiveTab(tab);
           setSidebarOpen(false);
-          // Se precisar redirecionar ao trocar de tab no sidebar
           if (tab !== 'editor') router.push(`/${tab}`);
         }} 
       />
 
-      {/* ÁREA PRINCIPAL */}
-      <main className="flex-1 flex flex-col h-full overflow-y-auto">
-        
-        {/* HEADER GLOBAL DO DASHBOARD */}
-        {/* <header className="sticky top-0 z-30 w-full bg-card/80 backdrop-blur-md border-b border-border px-4 lg:px-8 py-4 flex items-center justify-between shadow-sm shrink-0">
-          <div className="flex items-center gap-3">
-            <button 
-              className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors" 
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Abrir menu"
-            >
-              <Menu size={20} />
-            </button>
-            <LayoutDashboard className="text-primary hidden sm:block" />
-            <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">Editor Canva63</h2>
-          </div>
-        </header> */}
-
-        {/* --- INÍCIO DO CONTEÚDO DO EDITOR --- */}
+      <main className="flex-1 flex flex-col h-full overflow-y-auto bg-slate-100">
         <div className="flex flex-col flex-1 overflow-hidden relative">
           
-          {/* BARRA SUPERIOR DE FERRAMENTAS DO EDITOR */}
           <div className="h-14 border-b bg-white flex items-center justify-between px-6 shrink-0 z-20">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text font-bold text-lg">
+              <div className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text font-bold text-lg cursor-pointer lg:hidden" onClick={() => setSidebarOpen(true)}>
+                <Menu className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="hidden lg:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text font-bold text-lg">
                 <Layers className="w-6 h-6 text-blue-600" />
-                flow63
+                Flow Design
               </div>
               <Separator orientation="vertical" className="h-6 mx-2" />
               <Input 
@@ -294,11 +364,57 @@ export default function EditorPrincipal() {
             <div className="flex items-center gap-3">
               {isSaving && <div className="text-xs text-blue-600 flex items-center gap-2 mr-2"><Loader2 className="w-3 h-3 animate-spin"/> Guardando...</div>}
               
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="text-blue-900 hover:text-blue-600 hover:bg-blue-50 font-medium">
+                    <Crop className="w-4 h-4 mr-2" />
+                    Tamanho
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-60 p-4 rounded-xl shadow-xl border-slate-200 bg-white" align="end">
+                  <h4 className="font-bold text-sm text-slate-800 mb-3">Tamanho da Arte</h4>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Largura</Label>
+                      <div className="relative">
+                        <Input 
+                          type="number" 
+                          min={100}
+                          value={canvasSize.width} 
+                          onChange={(e) => setCanvasSize(prev => ({ ...prev, width: Number(e.target.value) }))} 
+                          className="h-9 text-xs pr-6 rounded-lg border-slate-200 focus:border-blue-500 focus:ring-blue-100" 
+                        />
+                        <span className="absolute right-2 top-2.5 text-[10px] text-slate-400">px</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Altura</Label>
+                      <div className="relative">
+                        <Input 
+                          type="number" 
+                          min={100}
+                          value={canvasSize.height} 
+                          onChange={(e) => setCanvasSize(prev => ({ ...prev, height: Number(e.target.value) }))} 
+                          className="h-9 text-xs pr-6 rounded-lg border-slate-200 focus:border-blue-500 focus:ring-blue-100" 
+                        />
+                        <span className="absolute right-2 top-2.5 text-[10px] text-slate-400">px</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button className="w-full h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg" onClick={handleResizeCanvas}>
+                    Aplicar Novo Tamanho
+                  </Button>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1080})}>Post IG</Button>
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1920})}>Story</Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <Button variant="ghost" className="text-blue-900 hover:text-blue-600 hover:bg-blue-50 font-medium" onClick={handleCreateNew}>
                 Novo Design
               </Button>
               
-              {/* MENU COMPARTILHAR / EXPORTAR */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-sm font-semibold rounded-lg px-6 border-0">
@@ -343,14 +459,11 @@ export default function EditorPrincipal() {
             </div>
           </div>
 
-          {/* PAINÉIS LATERAIS E CANVAS */}
           <div className="flex flex-1 overflow-hidden">
             
-            {/* BARRA LATERAL ESQUERDA (NOVO DEGRADÊ COMBINANDO COM O BOTÃO - TEXTO/ÍCONES 100% BRANCOS) */}
             <aside className="w-[380px] bg-white border-r flex flex-col overflow-hidden shrink-0 z-10">
               <Tabs defaultValue="projetos" className="flex flex-row w-full h-full">
                 
-                {/* MENU LATERAL DEGRADÊ COM TEXTO BRANCO */}
                 <TabsList className="flex flex-col h-full w-[80px] shrink-0 bg-gradient-to-b from-blue-600 to-indigo-600 text-white justify-start py-4 gap-3 rounded-none h-auto border-none">
                   
                   <TabsTrigger value="projetos" className="group flex flex-col items-center justify-center gap-1.5 w-[68px] h-16 text-[10px] font-medium text-white data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent border-none rounded-xl transition-all hover:bg-white/10 hover:text-white">
@@ -401,16 +514,28 @@ export default function EditorPrincipal() {
                         {savedModels.map((model) => (
                           <div 
                             key={model.id} 
-                            className={`group relative cursor-pointer aspect-square bg-slate-100 rounded-xl border-2 flex flex-col justify-end overflow-hidden hover:border-blue-500 transition-all ${currentModelId === model.id ? 'border-blue-600 shadow-md' : 'border-slate-200'}`}
                             onClick={() => handleLoadModel(model, false)}
-                            style={{ backgroundImage: `url(${model.thumbnail_url || ''})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                            className="group flex flex-col gap-2 cursor-pointer"
                           >
-                            {!model.thumbnail_url && <div className="absolute inset-0 flex items-center justify-center"><Layers className="text-slate-300 w-8 h-8" /></div>}
-                            <div className="absolute inset-0 bg-gradient-to-t from-blue-950/80 via-blue-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                              <div className="flex justify-end">
-                                <Button variant="destructive" size="icon" className="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 shadow-sm" onClick={(e) => handleDeleteModel(model.id, e, 'design_models')}><Trash2 className="w-3.5 h-3.5" /></Button>
+                            <div className={`relative aspect-square bg-white rounded-xl border flex items-center justify-center overflow-hidden transition-all ${currentModelId === model.id ? 'border-blue-600 shadow-md ring-1 ring-blue-600' : 'border-slate-200 hover:border-blue-400'}`}>
+                              {model.thumbnail_url ? (
+                                <img src={model.thumbnail_url} alt={model.title} className="max-w-[80%] max-h-[80%] object-contain shadow-sm rounded-sm" />
+                              ) : (
+                                <Layers className="text-slate-300 w-8 h-8" />
+                              )}
+                              
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="destructive" size="icon" className="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 shadow-sm" onClick={(e) => handleDeleteModel(model.id, e, 'design_models')}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
                               </div>
-                              <span className="text-white text-xs font-semibold truncate drop-shadow-md px-1">{model.title}</span>
+                            </div>
+                            
+                            <div className="px-1 flex flex-col">
+                              <span className="text-xs font-bold text-slate-800 truncate">{model.title}</span>
+                              <span className="text-[10px] text-slate-500 truncate mt-0.5">
+                                {model.data?.customCanvasSize ? `${model.data.customCanvasSize.width} px × ${model.data.customCanvasSize.height} px` : '1080 px × 1080 px'}
+                              </span>
                             </div>
                           </div>
                         ))}
@@ -431,16 +556,28 @@ export default function EditorPrincipal() {
                         {templates.map((template) => (
                           <div 
                             key={template.id} 
-                            className="group relative cursor-pointer aspect-[3/4] bg-blue-50 rounded-xl border border-blue-200 flex flex-col justify-end overflow-hidden hover:border-blue-500 hover:shadow-md transition-all"
-                            onClick={() => handleLoadModel(template, true)} 
-                            style={{ backgroundImage: `url(${template.thumbnail_url || ''})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                            onClick={() => handleLoadModel(template, true)}
+                            className="group flex flex-col gap-2 cursor-pointer"
                           >
-                            {!template.thumbnail_url && <div className="absolute inset-0 flex items-center justify-center"><LayoutTemplate className="text-blue-300 w-8 h-8" /></div>}
-                            <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                              <div className="flex justify-end">
-                                <Button variant="destructive" size="icon" className="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 shadow-sm" onClick={(e) => handleDeleteModel(template.id, e, 'design_templates')}><Trash2 className="w-3.5 h-3.5" /></Button>
+                            <div className="relative aspect-square bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden transition-all hover:border-blue-400 hover:shadow-sm">
+                              {template.thumbnail_url ? (
+                                <img src={template.thumbnail_url} alt={template.title} className="max-w-[80%] max-h-[80%] object-contain shadow-sm rounded-sm" />
+                              ) : (
+                                <LayoutTemplate className="text-slate-300 w-8 h-8" />
+                              )}
+                              
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="destructive" size="icon" className="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 shadow-sm" onClick={(e) => handleDeleteModel(template.id, e, 'design_templates')}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
                               </div>
-                              <span className="text-white text-xs font-semibold truncate drop-shadow-md px-1">{template.title}</span>
+                            </div>
+                            
+                            <div className="px-1 flex flex-col">
+                              <span className="text-xs font-bold text-slate-800 truncate">{template.title}</span>
+                              <span className="text-[10px] text-slate-500 truncate mt-0.5">
+                                {template.data?.customCanvasSize ? `${template.data.customCanvasSize.width} px × ${template.data.customCanvasSize.height} px` : '1080 px × 1080 px'}
+                              </span>
                             </div>
                           </div>
                         ))}
@@ -498,20 +635,167 @@ export default function EditorPrincipal() {
               </Tabs>
             </aside>
 
-            {/* CANVAS ÁREA */}
-            <main className="flex-1 flex items-center justify-center p-8 overflow-auto bg-[#f1f2f6] relative">
-              <div className="shadow-[0_4px_24px_rgba(0,0,0,0.06)] border border-slate-200 bg-white transition-all">
-                <canvas ref={canvasRef} />
-              </div>
-            </main>
+            <div className="flex-1 relative flex flex-col bg-slate-100 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] shadow-[inset_0_4px_6px_rgba(0,0,0,0.05)] overflow-hidden">
+              
+              <main ref={workspaceRef} className="flex-1 overflow-auto p-10 relative">
+                <div className="min-w-full min-h-full flex items-center justify-center">
+                  
+                  <div 
+                    className="relative transition-all duration-200 ease-out"
+                    style={{ 
+                      width: canvasSize.width * zoomLevel, 
+                      height: canvasSize.height * zoomLevel 
+                    }}
+                  >
+                    <div 
+                      className="absolute top-0 left-0 bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] ring-1 ring-slate-300"
+                      style={{
+                        width: canvasSize.width,
+                        height: canvasSize.height,
+                        transform: `scale(${zoomLevel})`,
+                        transformOrigin: 'top left'
+                      }}
+                    >
+                      <canvas ref={canvasRef} />
+                    </div>
+                  </div>
 
-            {/* --- BARRA LATERAL DIREITA (PROPRIEDADES) --- */}
+                </div>
+
+                {/* ---------------- MENU DE CONTEXTO (Botão Direito) ---------------- */}
+                {contextMenuInfo.visible && selectedObject && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-[100]" 
+                      onClick={(e) => { e.stopPropagation(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }} 
+                      onContextMenu={(e) => { e.preventDefault(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                    />
+                    
+                    <div 
+                      className="fixed z-[101] w-48 bg-white border border-slate-200 shadow-2xl rounded-xl py-1.5 flex flex-col text-sm text-slate-700 overflow-hidden"
+                      style={{ 
+                        left: Math.min(contextMenuInfo.x, typeof window !== 'undefined' ? window.innerWidth - 200 : contextMenuInfo.x), 
+                        top: Math.min(contextMenuInfo.y, typeof window !== 'undefined' ? window.innerHeight - 250 : contextMenuInfo.y) 
+                      }}
+                    >
+                      <button 
+                        className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 w-full text-left disabled:opacity-50"
+                        disabled={(selectedObject as any).locked}
+                        onClick={() => { bringToFront(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                      >
+                        <ArrowUpToLine className="w-4 h-4 mr-3 text-slate-400" /> Trazer p/ Frente
+                      </button>
+                      <button 
+                        className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 w-full text-left disabled:opacity-50"
+                        disabled={(selectedObject as any).locked}
+                        onClick={() => { sendToBack(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                      >
+                        <ArrowDownToLine className="w-4 h-4 mr-3 text-slate-400" /> Enviar p/ Trás
+                      </button>
+                      
+                      <Separator className="my-1.5" />
+                      
+                      <button 
+                        className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 w-full text-left disabled:opacity-50"
+                        disabled={(selectedObject as any).locked}
+                        onClick={() => { centerObject(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                      >
+                        <Maximize className="w-4 h-4 mr-3 text-slate-400" /> Centralizar
+                      </button>
+
+                      {selectedObject.type === 'image' && (selectedObject as any).isFrame && (
+                        <button 
+                          className="flex items-center px-4 py-2 hover:bg-blue-50 hover:text-blue-700 w-full text-left disabled:opacity-50"
+                          disabled={(selectedObject as any).locked}
+                          onClick={() => { detachImageFromFrame(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                        >
+                          <Unlink className="w-4 h-4 mr-3 text-slate-400" /> Desanexar Moldura
+                        </button>
+                      )}
+
+                      <Separator className="my-1.5" />
+
+                      <button 
+                        className="flex items-center px-4 py-2 hover:bg-slate-50 hover:text-slate-900 w-full text-left"
+                        onClick={() => { toggleLock(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                      >
+                        {(selectedObject as any).locked ? (
+                          <><LockOpen className="w-4 h-4 mr-3 text-slate-400" /> Destravar Item</>
+                        ) : (
+                          <><Lock className="w-4 h-4 mr-3 text-slate-400" /> Travar Item</>
+                        )}
+                      </button>
+
+                      <button 
+                        className="flex items-center px-4 py-2 hover:bg-red-50 text-red-600 w-full text-left disabled:opacity-50"
+                        disabled={(selectedObject as any).locked}
+                        onClick={() => { deleteSelected(); setContextMenuInfo({ ...contextMenuInfo, visible: false }); }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-3 text-red-500" /> Excluir
+                      </button>
+                    </div>
+                  </>
+                )}
+                {/* ------------------------------------------------------------------ */}
+              </main>
+
+              <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-white p-1.5 rounded-xl shadow-lg border border-slate-200 z-10">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-blue-600 hover:bg-blue-50" onClick={handleZoomOut} title="Diminuir Zoom">
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <div className="w-14 text-center text-xs font-semibold text-slate-600 select-none">
+                  {Math.round(zoomLevel * 100)}%
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-blue-600 hover:bg-blue-50" onClick={handleZoomIn} title="Aumentar Zoom">
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Separator orientation="vertical" className="h-5 mx-1" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-blue-600 hover:bg-blue-50" onClick={handleResetZoom} title="Centralizar Visualização">
+                  <Focus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
             <aside className="w-80 bg-white border-l p-5 flex flex-col gap-6 overflow-y-auto shrink-0 z-10 shadow-[inset_-10px_0_15px_-10px_rgba(0,0,0,0.05)]">
               {selectedObject ? (
                 <>
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-sm text-slate-800">Propriedades</h3>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg" onClick={deleteSelected}><Trash2 className="w-4 h-4" /></Button>
+                    <div className="flex items-center gap-1">
+                      
+                      {selectedObject.type === 'image' && (selectedObject as any).isFrame && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg disabled:opacity-50" 
+                          onClick={detachImageFromFrame}
+                          disabled={(selectedObject as any).locked}
+                          title="Desanexar Imagem da Moldura"
+                        >
+                          <Unlink className="w-4 h-4" />
+                        </Button>
+                      )}
+
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className={`h-8 w-8 rounded-lg ${ (selectedObject as any).locked ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700' }`} 
+                        onClick={toggleLock}
+                        title={(selectedObject as any).locked ? "Destravar Objeto" : "Travar Objeto"}
+                      >
+                        {(selectedObject as any).locked ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
+                      </Button>
+                      
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg disabled:opacity-50" 
+                        onClick={deleteSelected}
+                        disabled={(selectedObject as any).locked}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   {(selectedObject as any).isFrame && selectedObject.type !== 'image' && (
@@ -521,10 +805,10 @@ export default function EditorPrincipal() {
                     </div>
                   )}
 
-                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                  <div className={`bg-blue-50 p-4 rounded-xl border border-blue-100 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="flex items-center gap-2 mb-3 text-blue-600"><Wand2 className="w-4 h-4" /><span className="text-[10px] font-bold uppercase tracking-widest">Magic Fill (CRM)</span></div>
                     <Label className="text-[10px] mb-2 block text-blue-800 font-semibold">Preencher automaticamente com:</Label>
-                    <Select value={(selectedObject as any).variableId || 'none'} onValueChange={(val) => updateProperty('variableId', val === 'none' ? null : val)}>
+                    <Select value={(selectedObject as any).variableId || 'none'} onValueChange={(val) => updateProperty('variableId', val === 'none' ? null : val)} disabled={(selectedObject as any).locked}>
                       <SelectTrigger className="h-9 text-xs bg-white border-blue-200 focus:ring-blue-200 rounded-lg"><SelectValue placeholder="Escolha um campo" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Estático (Nenhum)</SelectItem>
@@ -539,22 +823,22 @@ export default function EditorPrincipal() {
                   <Separator className="bg-slate-100" />
 
                   {(selectedObject.type === 'image' || ((selectedObject as any).isFrame && (selectedObject as any).frameType === 'rect') || selectedObject.type === 'rect') && (
-                    <div className="space-y-6">
+                    <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                       {selectedObject.type !== 'circle' && (
                         <div className="space-y-3">
                           <Label className="text-xs font-semibold text-slate-800">Arredondar Cantos (px)</Label>
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" disabled={(selectedObject as any).locked} /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" disabled={(selectedObject as any).locked} /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" disabled={(selectedObject as any).locked} /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" disabled={(selectedObject as any).locked} /></div>
                           </div>
                         </div>
                       )}
 
                       <div className="space-y-3">
                         <div className="flex items-center justify-between"><Label className="text-xs font-semibold text-slate-800">Transparência</Label><span className="text-xs text-slate-500 font-medium">{Math.round((selectedObject.opacity || 1) * 100)}%</span></div>
-                        <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" />
+                        <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" disabled={(selectedObject as any).locked} />
                       </div>
                     </div>
                   )}
@@ -562,11 +846,11 @@ export default function EditorPrincipal() {
                   {selectedObject.type === 'image' && (
                     <>
                       <Separator className="bg-slate-100" />
-                      <div className="space-y-3">
+                      <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                         <Label className="text-xs font-semibold text-slate-800">Inverter Imagem</Label>
                         <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipX ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipX}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
-                          <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipY ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipY}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
+                          <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipX ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipX} disabled={(selectedObject as any).locked}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
+                          <Button variant="outline" size="sm" className={`rounded-lg ${selectedObject.flipY ? 'border-blue-600 text-blue-700 bg-blue-50' : 'text-slate-600'}`} onClick={toggleFlipY} disabled={(selectedObject as any).locked}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
                         </div>
                       </div>
                     </>
@@ -575,11 +859,11 @@ export default function EditorPrincipal() {
                   {['i-text', 'text', 'rect', 'circle', 'triangle', 'line'].includes(selectedObject.type) && !(selectedObject as any).isFrame && (
                     <>
                       <Separator className="bg-slate-100" />
-                      <div className="space-y-3">
+                      <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                         <Label className="text-xs font-semibold text-slate-800">Cor Principal</Label>
                         <div className="flex gap-3">
                           <div className="w-10 h-10 rounded-lg shadow-sm shrink-0 border border-slate-200" style={{ backgroundColor: (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string }} />
-                          <Input type="color" className="w-full h-10 p-1 cursor-pointer rounded-lg border-slate-200" value={(selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string} onChange={(e) => updateProperty(selectedObject.type === 'line' ? 'stroke' : 'fill', e.target.value)} />
+                          <Input type="color" className="w-full h-10 p-1 cursor-pointer rounded-lg border-slate-200" value={(selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string} onChange={(e) => updateProperty(selectedObject.type === 'line' ? 'stroke' : 'fill', e.target.value)} disabled={(selectedObject as any).locked} />
                         </div>
                       </div>
                     </>
@@ -587,32 +871,32 @@ export default function EditorPrincipal() {
 
                   <Separator className="bg-slate-100" />
 
-                  <div className="space-y-3">
+                  <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                     <Label className="text-xs font-semibold text-slate-800">Alinhamento e Camadas</Label>
                     <div className="grid grid-cols-3 gap-2">
-                      <Button variant="outline" size="sm" className="rounded-lg text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50" onClick={centerObject} title="Centralizar"><Maximize className="w-4 h-4" /></Button>
-                      <Button variant="outline" size="sm" className="rounded-lg text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50" onClick={bringToFront} title="Mover para frente"><ArrowUpToLine className="w-4 h-4" /></Button>
-                      <Button variant="outline" size="sm" className="rounded-lg text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50" onClick={sendToBack} title="Mover para trás"><ArrowDownToLine className="w-4 h-4" /></Button>
+                      <Button variant="outline" size="sm" className="rounded-lg text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50" onClick={centerObject} title="Centralizar" disabled={(selectedObject as any).locked}><Maximize className="w-4 h-4" /></Button>
+                      <Button variant="outline" size="sm" className="rounded-lg text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50" onClick={bringToFront} title="Mover para frente" disabled={(selectedObject as any).locked}><ArrowUpToLine className="w-4 h-4" /></Button>
+                      <Button variant="outline" size="sm" className="rounded-lg text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50" onClick={sendToBack} title="Mover para trás" disabled={(selectedObject as any).locked}><ArrowDownToLine className="w-4 h-4" /></Button>
                     </div>
                   </div>
 
                   {(selectedObject.type === 'i-text' || selectedObject.type === 'text') && (
                     <>
                       <Separator className="bg-slate-100" />
-                      <div className="space-y-5">
+                      <div className={`space-y-5 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                         <div className="space-y-3">
                           <Label className="text-xs font-semibold text-slate-800">Conteúdo do Texto</Label>
-                          <Input value={(selectedObject as any).text} onChange={(e) => updateProperty('text', e.target.value)} className="text-sm rounded-lg border-slate-200 focus:border-blue-400 focus:ring-blue-100" />
+                          <Input value={(selectedObject as any).text} onChange={(e) => updateProperty('text', e.target.value)} className="text-sm rounded-lg border-slate-200 focus:border-blue-400 focus:ring-blue-100" disabled={(selectedObject as any).locked} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-3">
                             <Label className="text-xs font-semibold text-slate-800">Tamanho</Label>
-                            <Input type="number" value={Math.round((selectedObject as any).fontSize)} onChange={(e) => updateProperty('fontSize', parseInt(e.target.value))} className="rounded-lg border-slate-200 focus:border-blue-400 focus:ring-blue-100" />
+                            <Input type="number" value={Math.round((selectedObject as any).fontSize)} onChange={(e) => updateProperty('fontSize', parseInt(e.target.value))} className="rounded-lg border-slate-200 focus:border-blue-400 focus:ring-blue-100" disabled={(selectedObject as any).locked} />
                           </div>
                         </div>
                         <div className="space-y-3">
                           <Label className="text-xs font-semibold text-slate-800">Fonte</Label>
-                          <Select value={(selectedObject as any).fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)}>
+                          <Select value={(selectedObject as any).fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)} disabled={(selectedObject as any).locked}>
                             <SelectTrigger className="text-sm rounded-lg border-slate-200 focus:ring-blue-100"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Arial">Arial</SelectItem>
