@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFabricEditor } from '@/hooks/use-fabric-editor';
 import { ImageUploads } from '@/components/central63/editor/ImageUploads';
+import { MagicFill } from '@/components/central63/editor/MagicFill';
 import { supabase } from '@/lib/supabase';
 import { Sidebar } from '@/components/central63/sidebar';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,6 @@ export default function EditorPrincipal() {
     isPanMode, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop,
     changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, 
     setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient,
-    // NOVAS FUNÇÕES DE HISTÓRICO
     undo, redo, canUndo, canRedo
   } = useFabricEditor();
 
@@ -332,6 +332,20 @@ export default function EditorPrincipal() {
     link.click();
     toast.success('Download iniciado!');
   };
+
+  // PROXY PARA O MAGIC FILL:
+  // Finge que o objeto selecionado NUNCA está "locked", garantindo que o 
+  // componente interno MagicFill não desative suas funções acidentalmente.
+  const activeItemForMagicFill = selectedObject ? new Proxy(selectedObject, {
+    get(target: any, prop: string | symbol) {
+      if (prop === 'locked') return false; // Força a liberação
+      const value = target[prop];
+      if (typeof value === 'function') {
+        return value.bind(target);
+      }
+      return value;
+    }
+  }) : null;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground">
@@ -823,7 +837,7 @@ export default function EditorPrincipal() {
               </div>
             </div>
 
-            <aside className="w-80 bg-white border-l p-5 flex flex-col gap-6 overflow-y-auto shrink-0 z-10 shadow-[inset_-10px_0_15px_-10px_rgba(0,0,0,0.05)]">
+            <aside className="w-100 bg-white border-l p-5 flex flex-col gap-6 overflow-y-auto shrink-0 z-10 shadow-[inset_-10px_0_15px_-10px_rgba(0,0,0,0.05)]">
               
               {cropBox ? (
                 <div className="flex flex-col gap-4 bg-blue-50 p-5 rounded-xl border border-blue-200 shadow-sm animate-in slide-in-from-right-4">
@@ -907,26 +921,18 @@ export default function EditorPrincipal() {
                     </div>
                   )}
 
-                  <div className={`bg-blue-50 p-4 rounded-xl border border-blue-100 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <div className="flex items-center gap-2 mb-3 text-blue-600"><Wand2 className="w-4 h-4" /><span className="text-[10px] font-bold uppercase tracking-widest">Magic Fill (CRM)</span></div>
-                    <Label className="text-[10px] mb-2 block text-blue-800 font-semibold">Preencher automaticamente com:</Label>
-                    <Select value={(selectedObject as any).variableId || 'none'} onValueChange={(val) => updateProperty('variableId', val === 'none' ? null : val)} disabled={(selectedObject as any).locked}>
-                      <SelectTrigger className="h-9 text-xs bg-white border-blue-200 focus:ring-blue-200 rounded-lg"><SelectValue placeholder="Escolha um campo" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Estático (Nenhum)</SelectItem>
-                        <SelectItem value="valor_imovel">Preço do Imóvel</SelectItem>
-                        <SelectItem value="endereco_imovel">Endereço Completo</SelectItem>
-                        <SelectItem value="nome_corretor">Nome do Corretor</SelectItem>
-                        <SelectItem value="foto_principal">Foto Principal (Imóvel)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* AQUI ESTÁ O AJUSTE: Passamos o objeto com a propriedade locked false */}
+                  <MagicFill 
+                    selectedObject={activeItemForMagicFill} 
+                    onUpdate={updateProperty} 
+                    onInjectImage={(url) => addImage(url)} 
+                  />
 
                   <Separator className="bg-slate-100" />
 
-                  {/* PROPRIEDADES DE TEXTO - NOVO PAINEL */}
+                  {/* PROPRIEDADES DE TEXTO */}
                   {(selectedObject.type === 'i-text' || selectedObject.type === 'text') && (
-                    <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="space-y-6">
                       
                       {/* Cor e Tamanho da Fonte */}
                       <div className="space-y-3">
@@ -983,7 +989,6 @@ export default function EditorPrincipal() {
                               value={Math.round(selectedObject.fontSize || 24)} 
                               onChange={(e) => setFontSize(parseInt(e.target.value))} 
                               className="pl-9 rounded-lg border-slate-200 focus:border-blue-400 focus:ring-blue-100" 
-                              disabled={(selectedObject as any).locked}
                             />
                           </div>
                         </div>
@@ -1087,7 +1092,7 @@ export default function EditorPrincipal() {
                       
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Fonte</Label>
-                        <Select value={(selectedObject as any).fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)} disabled={(selectedObject as any).locked}>
+                        <Select value={(selectedObject as any).fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)}>
                           <SelectTrigger className="text-sm rounded-lg border-slate-200 focus:ring-blue-100"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Arial">Arial</SelectItem>
@@ -1100,9 +1105,9 @@ export default function EditorPrincipal() {
                     </div>
                   )}
 
-                  {/* PROPRIEDADES DE FORMAS E MOLDURAS (Adicionado Seletor de degradê) */}
+                  {/* PROPRIEDADES DE FORMAS E MOLDURAS (Sem Trava de Conteúdo) */}
                   {(selectedObject.type === 'rect' || selectedObject.type === 'circle' || selectedObject.type === 'triangle' || selectedObject.type === 'line') && (
-                    <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="space-y-6">
                       
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Cor da Forma</Label>
@@ -1157,34 +1162,49 @@ export default function EditorPrincipal() {
                         <div className="space-y-3">
                           <Label className="text-xs font-semibold text-slate-800">Arredondar Cantos (px)</Label>
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" disabled={(selectedObject as any).locked} /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" disabled={(selectedObject as any).locked} /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" disabled={(selectedObject as any).locked} /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" disabled={(selectedObject as any).locked} /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
                           </div>
                         </div>
                       )}
 
                       <div className="space-y-3">
                         <div className="flex items-center justify-between"><Label className="text-xs font-semibold text-slate-800">Transparência</Label><span className="text-xs text-slate-500 font-medium">{Math.round((selectedObject.opacity || 1) * 100)}%</span></div>
-                        <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" disabled={(selectedObject as any).locked} />
+                        <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" />
                       </div>
                     </div>
                   )}
 
-                  {/* PROPRIEDADES DE IMAGENS */}
+                  {/* PROPRIEDADES DE IMAGENS (Agora com Arredondamento e Sem Trava) */}
                   {selectedObject.type === 'image' && (
-                    <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="space-y-6">
+                      
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-slate-800">Arredondar Cantos (px)</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                        </div>
+                      </div>
+
+                      <Separator className="bg-slate-100" />
+
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Transparência</Label>
-                        <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" disabled={(selectedObject as any).locked} />
+                        <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" />
                       </div>
+
                       <Separator className="bg-slate-100" />
+                      
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Inverter</Label>
                         <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" size="sm" className={selectedObject.flipX ? 'border-blue-600 bg-blue-50' : ''} onClick={toggleFlipX} disabled={(selectedObject as any).locked}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
-                          <Button variant="outline" size="sm" className={selectedObject.flipY ? 'border-blue-600 bg-blue-50' : ''} onClick={toggleFlipY} disabled={(selectedObject as any).locked}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
+                          <Button variant="outline" size="sm" className={selectedObject.flipX ? 'border-blue-600 bg-blue-50' : ''} onClick={toggleFlipX}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
+                          <Button variant="outline" size="sm" className={selectedObject.flipY ? 'border-blue-600 bg-blue-50' : ''} onClick={toggleFlipY}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
                         </div>
                       </div>
                     </div>
@@ -1192,7 +1212,7 @@ export default function EditorPrincipal() {
 
                   <Separator className="bg-slate-100" />
 
-                  {/* ALINHAMENTO GLOBAL */}
+                  {/* ALINHAMENTO GLOBAL (Este manteve a trava para não bagunçar posições) */}
                   <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                     <Label className="text-xs font-semibold text-slate-800">Alinhamento e Camadas</Label>
                     <div className="grid grid-cols-3 gap-2">

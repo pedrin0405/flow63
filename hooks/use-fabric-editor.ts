@@ -308,16 +308,18 @@ export const useFabricEditor = () => {
     const isLocked = (frame as any).locked;
     const zIndex = fabricCanvas.current.getObjects().indexOf(frame);
 
-    const frameWidth = frame.width! * (frame.scaleX || 1);
-    const frameHeight = frame.height! * (frame.scaleY || 1);
+    const frameWidth = frame.getScaledWidth();
+    const frameHeight = frame.getScaledHeight();
 
     const scaleX = frameWidth / img.width!;
     const scaleY = frameHeight / img.height!;
     const scale = Math.max(scaleX, scaleY);
 
+    const centerPoint = frame.getCenterPoint();
+
     img.set({ 
       originX: 'center', originY: 'center', 
-      left: frame.left, top: frame.top, 
+      left: centerPoint.x, top: centerPoint.y, 
       scaleX: scale, scaleY: scale, angle: frame.angle 
     });
 
@@ -398,8 +400,9 @@ export const useFabricEditor = () => {
         const cosA = Math.cos(angleRad);
         const sinA = Math.sin(angleRad);
 
-        const dx = absX - img.left!;
-        const dy = absY - img.top!;
+        const imgCenter = img.getCenterPoint();
+        const dx = absX - imgCenter.x;
+        const dy = absY - imgCenter.y;
 
         const relX = dx * cosA - dy * sinA;
         const relY = dx * sinA + dy * cosA;
@@ -579,7 +582,6 @@ export const useFabricEditor = () => {
     let fontSize = 30;
     let fontWeight: string | number = 'normal';
 
-    // Ajusta o tamanho e peso da fonte baseado no botão clicado
     const lowerContent = content.toLowerCase();
     if (lowerContent.includes('subtítulo')) {
       fontSize = 55;
@@ -704,10 +706,69 @@ export const useFabricEditor = () => {
 
     try {
       const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
+      const activeObject = fabricCanvas.current.getActiveObject();
 
-      if (selectedObject && (selectedObject as any).isFrame && selectedObject.type !== 'image') {
-        attachImageToFrame(img, selectedObject);
+      // CASO 1: Existe algo selecionado que é uma MOLDURA
+      if (activeObject && (activeObject as any).isFrame) {
+        
+        if (activeObject.type === 'image') {
+          // CORREÇÃO MÁGICA: Em vez de pegar a origem errada, calculamos a origem 
+          // a partir da máscara (clipPath) que dita a posição física da moldura
+          const clipPath = activeObject.clipPath;
+          const imgCenter = activeObject.getCenterPoint();
+          
+          let frameAbsX = imgCenter.x;
+          let frameAbsY = imgCenter.y;
+          let frameAngle = activeObject.angle || 0;
+          
+          if (clipPath) {
+             const angleRad = (activeObject.angle || 0) * Math.PI / 180;
+             const cosA = Math.cos(angleRad);
+             const sinA = Math.sin(angleRad);
+             const relX = (clipPath.left || 0) * (activeObject.scaleX || 1);
+             const relY = (clipPath.top || 0) * (activeObject.scaleY || 1);
+             
+             frameAbsX = imgCenter.x + relX * cosA - relY * sinA;
+             frameAbsY = imgCenter.y + relX * sinA + relY * cosA;
+             frameAngle = (activeObject.angle || 0) + (clipPath.angle || 0);
+          }
+
+          const frameData = {
+            width: (activeObject as any)._origFrameW || activeObject.width,
+            height: (activeObject as any)._origFrameH || activeObject.height,
+            scaleX: (activeObject as any)._origFrameScaleX || activeObject.scaleX,
+            scaleY: (activeObject as any)._origFrameScaleY || activeObject.scaleY,
+            left: frameAbsX,
+            top: frameAbsY,
+            angle: frameAngle,
+            originX: 'center', 
+            originY: 'center',
+            frameType: (activeObject as any).frameType,
+            customRadii: (activeObject as any).customRadii,
+            variableId: (activeObject as any).variableId,
+            locked: (activeObject as any).locked
+          };
+
+          fabricCanvas.current.remove(activeObject);
+          
+          const tempFrame = new fabric.Rect({
+             ...frameData,
+             visible: false
+          });
+          (tempFrame as any).isFrame = true;
+          (tempFrame as any).frameType = frameData.frameType;
+          (tempFrame as any).customRadii = frameData.customRadii;
+          (tempFrame as any).variableId = frameData.variableId;
+          (tempFrame as any).locked = frameData.locked;
+
+          attachImageToFrame(img, tempFrame);
+          toast.success('Imagem substituída com sucesso!');
+        } 
+        else {
+          attachImageToFrame(img, activeObject);
+        }
       } 
+      // CASO 2: Normal, Nenhuma moldura selecionada
       else {
         img.scaleToWidth(200);
         img.set({ originX: 'center', originY: 'center' });
@@ -736,6 +797,7 @@ export const useFabricEditor = () => {
       forceUpdate();
     } catch (error) {
       console.error("Erro ao carregar imagem no Fabric:", error);
+      toast.error("Erro ao carregar a imagem.");
     }
   };
 
@@ -759,6 +821,20 @@ export const useFabricEditor = () => {
     const frameScaleX = (img as any)._origFrameScaleX || 1;
     const frameScaleY = (img as any)._origFrameScaleY || 1;
     
+    const centerPoint = img.getCenterPoint();
+    
+    // CORREÇÃO MÁGICA 2: Calcula a posição e ângulo absoluto da moldura (clipPath)
+    // na tela, desconsiderando onde a imagem real foi parar no "pan mode".
+    const angleRad = (img.angle || 0) * Math.PI / 180;
+    const cosA = Math.cos(angleRad);
+    const sinA = Math.sin(angleRad);
+    const relX = (clipPath.left || 0) * (img.scaleX || 1);
+    const relY = (clipPath.top || 0) * (img.scaleY || 1);
+    
+    const frameAbsX = centerPoint.x + relX * cosA - relY * sinA;
+    const frameAbsY = centerPoint.y + relX * sinA + relY * cosA;
+    const frameAngle = (img.angle || 0) + (clipPath.angle || 0);
+    
     let frameObj: fabric.FabricObject;
 
     if (frameType === 'circle') {
@@ -766,7 +842,7 @@ export const useFabricEditor = () => {
         radius: frameW / 2,
         fill: '#f1f5f9', stroke: '#cbd5e1', strokeWidth: 2, strokeDashArray: [8, 8],
         originX: 'center', originY: 'center',
-        left: img.left, top: img.top, angle: img.angle,
+        left: frameAbsX, top: frameAbsY, angle: frameAngle,
         scaleX: frameScaleX, scaleY: frameScaleY
       });
     } else {
@@ -774,7 +850,7 @@ export const useFabricEditor = () => {
         width: frameW, height: frameH,
         fill: '#f1f5f9', stroke: '#cbd5e1', strokeWidth: 2, strokeDashArray: [8, 8],
         originX: 'center', originY: 'center',
-        left: img.left, top: img.top, angle: img.angle,
+        left: frameAbsX, top: frameAbsY, angle: frameAngle,
         rx: customRadii?.tl || 16, ry: customRadii?.tl || 16,
         scaleX: frameScaleX, scaleY: frameScaleY
       });
@@ -868,8 +944,9 @@ export const useFabricEditor = () => {
          const relX = clipPath.left! * (img.scaleX || 1);
          const relY = clipPath.top! * (img.scaleY || 1);
          
-         const absX = img.left! + relX * cosA - relY * sinA;
-         const absY = img.top! + relX * sinA + relY * cosA;
+         const imgCenter = img.getCenterPoint();
+         const absX = imgCenter.x + relX * cosA - relY * sinA;
+         const absY = imgCenter.y + relX * sinA + relY * cosA;
          
          const fixedScaleX = (clipPath.scaleX || 1) * (img.scaleX || 1);
          const fixedScaleY = (clipPath.scaleY || 1) * (img.scaleY || 1);
@@ -944,13 +1021,16 @@ export const useFabricEditor = () => {
        return;
     }
 
+    const imgCenter = img.getCenterPoint();
+
     const rect = new fabric.Rect({
-       left: img.left,
-       top: img.top,
+       left: imgCenter.x,
+       top: imgCenter.y,
        width: img.getScaledWidth(),
        height: img.getScaledHeight(),
        originX: 'center',
        originY: 'center',
+       angle: img.angle,
        fill: 'rgba(0,0,0,0.5)',
        stroke: '#3b82f6',
        strokeWidth: 2,
@@ -975,8 +1055,11 @@ export const useFabricEditor = () => {
     if (!fabricCanvas.current || !cropBox) return;
     const img = (cropBox as any).targetImg as fabric.FabricImage;
 
-    const diffX = cropBox.left! - img.left!;
-    const diffY = cropBox.top! - img.top!;
+    const imgCenter = img.getCenterPoint();
+    const cropCenter = cropBox.getCenterPoint();
+
+    const diffX = cropCenter.x - imgCenter.x;
+    const diffY = cropCenter.y - imgCenter.y;
     const angleDiff = (cropBox.angle || 0) - (img.angle || 0);
 
     const angleRad = -(img.angle || 0) * Math.PI / 180;
