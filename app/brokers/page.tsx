@@ -18,8 +18,10 @@ export default function CorretoresPage() {
   // Estados de Dados e Paginação
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const [allCities, setAllCities] = useState<string[]>([]) // Estado para armazenar as cidades
-  const itemsPerPage = 8
+  const [allCities, setAllCities] = useState<string[]>([])
+  
+  // Alterado para 10 para coincidir com o "itemsPerPage = 10" do broker-list.tsx
+  const itemsPerPage = 10
 
   const [filters, setFilters] = useState({
     search: "",
@@ -31,16 +33,14 @@ export default function CorretoresPage() {
   useEffect(() => {
     const fetchCities = async () => {
       try {
-        const [pmwRes, auxRes] = await Promise.all([
-          supabase.from('corretores_pmw').select('cidade_origem'),
-          supabase.from('corretores_aux').select('cidade_origem')
-        ])
+        // Agora busca diretamente da view unificada
+        const { data, error } = await supabase
+          .from('todos_corretores')
+          .select('cidade_origem')
         
-        const citiesSet = new Set([
-          ...(pmwRes.data || []).map(b => b.cidade_origem),
-          ...(auxRes.data || []).map(b => b.cidade_origem)
-        ].filter(Boolean))
-        
+        if (error) throw error
+
+        const citiesSet = new Set((data || []).map(b => b.cidade_origem).filter(Boolean))
         setAllCities(Array.from(citiesSet).sort())
       } catch (error) {
         console.error("Erro ao carregar cidades:", error)
@@ -55,38 +55,32 @@ export default function CorretoresPage() {
     try {
       const from = (currentPage - 1) * itemsPerPage
       const to = from + itemsPerPage - 1
-      const colunas = 'id, nome, cidade_origem, desativado, imagem_url, unidade, departamento, data_nascimento'
+      const colunas = 'id, nome, cidade_origem, desativado, imagem_url, unidade, departamento, data_nascimento, origem'
 
-      const applyFilters = (tableName: string) => {
-        let query = supabase.from(tableName).select(colunas, { count: 'exact' })
-        
-        // Pesquisa direta no banco para economizar Egress
-        if (filters.search) {
-          query = query.or(`nome.ilike.%${filters.search}%,unidade.ilike.%${filters.search}%`)
-        }
-        if (filters.city !== "all") {
-          query = query.eq('cidade_origem', filters.city)
-        }
-        if (filters.status !== "all") {
-          query = query.eq('desativado', filters.status === "inactive")
-        }
-        
-        return query.order('nome').range(from, to)
-      }
-
-      const [pmwRes, auxRes] = await Promise.all([
-        applyFilters('corretores_pmw'),
-        applyFilters('corretores_aux')
-      ])
-
-      if (pmwRes.error) throw pmwRes.error
-      if (auxRes.error) throw auxRes.error
-
-      // Combina e garante que apenas 8 registros sejam processados por página
-      const combined = [...(pmwRes.data || []), ...(auxRes.data || [])].slice(0, 8)
+      // Consulta a View que une as tabelas PMW e AUX
+      let query = supabase
+        .from('todos_corretores')
+        .select(colunas, { count: 'exact' })
       
-      setBrokers(combined as Broker[])
-      setTotalCount((pmwRes.count || 0) + (auxRes.count || 0))
+      // Aplica os filtros
+      if (filters.search) {
+        query = query.or(`nome.ilike.%${filters.search}%,unidade.ilike.%${filters.search}%`)
+      }
+      if (filters.city !== "all") {
+        query = query.eq('cidade_origem', filters.city)
+      }
+      if (filters.status !== "all") {
+        // A view converte o campo para boolean, então essa validação funcionará perfeitamente
+        query = query.eq('desativado', filters.status === "inactive")
+      }
+      
+      // Aplica a ordem e a paginação unificada diretamente no banco
+      const { data, count, error } = await query.order('nome').range(from, to)
+
+      if (error) throw error
+
+      setBrokers(data as Broker[])
+      setTotalCount(count || 0)
 
     } catch (error: any) {
       toast({ 
@@ -132,7 +126,7 @@ export default function CorretoresPage() {
               onPageChange={setCurrentPage}
               filters={filters}
               setFilters={setFilters}
-              cities={allCities} // Propriedade cities enviada corretamente agora
+              cities={allCities}
             />
           </div>
         </main>
