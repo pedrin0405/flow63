@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useFabricEditor } from '@/hooks/use-fabric-editor';
+import React, { useState, useEffect, useRef, Suspense, useCallback, useMemo } from 'react';
+import { Artboard } from '@/components/central63/editor/Artboard';
 import { ImageUploads } from '@/components/central63/editor/ImageUploads';
 import { MagicFill } from '@/components/central63/editor/MagicFill';
 import { supabase } from '@/lib/supabase';
@@ -26,21 +26,32 @@ import {
   CornerUpLeft, CornerUpRight, CornerDownLeft, CornerDownRight, Loader2, Share, Menu, Crop,
   ZoomIn, ZoomOut, Focus, LockOpen, Unlink, Move, Scissors, Check, X,
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ArrowRightToLine, Type, Paintbrush, Undo2, Redo2
+  List, ArrowRightToLine, Type, Paintbrush, Undo2, Redo2, Plus, Copy, ChevronUp, ChevronDown, Files
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
+import { cn } from '../../lib/utils';
+import Loading from '../loading';
 
-export default function EditorPrincipal() {
+interface ArtboardData {
+  id: string;
+  title: string;
+  width: number;
+  height: number;
+  data?: any;
+}
+
+function SupportContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [canvasTitle, setCanvasTitle] = useState('Nova Arte Sem Título');
   const [isSaving, setIsSaving] = useState(false);
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('editor'); 
-  const [canvasSize, setCanvasSize] = useState({ width: 1080, height: 1080 });
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(0.6);
 
   const workspaceRef = useRef<HTMLElement>(null);
 
@@ -51,17 +62,161 @@ export default function EditorPrincipal() {
 
   const [gradColor1, setGradColor1] = useState('#3b82f6');
   const [gradColor2, setGradColor2] = useState('#1d4ed8');
-  
+
+  // Gatilho para forçar re-renderização da página quando o Fabric altera objetos
+  const [, setUpdateTrigger] = useState(0);
+  const forceUpdatePage = () => setUpdateTrigger(prev => prev + 1);
+
+  // ESTADO DE MÚLTIPLAS PRANCHETAS
+  const [artboards, setArtboards] = useState<ArtboardData[]>([
+    { id: uuidv4(), title: 'Prancheta 1', width: 1080, height: 1080 }
+  ]);
+  const [activeArtboardId, setActiveArtboardId] = useState<string>(artboards[0].id);
+  const artboardsMethods = useRef<Record<string, any>>({});
+  const [activeEditor, setActiveEditor] = useState<any>(null);
+
+  // Destruturação segura dos métodos do editor ativo
   const {
-    canvasRef, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas,
-    deleteSelected, setCornerRadii, toggleFlipX, toggleFlipY,
-    setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, selectedObject, fabricCanvas,
-    contextMenuInfo, setContextMenuInfo,
-    isPanMode, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop,
-    changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, 
-    setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient,
-    undo, redo, canUndo, canRedo
-  } = useFabricEditor();
+    addText = () => {}, 
+    addImage = () => {}, 
+    addShape = () => {}, 
+    addFrame = () => {}, 
+    detachImageFromFrame = () => {}, 
+    exportToImage = () => '', 
+    saveToJson = () => '', 
+    clearCanvas = () => {}, 
+    deleteSelected = () => {},
+    setCornerRadii = () => {}, 
+    toggleFlipX = () => {}, 
+    toggleFlipY = () => {}, 
+    setImageOpacity = () => {}, 
+    centerObject = () => {}, 
+    bringToFront = () => {}, 
+    sendToBack = () => {}, 
+    toggleLock = () => {}, 
+    selectedObject = null, 
+    fabricCanvas = { current: null }, 
+    contextMenuInfo = { visible: false, x: 0, y: 0 }, 
+    setContextMenuInfo = () => {},
+    isPanMode = false, 
+    togglePanMode = () => {}, 
+    cropBox = null, 
+    startCrop = () => {}, 
+    applyCrop = () => {}, 
+    cancelCrop = () => {}, 
+    removeCrop = () => {},
+    changeTextColor = () => {}, 
+    toggleBold = () => {}, 
+    toggleItalic = () => {}, 
+    toggleUnderline = () => {}, 
+    toggleLinethrough = () => {}, 
+    setFontSize = () => {}, 
+    setTextAlignment = () => {}, 
+    toggleList = () => {}, 
+    setLineHeight = () => {}, 
+    setTextIndent = () => {}, 
+    applyGradient = () => {},
+    undo = () => {}, 
+    redo = () => {}, 
+    canUndo = false, 
+    canRedo = false,
+    setCanvasProperty = (key: string, val: any) => {},
+    changeCount = 0
+  } = activeEditor || {};
+
+  const handleRegisterMethods = useCallback((id: string, methods: any) => {
+    artboardsMethods.current[id] = methods;
+    if (id === activeArtboardId) {
+      setActiveEditor(methods);
+    }
+  }, [activeArtboardId]);
+
+  const handleSelectArtboard = useCallback((id: string, methods: any) => {
+    setActiveArtboardId(id);
+    // Forçamos uma nova referência do objeto de métodos para que o React 
+    // perceba a mudança e atualize a barra lateral e painéis.
+    setActiveEditor({ ...methods }); 
+    setUpdateTrigger(prev => prev + 1);
+  }, []);
+
+  const updateProperty = (key: string, value: any) => {
+    if (setCanvasProperty && typeof setCanvasProperty === 'function' && activeEditor) {
+      setCanvasProperty(key, value);
+    } else if (selectedObject && fabricCanvas.current) {
+      selectedObject.set(key as any, value);
+      fabricCanvas.current.renderAll();
+      fabricCanvas.current.fire('object:modified');
+    }
+    forceUpdatePage();
+  };
+
+  const handleAddArtboard = () => {
+    const newId = uuidv4();
+    const lastArtboard = artboards[artboards.length - 1];
+    const newArtboard: ArtboardData = {
+      id: newId,
+      title: `Prancheta ${artboards.length + 1}`,
+      width: lastArtboard.width,
+      height: lastArtboard.height
+    };
+    setArtboards([...artboards, newArtboard]);
+    setActiveArtboardId(newId);
+    toast.success('Nova prancheta adicionada.');
+  };
+
+  const handleDuplicateArtboard = (id: string) => {
+    const artboardToDup = artboards.find(a => a.id === id);
+    if (!artboardToDup) return;
+
+    const methods = artboardsMethods.current[id];
+    const jsonData = methods ? JSON.parse(methods.saveToJson()) : null;
+
+    const newId = uuidv4();
+    const newArtboard: ArtboardData = {
+      ...artboardToDup,
+      id: newId,
+      title: `${artboardToDup.title} (Cópia)`,
+      data: jsonData
+    };
+
+    const index = artboards.findIndex(a => a.id === id);
+    const newArtboards = [...artboards];
+    newArtboards.splice(index + 1, 0, newArtboard);
+    
+    setArtboards(newArtboards);
+    setActiveArtboardId(newId);
+    toast.success('Prancheta duplicada.');
+  };
+
+  const handleDeleteArtboard = (id: string) => {
+    if (artboards.length <= 1) {
+      toast.error('O projeto deve ter pelo menos uma prancheta.');
+      return;
+    }
+
+    const newArtboards = artboards.filter(a => a.id !== id);
+    setArtboards(newArtboards);
+    delete artboardsMethods.current[id];
+
+    if (activeArtboardId === id) {
+      const nextActive = newArtboards[0];
+      setActiveArtboardId(nextActive.id);
+      setActiveEditor(artboardsMethods.current[nextActive.id]);
+    }
+    toast.success('Prancheta removida.');
+  };
+
+  const handleMoveArtboard = (id: string, direction: 'up' | 'down') => {
+    const index = artboards.findIndex(a => a.id === id);
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === artboards.length - 1) return;
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    const newArtboards = [...artboards];
+    const [removed] = newArtboards.splice(index, 1);
+    newArtboards.splice(newIndex, 0, removed);
+    setArtboards(newArtboards);
+  };
 
   const fetchModels = async () => {
     setIsLoadingModels(true);
@@ -87,43 +242,9 @@ export default function EditorPrincipal() {
     setIsLoadingModels(false);
   };
 
-  const calculateFitZoom = (width: number, height: number) => {
-    if (!workspaceRef.current) return 1;
-    
-    const padding = 100; 
-    const availableWidth = workspaceRef.current.clientWidth - padding;
-    const availableHeight = workspaceRef.current.clientHeight - padding;
-    
-    const scaleX = availableWidth / width;
-    const scaleY = availableHeight / height;
-    
-    let bestScale = Math.min(scaleX, scaleY);
-    if (bestScale > 1) bestScale = 1;
-    if (bestScale < 0.1) bestScale = 0.1;
-    
-    return Number(bestScale.toFixed(2));
-  };
-
   useEffect(() => {
     fetchModels();
-    
-    setTimeout(() => {
-      setZoomLevel(calculateFitZoom(1080, 1080));
-    }, 200);
   }, []);
-
-  useEffect(() => {
-    if (fabricCanvas.current) {
-      fabricCanvas.current.calcOffset();
-    }
-  }, [zoomLevel, canvasSize, sidebarOpen]);
-
-  const updateProperty = (key: string, value: any) => {
-    if (!selectedObject || !fabricCanvas.current) return;
-    selectedObject.set(key as any, value);
-    fabricCanvas.current.renderAll();
-    fabricCanvas.current.fire('object:modified');
-  };
 
   const getCornerRadii = () => {
     if (!selectedObject) return { tl: 0, tr: 0, br: 0, bl: 0 };
@@ -141,57 +262,52 @@ export default function EditorPrincipal() {
   };
 
   const handleCreateNew = () => {
-    clearCanvas();
+    const newId = uuidv4();
+    setArtboards([{ id: newId, title: 'Prancheta 1', width: 1080, height: 1080 }]);
+    setActiveArtboardId(newId);
     setCanvasTitle('Nova Arte Sem Título');
     setCurrentModelId(null);
-    
-    setCanvasSize({ width: 1080, height: 1080 });
-    if (fabricCanvas.current) {
-      fabricCanvas.current.setDimensions({ width: 1080, height: 1080 });
-      fabricCanvas.current.renderAll();
-    }
-    
-    setTimeout(() => {
-      setZoomLevel(calculateFitZoom(1080, 1080));
-    }, 100);
-
-    toast.success('Novo canvas em branco criado.');
+    toast.success('Novo projeto criado.');
   };
 
-  const handleResizeCanvas = () => {
-    if (!fabricCanvas.current) return;
-    const newWidth = Math.max(100, canvasSize.width);
-    const newHeight = Math.max(100, canvasSize.height);
-    
-    fabricCanvas.current.setDimensions({ width: newWidth, height: newHeight });
-    fabricCanvas.current.renderAll();
-    
-    setZoomLevel(calculateFitZoom(newWidth, newHeight));
-    toast.success(`Tamanho alterado para ${newWidth}x${newHeight}px`);
+  const handleResizeCanvas = (width: number, height: number) => {
+    const newArtboards = artboards.map(a => 
+      a.id === activeArtboardId ? { ...a, width, height } : a
+    );
+    setArtboards(newArtboards);
+    toast.success(`Prancheta redimensionada.`);
   };
 
   const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 0.15, 4)); 
+    setZoomLevel(prev => Math.min(prev + 0.1, 2)); 
   };
 
   const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 0.15, 0.1)); 
+    setZoomLevel(prev => Math.max(prev - 0.1, 0.1)); 
   };
 
   const handleResetZoom = () => {
-    setZoomLevel(calculateFitZoom(canvasSize.width, canvasSize.height));
+    setZoomLevel(0.6);
   };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const jsonStr = saveToJson();
-      if (!jsonStr) throw new Error("Não foi possível gerar os dados da arte.");
+      
+      const artboardsWithData = artboards.map(a => {
+        const methods = artboardsMethods.current[a.id];
+        return {
+          ...a,
+          data: methods ? JSON.parse(methods.saveToJson()) : a.data
+        };
+      });
 
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error("Precisa fazer login para guardar modelos.");
 
-      const thumbnailUrl = exportToImage(); 
+      // Exporta a primeira prancheta como thumbnail
+      const firstMethods = artboardsMethods.current[artboards[0].id];
+      const thumbnailUrl = firstMethods?.exportToImage(); 
       let savedThumbnailUrl = null;
 
       if (thumbnailUrl) {
@@ -206,13 +322,10 @@ export default function EditorPrincipal() {
          }
       }
 
-      const parsedData = JSON.parse(jsonStr);
-      parsedData.customCanvasSize = canvasSize;
-
       const payload = {
         user_id: user.id,
         title: canvasTitle,
-        data: parsedData,
+        data: { artboards: artboardsWithData },
         ...(savedThumbnailUrl && { thumbnail_url: savedThumbnailUrl })
       };
 
@@ -238,13 +351,20 @@ export default function EditorPrincipal() {
   const handleSaveAsTemplate = async () => {
     try {
       setIsSaving(true);
-      const jsonStr = saveToJson();
-      if (!jsonStr) throw new Error("Não foi possível gerar os dados da arte.");
+      
+      const artboardsWithData = artboards.map(a => {
+        const methods = artboardsMethods.current[a.id];
+        return {
+          ...a,
+          data: methods ? JSON.parse(methods.saveToJson()) : a.data
+        };
+      });
 
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error("Precisa fazer login.");
 
-      const thumbnailUrl = exportToImage(); 
+      const firstMethods = artboardsMethods.current[artboards[0].id];
+      const thumbnailUrl = firstMethods?.exportToImage(); 
       let savedThumbnailUrl = null;
 
       if (thumbnailUrl) {
@@ -259,13 +379,10 @@ export default function EditorPrincipal() {
          }
       }
 
-      const parsedData = JSON.parse(jsonStr);
-      parsedData.customCanvasSize = canvasSize;
-
       const payload = {
         user_id: user.id,
         title: canvasTitle,
-        data: parsedData,
+        data: { artboards: artboardsWithData },
         ...(savedThumbnailUrl && { thumbnail_url: savedThumbnailUrl })
       };
 
@@ -282,23 +399,26 @@ export default function EditorPrincipal() {
   };
 
   const handleLoadModel = (model: any, isTemplate: boolean = false) => {
-    const loadedSize = model.data.customCanvasSize || { width: 1080, height: 1080 };
-    setCanvasSize(loadedSize);
-
-    loadFromJson(model.data);
-    
-    setTimeout(() => {
-      if (fabricCanvas.current) {
-        fabricCanvas.current.setDimensions(loadedSize);
-        fabricCanvas.current.renderAll();
-      }
-      setZoomLevel(calculateFitZoom(loadedSize.width, loadedSize.height));
-    }, 50);
+    if (model.data?.artboards) {
+      setArtboards(model.data.artboards);
+      setActiveArtboardId(model.data.artboards[0].id);
+    } else {
+      // Compatibilidade com modelos antigos de prancheta única
+      const newId = uuidv4();
+      setArtboards([{ 
+        id: newId, 
+        title: 'Prancheta 1', 
+        width: model.data.customCanvasSize?.width || 1080, 
+        height: model.data.customCanvasSize?.height || 1080,
+        data: model.data
+      }]);
+      setActiveArtboardId(newId);
+    }
 
     if (isTemplate) {
       setCanvasTitle(`${model.title} (Cópia)`);
       setCurrentModelId(null); 
-      toast.success(`Template Base carregado para edição.`);
+      toast.success(`Template Base carregado.`);
     } else {
       setCanvasTitle(model.title);
       setCurrentModelId(model.id);
@@ -326,19 +446,21 @@ export default function EditorPrincipal() {
   };
 
   const handleExportPNG = () => {
+    const activeMethods = artboardsMethods.current[activeArtboardId];
+    if (!activeMethods) return;
+    
+    const activeArtboard = artboards.find(a => a.id === activeArtboardId);
     const link = document.createElement('a'); 
-    link.download = `${canvasTitle}.png`; 
-    link.href = exportToImage() || ''; 
+    link.download = `${canvasTitle}_${activeArtboard?.title || 'art'}.png`; 
+    link.href = activeMethods.exportToImage() || ''; 
     link.click();
     toast.success('Download iniciado!');
   };
 
   // PROXY PARA O MAGIC FILL:
-  // Finge que o objeto selecionado NUNCA está "locked", garantindo que o 
-  // componente interno MagicFill não desative suas funções acidentalmente.
   const activeItemForMagicFill = selectedObject ? new Proxy(selectedObject, {
     get(target: any, prop: string | symbol) {
-      if (prop === 'locked') return false; // Força a liberação
+      if (prop === 'locked') return false; 
       const value = target[prop];
       if (typeof value === 'function') {
         return value.bind(target);
@@ -350,7 +472,6 @@ export default function EditorPrincipal() {
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground">
       
-      {/* SOLUÇÃO DEFINITIVA DO BUG DO TEXTAREA */}
       <style dangerouslySetInnerHTML={{ __html: `
         body > textarea, .canvas-container textarea {
           position: fixed !important;
@@ -382,7 +503,7 @@ export default function EditorPrincipal() {
         }} 
       />
 
-      <main className="flex-1 flex flex-col h-full overflow-y-auto bg-slate-100">
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-slate-100">
         <div className="flex flex-col flex-1 overflow-hidden relative">
           
           <div className="h-14 border-b bg-white flex items-center justify-between px-6 shrink-0 z-20">
@@ -400,7 +521,6 @@ export default function EditorPrincipal() {
                 className="border-transparent hover:border-blue-200 focus:border-blue-500 w-64 font-medium h-9 text-base transition-colors" 
               />
               
-              {/* BOTÕES DESFAZER / REFAZER */}
               <div className="flex items-center gap-1 ml-2">
                 <Button 
                   variant="ghost" size="icon" className="h-8 w-8 text-slate-600" 
@@ -423,21 +543,20 @@ export default function EditorPrincipal() {
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" className="text-blue-900 hover:text-blue-600 hover:bg-blue-50 font-medium">
-                    <Crop className="w-4 h-4 mr-2" /> Tamanho
+                    <Crop className="w-4 h-4 mr-2" /> Formato
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-60 p-4 rounded-xl shadow-xl border-slate-200 bg-white" align="end">
-                  <h4 className="font-bold text-sm text-slate-800 mb-3">Tamanho da Arte</h4>
+                  <h4 className="font-bold text-sm text-slate-800 mb-3">Tamanho da Prancheta</h4>
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="space-y-1.5">
                       <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Largura</Label>
                       <div className="relative">
                         <Input 
                           type="number" 
-                          min={100}
-                          value={canvasSize.width} 
-                          onChange={(e) => setCanvasSize(prev => ({ ...prev, width: Number(e.target.value) }))} 
-                          className="h-9 text-xs pr-6 rounded-lg border-slate-200 focus:border-blue-500 focus:ring-blue-100" 
+                          defaultValue={1080}
+                          id="custom-width"
+                          className="h-9 text-xs pr-6 rounded-lg border-slate-200 focus:border-blue-500" 
                         />
                         <span className="absolute right-2 top-2.5 text-[10px] text-slate-400">px</span>
                       </div>
@@ -447,23 +566,26 @@ export default function EditorPrincipal() {
                       <div className="relative">
                         <Input 
                           type="number" 
-                          min={100}
-                          value={canvasSize.height} 
-                          onChange={(e) => setCanvasSize(prev => ({ ...prev, height: Number(e.target.value) }))} 
-                          className="h-9 text-xs pr-6 rounded-lg border-slate-200 focus:border-blue-500 focus:ring-blue-100" 
+                          defaultValue={1080}
+                          id="custom-height"
+                          className="h-9 text-xs pr-6 rounded-lg border-slate-200 focus:border-blue-500" 
                         />
                         <span className="absolute right-2 top-2.5 text-[10px] text-slate-400">px</span>
                       </div>
                     </div>
                   </div>
-                  <Button className="w-full h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg" onClick={handleResizeCanvas}>
-                    Aplicar Novo Tamanho
+                  <Button className="w-full h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg" onClick={() => {
+                    const w = Number((document.getElementById('custom-width') as HTMLInputElement).value);
+                    const h = Number((document.getElementById('custom-height') as HTMLInputElement).value);
+                    handleResizeCanvas(w, h);
+                  }}>
+                    Redimensionar Ativa
                   </Button>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1080})}>Feed Quad.</Button>
-                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1350})}>Feed Vert.</Button>
-                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1920})}>Story</Button>
-                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => setCanvasSize({width: 1080, height: 1440})}>Capa Reels</Button>
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => handleResizeCanvas(1080, 1080)}>Feed Quad.</Button>
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => handleResizeCanvas(1080, 1350)}>Feed Vert.</Button>
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => handleResizeCanvas(1080, 1920)}>Story</Button>
+                    <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => handleResizeCanvas(1080, 1440)}>Capa Reels</Button>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -490,7 +612,7 @@ export default function EditorPrincipal() {
                     <Save className="w-4 h-4 mr-3 text-slate-500" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-sm">Salvar Projeto</span>
-                      <span className="text-[10px] text-slate-500">Guarda em "Meus Projetos"</span>
+                      <span className="text-[10px] text-slate-500">Guarda todas as pranchetas</span>
                     </div>
                   </DropdownMenuItem>
 
@@ -498,7 +620,7 @@ export default function EditorPrincipal() {
                     <LayoutTemplate className="w-4 h-4 mr-3 text-slate-500" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-sm">Salvar como Template</span>
-                      <span className="text-[10px] text-slate-500">Disponível para toda a equipe</span>
+                      <span className="text-[10px] text-slate-500">Para toda a equipe</span>
                     </div>
                   </DropdownMenuItem>
 
@@ -508,7 +630,7 @@ export default function EditorPrincipal() {
                     <Download className="w-4 h-4 mr-3 text-slate-500" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-sm">Baixar PNG</span>
-                      <span className="text-[10px] text-slate-500">Alta qualidade para redes sociais</span>
+                      <span className="text-[10px] text-slate-500">Apenas prancheta selecionada</span>
                     </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -523,6 +645,10 @@ export default function EditorPrincipal() {
                 
                 <TabsList className="flex flex-col h-full w-[80px] shrink-0 bg-gradient-to-b from-blue-600 to-indigo-600 text-white justify-start py-4 gap-3 rounded-none h-auto border-none">
                   
+                  <TabsTrigger value="pranchetas" className="group flex flex-col items-center justify-center gap-1.5 w-[68px] h-16 text-[10px] font-medium text-white data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent border-none rounded-xl transition-all hover:bg-white/10 hover:text-white">
+                    <Files className="w-[22px] h-[22px] text-white" /> Páginas
+                  </TabsTrigger>
+
                   <TabsTrigger value="projetos" className="group flex flex-col items-center justify-center gap-1.5 w-[68px] h-16 text-[10px] font-medium text-white data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent border-none rounded-xl transition-all hover:bg-white/10 hover:text-white">
                     <FolderHeart className="w-[22px] h-[22px] text-white" /> Projetos
                   </TabsTrigger>
@@ -539,12 +665,6 @@ export default function EditorPrincipal() {
                     <TypeIcon className="w-[22px] h-[22px] text-white" /> Texto
                   </TabsTrigger>
                   
-                  <TabsTrigger value="marca" className="group flex flex-col items-center justify-center gap-1.5 w-[68px] h-16 text-[10px] font-medium text-white data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent border-none rounded-xl transition-all hover:bg-white/10 hover:text-white relative">
-                    <Palette className="w-[22px] h-[22px] text-white" /> 
-                    Marca
-                    <Crown className="w-3 h-3 text-amber-300 absolute top-1 right-2" />
-                  </TabsTrigger>
-
                   <TabsTrigger value="uploads" className="group flex flex-col items-center justify-center gap-1.5 w-[68px] h-16 text-[10px] font-medium text-white data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent border-none rounded-xl transition-all hover:bg-white/10 hover:text-white">
                     <UploadCloud className="w-[22px] h-[22px] text-white" /> Uploads
                   </TabsTrigger>
@@ -557,6 +677,50 @@ export default function EditorPrincipal() {
 
                 <div className="flex-1 h-full overflow-y-auto bg-white shadow-[inset_10px_0_15px_-10px_rgba(0,0,0,0.05)]">
                   
+                  <TabsContent value="pranchetas" className="m-0 p-5 space-y-4 outline-none border-none">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-base text-slate-800">Pranchetas</h3>
+                      <Button size="sm" onClick={handleAddArtboard} className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">
+                        <Plus className="w-3.5 h-3.5" /> Adicionar
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {artboards.map((artboard, index) => (
+                        <div 
+                          key={artboard.id}
+                          className={cn(
+                            "group p-3 rounded-xl border-2 transition-all flex items-center justify-between cursor-pointer",
+                            activeArtboardId === artboard.id ? "border-blue-600 bg-blue-50/50" : "border-slate-100 hover:border-slate-200 bg-white"
+                          )}
+                          onClick={() => {
+                            const methods = artboardsMethods.current[artboard.id];
+                            if (methods) handleSelectArtboard(artboard.id, methods);
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-6 h-6 rounded-md bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                              {index + 1}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-800">{artboard.title}</span>
+                              <span className="text-[10px] text-slate-500">{artboard.width}x{artboard.height}px</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600" onClick={(e) => { e.stopPropagation(); handleDuplicateArtboard(artboard.id); }} title="Duplicar">
+                              <Copy className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-600" onClick={(e) => { e.stopPropagation(); handleDeleteArtboard(artboard.id); }} title="Excluir">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+
                   <TabsContent value="projetos" className="m-0 p-5 space-y-4 outline-none border-none">
                     <h3 className="font-bold text-base text-slate-800 mb-4">Meus Projetos</h3>
                     {isLoadingModels ? (
@@ -591,7 +755,7 @@ export default function EditorPrincipal() {
                             <div className="px-1 flex flex-col">
                               <span className="text-xs font-bold text-slate-800 truncate">{model.title}</span>
                               <span className="text-[10px] text-slate-500 truncate mt-0.5">
-                                {model.data?.customCanvasSize ? `${model.data.customCanvasSize.width} px × ${model.data.customCanvasSize.height} px` : '1080 px × 1080 px'}
+                                {model.data?.artboards ? `${model.data.artboards.length} pranchetas` : '1 prancheta'}
                               </span>
                             </div>
                           </div>
@@ -633,7 +797,7 @@ export default function EditorPrincipal() {
                             <div className="px-1 flex flex-col">
                               <span className="text-xs font-bold text-slate-800 truncate">{template.title}</span>
                               <span className="text-[10px] text-slate-500 truncate mt-0.5">
-                                {template.data?.customCanvasSize ? `${template.data.customCanvasSize.width} px × ${template.data.customCanvasSize.height} px` : '1080 px × 1080 px'}
+                                {template.data?.artboards ? `${template.data.artboards.length} pranchetas` : '1 prancheta'}
                               </span>
                             </div>
                           </div>
@@ -673,14 +837,6 @@ export default function EditorPrincipal() {
                     <ImageUploads onImageSelect={(url) => addImage(url)} />
                   </TabsContent>
 
-                  <TabsContent value="marca" className="m-0 p-5 space-y-6 outline-none border-none">
-                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3"><Crown className="text-amber-500 w-8 h-8 shrink-0" /><div><h4 className="font-bold text-sm text-amber-800">Kit de Marca Pro</h4><p className="text-[11px] text-amber-700 mt-1 leading-tight">Mantenha a identidade visual da sua imobiliária sempre acessível.</p></div></div>
-                    <div>
-                      <h3 className="font-bold text-sm mb-3 text-slate-800">Cores Oficiais</h3>
-                      <div className="flex gap-2"><div className="w-10 h-10 rounded-full bg-blue-600 border shadow-sm cursor-pointer" /><div className="w-10 h-10 rounded-full bg-slate-900 border shadow-sm cursor-pointer" /><div className="w-10 h-10 rounded-full bg-white border shadow-sm cursor-pointer" /><div className="w-10 h-10 rounded-full border border-dashed border-slate-300 flex items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-50">+</div></div>
-                    </div>
-                  </TabsContent>
-
                   <TabsContent value="ferramentas" className="m-0 p-5 space-y-4 outline-none border-none">
                     <h3 className="font-bold text-sm mb-4 text-slate-800">Magic Tools</h3>
                     <div className="grid grid-cols-2 gap-3">
@@ -694,29 +850,22 @@ export default function EditorPrincipal() {
 
             <div className="flex-1 relative flex flex-col bg-slate-100 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] shadow-[inset_0_4px_6px_rgba(0,0,0,0.05)] overflow-hidden">
               
-              <main ref={workspaceRef} className="flex-1 overflow-auto p-10 relative">
-                <div className="min-w-full min-h-full flex items-center justify-center">
-                  
-                  <div 
-                    className="relative transition-all duration-200 ease-out"
-                    style={{ 
-                      width: canvasSize.width * zoomLevel, 
-                      height: canvasSize.height * zoomLevel 
-                    }}
-                  >
-                    <div 
-                      className="absolute top-0 left-0 bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] ring-1 ring-slate-300 overflow-hidden"
-                      style={{
-                        width: canvasSize.width,
-                        height: canvasSize.height,
-                        transform: `scale(${zoomLevel})`,
-                        transformOrigin: 'top left'
-                      }}
-                    >
-                      <canvas ref={canvasRef} />
-                    </div>
-                  </div>
-
+              <main ref={workspaceRef} className="flex-1 overflow-auto p-20 relative scroll-smooth custom-scrollbar">
+                <div className="min-w-full flex flex-col items-center gap-8 py-10">
+                  {artboards.map((artboard) => (
+                    <Artboard 
+                      key={artboard.id}
+                      id={artboard.id}
+                      title={artboard.title}
+                      width={artboard.width}
+                      height={artboard.height}
+                      isActive={activeArtboardId === artboard.id}
+                      onSelect={handleSelectArtboard}
+                      onMethodsReady={handleRegisterMethods}
+                      initialData={artboard.data}
+                      zoomLevel={zoomLevel}
+                    />
+                  ))}
                 </div>
 
                 {/* MENU DE CONTEXTO */}
@@ -831,7 +980,7 @@ export default function EditorPrincipal() {
                   <ZoomIn className="w-4 h-4" />
                 </Button>
                 <Separator orientation="vertical" className="h-5 mx-1" />
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-blue-600 hover:bg-blue-50" onClick={handleResetZoom} title="Centralizar Visualização">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-blue-600 hover:bg-blue-50" onClick={handleResetZoom} title="Reset Zoom">
                   <Focus className="w-4 h-4" />
                 </Button>
               </div>
@@ -905,7 +1054,7 @@ export default function EditorPrincipal() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg disabled:opacity-50" 
+                        className="h-8 w-8 text-red-500 hover:bg-red-600 hover:text-white rounded-lg disabled:opacity-50" 
                         onClick={deleteSelected}
                         disabled={(selectedObject as any).locked}
                       >
@@ -921,7 +1070,6 @@ export default function EditorPrincipal() {
                     </div>
                   )}
 
-                  {/* AQUI ESTÁ O AJUSTE: Passamos o objeto com a propriedade locked false */}
                   <MagicFill 
                     selectedObject={activeItemForMagicFill} 
                     onUpdate={updateProperty} 
@@ -934,7 +1082,6 @@ export default function EditorPrincipal() {
                   {(selectedObject.type === 'i-text' || selectedObject.type === 'text') && (
                     <div className="space-y-6">
                       
-                      {/* Cor e Tamanho da Fonte */}
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Texto</Label>
                         <div className="flex gap-2">
@@ -994,7 +1141,6 @@ export default function EditorPrincipal() {
                         </div>
                       </div>
 
-                      {/* Estilos de Fonte */}
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Estilo</Label>
                         <div className="flex flex-wrap gap-1">
@@ -1025,7 +1171,6 @@ export default function EditorPrincipal() {
                         </div>
                       </div>
 
-                      {/* Alinhamento */}
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Alinhamento</Label>
                         <div className="flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
@@ -1047,7 +1192,6 @@ export default function EditorPrincipal() {
                         </div>
                       </div>
 
-                      {/* Listas e Recuo */}
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Formatação</Label>
                         <div className="flex gap-2">
@@ -1075,7 +1219,6 @@ export default function EditorPrincipal() {
                         </div>
                       </div>
 
-                      {/* Espaçamento de Linha */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Label className="text-xs font-semibold text-slate-800">Espaçamento entre Linhas</Label>
@@ -1092,23 +1235,36 @@ export default function EditorPrincipal() {
                       
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Fonte</Label>
-                        <Select value={(selectedObject as any).fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)}>
-                          <SelectTrigger className="text-sm rounded-lg border-slate-200 focus:ring-blue-100"><SelectValue /></SelectTrigger>
+                        <Select 
+                          value={selectedObject.get ? selectedObject.get('fontFamily') : (selectedObject as any).fontFamily} 
+                          onValueChange={(val) => setCanvasProperty('fontFamily', val)}
+                        >
+                          <SelectTrigger className="text-sm rounded-lg border-slate-200 focus:ring-blue-100">
+                            <SelectValue />
+                          </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Arial">Arial</SelectItem>
                             <SelectItem value="Inter">Inter</SelectItem>
                             <SelectItem value="Montserrat">Montserrat</SelectItem>
+                            <SelectItem value="Poppins">Poppins</SelectItem>
+                            <SelectItem value="Roboto">Roboto</SelectItem>
+                            <SelectItem value="Open Sans">Open Sans</SelectItem>
+                            <SelectItem value="Lato">Lato</SelectItem>
+                            <SelectItem value="Oswald">Oswald</SelectItem>
+                            <SelectItem value="Raleway">Raleway</SelectItem>
+                            <SelectItem value="Nunito">Nunito</SelectItem>
+                            <SelectItem value="Merriweather">Merriweather</SelectItem>
                             <SelectItem value="Playfair Display">Playfair Display</SelectItem>
+                            <SelectItem value="Bebas Neue">Bebas Neue</SelectItem>
+                            <SelectItem value="Dancing Script">Dancing Script</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
                   )}
 
-                  {/* PROPRIEDADES DE FORMAS E MOLDURAS (Sem Trava de Conteúdo) */}
                   {(selectedObject.type === 'rect' || selectedObject.type === 'circle' || selectedObject.type === 'triangle' || selectedObject.type === 'line') && (
                     <div className="space-y-6">
-                      
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Cor da Forma</Label>
                         <Popover>
@@ -1162,10 +1318,10 @@ export default function EditorPrincipal() {
                         <div className="space-y-3">
                           <Label className="text-xs font-semibold text-slate-800">Arredondar Cantos (px)</Label>
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
                           </div>
                         </div>
                       )}
@@ -1177,29 +1333,21 @@ export default function EditorPrincipal() {
                     </div>
                   )}
 
-                  {/* PROPRIEDADES DE IMAGENS (Agora com Arredondamento e Sem Trava) */}
                   {selectedObject.type === 'image' && (
                     <div className="space-y-6">
-                      
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Arredondar Cantos (px)</Label>
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
-                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
+                          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 font-medium" /></div>
                         </div>
                       </div>
-
-                      <Separator className="bg-slate-100" />
-
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Transparência</Label>
                         <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" />
                       </div>
-
-                      <Separator className="bg-slate-100" />
-                      
                       <div className="space-y-3">
                         <Label className="text-xs font-semibold text-slate-800">Inverter</Label>
                         <div className="grid grid-cols-2 gap-2">
@@ -1212,7 +1360,6 @@ export default function EditorPrincipal() {
 
                   <Separator className="bg-slate-100" />
 
-                  {/* ALINHAMENTO GLOBAL (Este manteve a trava para não bagunçar posições) */}
                   <div className={`space-y-3 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                     <Label className="text-xs font-semibold text-slate-800">Alinhamento e Camadas</Label>
                     <div className="grid grid-cols-3 gap-2">
@@ -1235,4 +1382,12 @@ export default function EditorPrincipal() {
       </main>
     </div>
   );
+}
+
+export default function App() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <SupportContent />
+    </Suspense>
+  )
 }

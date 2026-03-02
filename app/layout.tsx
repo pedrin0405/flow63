@@ -1,6 +1,6 @@
 import React from "react"
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist, Geist_Mono, Montserrat, Playfair_Display, Poppins, Roboto, Open_Sans, Lato, Oswald, Raleway, Nunito, Merriweather, Bebas_Neue, Dancing_Script } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
@@ -10,6 +10,20 @@ import { Toaster } from "@/components/ui/toaster"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
+
+// Configuração das fontes adicionais para o Flow Design
+const montserrat = Montserrat({ subsets: ["latin"], variable: '--font-montserrat' });
+const playfair = Playfair_Display({ subsets: ["latin"], variable: '--font-playfair' });
+const poppins = Poppins({ subsets: ["latin"], weight: ['400', '600', '700'], variable: '--font-poppins' });
+const roboto = Roboto({ subsets: ["latin"], weight: ['400', '700'], variable: '--font-roboto' });
+const openSans = Open_Sans({ subsets: ["latin"], variable: '--font-open-sans' });
+const lato = Lato({ subsets: ["latin"], weight: ['400', '700'], variable: '--font-lato' });
+const oswald = Oswald({ subsets: ["latin"], variable: '--font-oswald' });
+const raleway = Raleway({ subsets: ["latin"], variable: '--font-raleway' });
+const nunito = Nunito({ subsets: ["latin"], variable: '--font-nunito' });
+const merriweather = Merriweather({ subsets: ["latin"], weight: ['400', '700'], variable: '--font-merriweather' });
+const bebasNeue = Bebas_Neue({ subsets: ["latin"], weight: ['400'], variable: '--font-bebas-neue' });
+const dancingScript = Dancing_Script({ subsets: ["latin"], variable: '--font-dancing-script' });
 
 export const metadata: Metadata = {
   title: 'Central63 - Gestão Imobiliária',
@@ -41,9 +55,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      {/* ADICIONADO: suppressHydrationWarning para ignorar alterações de extensões */}
       <body 
-        className={`font-sans antialiased`}
+        className={`font-sans antialiased ${montserrat.variable} ${playfair.variable} ${poppins.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${oswald.variable} ${raleway.variable} ${nunito.variable} ${merriweather.variable} ${bebasNeue.variable} ${dancingScript.variable}`}
         suppressHydrationWarning={true}
       >
         {children}
