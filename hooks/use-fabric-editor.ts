@@ -67,11 +67,13 @@ export const useFabricEditor = () => {
       'originX', 'originY' // Crucial para manter a posição correta
     ]));
 
+    // Evita salvar estados duplicados idênticos seguidos
     if (undoStack.current.length > 0 && undoStack.current[undoStack.current.length - 1] === json) return;
 
     undoStack.current.push(json);
-    redoStack.current = []; 
+    redoStack.current = []; // Limpa o refazer ao criar uma nova ação
     
+    // Limite de histórico para performance (ex: 50 ações)
     if (undoStack.current.length > 50) undoStack.current.shift();
     
     forceUpdate();
@@ -112,6 +114,52 @@ export const useFabricEditor = () => {
     isHistoryProcessing.current = false;
     forceUpdate();
   }, [forceUpdate]);
+
+  // --- ATALHOS DE TECLADO ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!fabricCanvas.current) return;
+      
+      // Evita disparar atalhos se o usuário estiver digitando em um input/textarea global
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      const activeObj = fabricCanvas.current.getActiveObject();
+      // Evita disparar atalhos se o usuário estiver editando o texto no canvas
+      if (activeObj && (activeObj as any).isEditing) return;
+
+      const isCtrl = e.ctrlKey || e.metaKey;
+
+      // Ctrl + Z (Desfazer)
+      if (isCtrl && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+
+      // Ctrl + Shift + Z ou Ctrl + Y (Refazer)
+      if ((isCtrl && e.shiftKey && e.key.toLowerCase() === 'z') || (isCtrl && e.key.toLowerCase() === 'y')) {
+        e.preventDefault();
+        redo();
+      }
+
+      // Delete ou Backspace (Remover item selecionado)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (activeObj && !(activeObj as any).locked) {
+          e.preventDefault();
+          fabricCanvas.current.remove(activeObj);
+          fabricCanvas.current.discardActiveObject();
+          fabricCanvas.current.renderAll();
+          saveHistory();
+          forceUpdate();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, saveHistory, forceUpdate]);
 
   // --- NOVAS FUNÇÕES DE EDIÇÃO DE TEXTO ---
 
@@ -515,8 +563,6 @@ export const useFabricEditor = () => {
           }
         }
       });
-
-      saveHistory();
     }
 
     return () => {
@@ -529,16 +575,31 @@ export const useFabricEditor = () => {
 
   const addText = (content = 'Novo Texto') => {
     if (!fabricCanvas.current) return;
+
+    let fontSize = 30;
+    let fontWeight: string | number = 'normal';
+
+    // Ajusta o tamanho e peso da fonte baseado no botão clicado
+    const lowerContent = content.toLowerCase();
+    if (lowerContent.includes('subtítulo')) {
+      fontSize = 55;
+      fontWeight = '600';
+    } else if (lowerContent.includes('título')) {
+      fontSize = 75
+      fontWeight = 'bold';
+    } else {
+      fontSize = 35;
+    }
+
     const text = new fabric.IText(content, { 
       left: 100, 
       top: 100, 
       fontFamily: 'Arial', 
-      fontSize: 24, 
-      fill: '#000000',
-      lineHeight: 1.16,
-      originX: 'center',
-      originY: 'center'
+      fontSize: fontSize, 
+      fontWeight: fontWeight,
+      fill: '#000000' 
     });
+
     (text as any).variableId = null;
     (text as any).locked = false;
     
@@ -1075,6 +1136,8 @@ export const useFabricEditor = () => {
     fabricCanvas.current.remove(selectedObject);
     fabricCanvas.current.discardActiveObject();
     fabricCanvas.current.renderAll();
+    saveHistory();
+    forceUpdate();
   };
 
   const setCornerRadii = (tl: number, tr: number, br: number, bl: number) => {

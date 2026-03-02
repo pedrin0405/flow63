@@ -1100,8 +1100,8 @@ export default function EditorPrincipal() {
                     </div>
                   )}
 
-                  {/* PROPRIEDADES DE FORMAS (Adicionado Seletor de degradê) */}
-                  {(selectedObject.type === 'rect' || selectedObject.type === 'circle' || selectedObject.type === 'triangle' || selectedObject.type === 'line') && !(selectedObject as any).isFrame && (
+                  {/* PROPRIEDADES DE FORMAS E MOLDURAS (Adicionado Seletor de degradê) */}
+                  {(selectedObject.type === 'rect' || selectedObject.type === 'circle' || selectedObject.type === 'triangle' || selectedObject.type === 'line') && (
                     <div className={`space-y-6 ${(selectedObject as any).locked ? 'opacity-50 pointer-events-none' : ''}`}>
                       
                       <div className="space-y-3">
