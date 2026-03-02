@@ -366,7 +366,7 @@ export default function DashboardPage() {
               <Menu size={20} />
             </button>
             <LayoutDashboard className="text-primary hidden sm:block" />
-            <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">Dashboard</h2>
+            <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">Página Inicial</h2>
           </div>
         </header>
 

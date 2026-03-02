@@ -23,6 +23,7 @@ export interface EditableLeadData {
   phone?: string
   lista_imoveis?: ImovelVendido[] 
   valor_venda?: number
+  valor_venda_db?: number // Novo campo para referência do valor no dashboard
   comissao?: number
   data_venda?: string
   obs_venda?: string
@@ -44,6 +45,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
     phone: "",
     lista_imoveis: [],
     valor_venda: 0,
+    valor_venda_db: 0,
     comissao: 5,
     data_venda: new Date().toISOString().slice(0, 16),
     obs_venda: "",
@@ -80,7 +82,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
     try {
       const { data: vendasData } = await supabase
         .from('vendas')
-        .select('valor_venda, lista_imoveis, status_dashboard')
+        .select('valor_venda, comissao, lista_imoveis, status_dashboard')
         .eq('id_origem', lead.raw_codigo || lead.id)
 
       const codigosVendidos = vendasData?.flatMap(v => 
@@ -109,7 +111,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
         imoveisMap.set(String(lead.propertyLocation), {
           codigo: String(lead.propertyLocation),
           valor: lead.valueLaunched || lead.value || 0,
-          imagem: lead.image,
+          image: lead.image,
         });
       }
 
@@ -160,7 +162,8 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
         clientName: lead.clientName || "",
         lista_imoveis: imoveisFinal,
         valor_venda: imoveisFinal.reduce((acc, curr) => acc + curr.valor, 0),
-        comissao: lead.comissao || 5,
+        valor_venda_db: vendaExistente?.valor_venda || 0,
+        comissao: vendaExistente?.comissao || lead.comissao || 5,
         // Correção aqui: Garantimos a conversão para Date e formatamos para o input (AAAA-MM-DDTHH:mm)
         data_venda: (() => {
           if (!lead.raw_data) return new Date().toISOString().slice(0, 16);
@@ -184,11 +187,9 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
             if (vendaExistente && vendaExistente.status_dashboard !== undefined) {
               return vendaExistente.status_dashboard === "Visível" || vendaExistente.status_dashboard === true;
             }
-            // 2. Fallback para o que veio do componente pai
-            if (lead.visibleOnDashboard !== undefined) return !!lead.visibleOnDashboard;
             
-            // 3. Fallback final
-            return lead.status_dashboard === "Visível" || lead.status_dashboard === true;
+            // 2. Se for uma nova venda (vendaExistente é null), o padrão agora é SEMPRE true (Visível)
+            return true;
           })()
       }))
     } catch (err) {
@@ -236,6 +237,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
       const resetData: EditableLeadData = {
         ...formData,
         valor_venda: 0,
+        valor_venda_db: 0,
         status_dashboard: false, // Oculta do dashboard para atualizar o card
         obs_venda: ""
       }
@@ -333,20 +335,38 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                     </div>
                   </div>
 
-                  {/* VGV e Data */}
+                  {/* VGV Total e VGV DASH */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label className="text-emerald-700 font-semibold">VGV Total</Label>
+                      <Label className="text-emerald-700 font-semibold text-xs">VGV Total</Label>
                       <div className="relative">
                         <span className="absolute left-3 top-2.5 text-xs font-bold text-emerald-600">R$</span>
-                        <Input readOnly className="pl-9 border-emerald-200 bg-emerald-50 text-emerald-700 font-bold" value={formatCurrency(formData.valor_venda)} />
+                        <Input readOnly className="pl-9 border-emerald-200 bg-emerald-50 text-emerald-700 font-bold h-10 w-full" value={formatCurrency(formData.valor_venda)} />
                       </div>
                     </div>
                     <div className="grid gap-2">
-                      <Label>Data da Venda</Label>
+                      <Label className="text-blue-700 font-semibold text-xs">VGV DASH (Atual no Banco)</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-blue-600">R$</span>
+                        <Input readOnly className="pl-9 border-blue-200 bg-blue-50 text-blue-700 font-bold h-10 w-full" value={formatCurrency(formData.valor_venda_db)} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Data e Comissão */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label className="text-xs font-medium text-slate-500">Data da Venda</Label>
                       <div className="relative">
                         <Calendar size={14} className="absolute left-3 top-3 text-muted-foreground" />
-                        <Input type="datetime-local" className="pl-9" value={formData.data_venda || ""} onChange={(e) => setFormData({ ...formData, data_venda: e.target.value })} />
+                        <Input type="datetime-local" className="pl-9 text-[11px] h-10 w-full" value={formData.data_venda || ""} onChange={(e) => setFormData({ ...formData, data_venda: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-xs font-medium text-slate-500">Comissão (%)</Label>
+                      <div className="relative">
+                        <Percent size={14} className="absolute left-3 top-3 text-muted-foreground" />
+                        <Input type="number" className="pl-9 h-10 w-full" value={formData.comissao} onChange={(e) => setFormData({ ...formData, comissao: Number(e.target.value) })} />
                       </div>
                     </div>
                   </div>

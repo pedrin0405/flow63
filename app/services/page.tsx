@@ -385,7 +385,7 @@ export default function Central63App() {
             const chunk = idsToVerify.slice(i, i + verifyBatchSize);
             const { data: vendasMatches, error: errVendas } = await supabase
                 .from('vendas')
-                .select('id, valor_venda, status_dashboard') 
+                .select('id, valor_venda, status_dashboard, comissao') 
                 .in('id', chunk)
             
             if (!errVendas && vendasMatches) {
@@ -393,7 +393,8 @@ export default function Central63App() {
                     salesDataMap.set(match.id, {
                       visible: true,
                       valorVenda: match.valor_venda || 0,
-                      statusDashboard: match.status_dashboard
+                      statusDashboard: match.status_dashboard,
+                      comissao: match.comissao
                     });
                 })
             }
@@ -520,6 +521,7 @@ export default function Central63App() {
           visibleOnDashboard: !!saleInfo, 
           valueLaunched: saleInfo?.valorVenda || 0, 
           status_dashboard: saleInfo?.statusDashboard || "Visível",
+          comissao: saleInfo?.comissao,
         }
       })
 

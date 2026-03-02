@@ -34,6 +34,8 @@ import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
 
 interface SidebarItemProps {
   icon: LucideIcon
@@ -57,20 +59,20 @@ function SidebarItem({ icon: Icon, label, active, onClick, badge, collapsed }: S
       )}
     >
       <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
-        <Icon size={20} />
+        <Icon size={20} className={cn(
+          badge !== undefined && badge > 0 && !active && "text-[#007AFF] animate-pulse"
+        )} />
         {!collapsed && <span className="font-medium whitespace-nowrap">{label}</span>}
       </div>
       
-      {!collapsed && badge !== undefined && (
-        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-          active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
-        }`}>
-          {badge}
+      {!collapsed && badge !== undefined && badge > 0 && (
+        <span className="bg-[#FF3B30] text-white text-[10px] px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full font-bold shadow-sm animate-in zoom-in duration-300">
+          {badge > 99 ? '99+' : badge}
         </span>
       )}
 
       {collapsed && badge !== undefined && badge > 0 && (
-        <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-card" />
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF3B30] text-white text-[8px] flex items-center justify-center rounded-full border-2 border-card font-bold animate-pulse" />
       )}
 
       {!collapsed && badge === undefined && (
@@ -106,18 +108,95 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosCount }: SidebarProps) {
+  const { toast } = useToast()
   const [isCollapsed, setIsCollapsed] = useState(true)
-  // Adicionado a propriedade 'role' ao estado userData
   const [userData, setUserData] = useState<{ name: string; email: string; initial: string; avatarUrl?: string; role?: string } | null>(null)
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0)
   const router = useRouter()
   const pathname = usePathname()
+
+  // Lógica de permissão para o Chat de Suporte
+  const canAccessChat = userData?.role === 'Marketing' || userData?.role === 'Gestor' || userData?.role === 'Diretor' || userData?.role === 'Admin';
+
+  // Atualiza o título da aba com a contagem de mensagens não lidas
+  useEffect(() => {
+    const originalTitle = document.title;
+    if (unreadSupportCount > 0) {
+      document.title = `(${unreadSupportCount}) Novo Ticket - ${originalTitle.replace(/^\(\d+\)\s/, '')}`;
+    } else {
+      document.title = originalTitle.replace(/^\(\d+\)\s/, '');
+    }
+    return () => { document.title = originalTitle; }
+  }, [unreadSupportCount])
+
+  // Busca mensagens não lidas para o suporte e configura notificações globais
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      const { count } = await supabase
+        .from('suporte_mensagens')
+        .select('*', { count: 'exact', head: true })
+        .eq('eh_admin', false)
+        .eq('lida', false)
+      
+      setUnreadSupportCount(count || 0)
+    }
+
+    fetchUnreadCount()
+
+    const subscription = supabase
+      .channel('global_support_listener')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'suporte_mensagens' 
+      }, (payload) => {
+        const newMessage = payload.new;
+        fetchUnreadCount()
+
+        // Notifica o suporte globalmente se a mensagem for de um cliente
+        if (!newMessage.eh_admin && canAccessChat && pathname !== '/chat-support') {
+          let meta = newMessage.metadados;
+          if (meta && typeof meta === 'string') {
+            try { meta = JSON.parse(meta); } catch(e) {}
+          }
+
+          toast({
+            title: `Mensagem de ${meta?.nome || 'Novo Cliente'}`,
+            description: newMessage.conteudo.substring(0, 60) + (newMessage.conteudo.length > 60 ? "..." : ""),
+            variant: "support",
+            action: (
+              <Button size="sm" className="rounded-full bg-[#007AFF] text-white hover:bg-[#0062CC] shadow-md border-none px-4 font-semibold transition-all active:scale-95" onClick={() => router.push(`/chat-support?id=${newMessage.chamado_id}`)}>
+                Responder
+              </Button>
+            ),
+          })
+
+          try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3')
+            audio.volume = 0.5
+            audio.play().catch(() => {})
+          } catch (e) {}
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'suporte_mensagens'
+      }, () => {
+        fetchUnreadCount()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [canAccessChat, pathname, router, toast])
 
   // Busca os dados atualizados do perfil (incluindo o avatar e a role)
   useEffect(() => {
     const getUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        // Busca os dados da tabela profiles para pegar avatar_url, full_name e role
         const { data: profileData } = await supabase
           .from('profiles')
           .select('full_name, avatar_url, role')
@@ -132,7 +211,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
           email: user.email || "",
           initial: initial,
           avatarUrl: profileData?.avatar_url,
-          role: profileData?.role // Armazena a role (ex: 'admin', 'marketing', 'gestao', 'corretor')
+          role: profileData?.role 
         })
       }
     }
@@ -141,7 +220,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
     const profileSubscription = supabase
       .channel('profile_changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, payload => {
-        // Verificação simplificada para atualizar dados do usuário logado
         getUserData()
       })
       .subscribe()
@@ -185,9 +263,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
     if (pathname === "/" && activeTab === key) return true
     return false
   }
-
-  // Lógica de permissão para o Chat de Suporte
-  const canAccessChat = userData?.role === 'Marketing' || userData?.role === 'Gestor' || userData?.role === 'Diretor';
 
   return (
     <>
@@ -344,6 +419,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
                 label="Chat de Suporte" 
                 active={isActive("chat", "/chat-support")} 
                 onClick={() => handleNavigation("chat", "/chat-support")}
+                badge={unreadSupportCount > 0 ? unreadSupportCount : undefined}
                 collapsed={isCollapsed}
               />
             )}

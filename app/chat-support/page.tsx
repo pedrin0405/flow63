@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { 
   Menu, MessageSquare, Send, User, Monitor, 
-  Search, Clock, ChevronRight, CheckCheck, 
+  Search, Clock, ChevronRight, CheckCheck, Check,
   Paperclip, StickyNote, History, CheckCircle2,
   Settings, Globe, Cpu, Hash, ShieldCheck, 
-  Zap, Loader2, Save, Trash2, MessageCircle, Mail
+  Zap, Loader2, Save, Trash2, MessageCircle, Mail, X
 } from "lucide-react"
 import { Sidebar } from "../../components/central63/sidebar"
 import { supabase } from "../../lib/supabase"
@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "../../components/ui/select"
 import { useToast } from "../../hooks/use-toast"
+import { useRouter, useSearchParams } from "next/navigation"
 import Loading from "../loading"
 
 const TAG_CONFIG = {
@@ -35,8 +36,11 @@ const TAG_CONFIG = {
   concluido: { label: 'Finalizado', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200' },
 }
 
-export default function App() {
+function SupportContent() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
+  const ticketIdFromUrl = searchParams.get('id')
+  
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("support")
@@ -47,13 +51,35 @@ export default function App() {
   const [novaResposta, setNovaResposta] = useState("")
   const [notaInterna, setNotaInterna] = useState("")
   
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
   const [isSavingNote, setIsSavingNote] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [noteSaved, setNoteSaved] = useState(false)
+  
+  const chatScrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     carregarChamados()
   }, [])
+
+  // Auto-scroll sempre que as mensagens mudarem
+  useEffect(() => {
+    scrollToBottom()
+  }, [mensagens])
+
+  // Efeito para selecionar ticket vindo da URL
+  useEffect(() => {
+    if (ticketIdFromUrl && chamados.length > 0) {
+      const ticket = chamados.find(c => c.id === ticketIdFromUrl)
+      if (ticket && chamadoSelecionado?.id !== ticket.id) {
+        setChamadoSelecionado(ticket)
+        carregarMensagens(ticket)
+      }
+    }
+  }, [ticketIdFromUrl, chamados])
 
   useEffect(() => {
     const canalLista = supabase
@@ -69,6 +95,7 @@ export default function App() {
 
     let canalChat: any;
     if (chamadoSelecionado?.id) {
+      marcarComoLidas(chamadoSelecionado.id);
       canalChat = supabase
         .channel(`chat-ativo-${chamadoSelecionado.id}`)
         .on('postgres_changes', { 
@@ -77,11 +104,41 @@ export default function App() {
           table: 'suporte_mensagens',
           filter: `chamado_id=eq.${chamadoSelecionado.id}` 
         }, (payload) => {
+          const newMessage = payload.new;
+          // Garante que metadados seja um objeto (Supabase realtime às vezes envia como string)
+          if (newMessage.metadados && typeof newMessage.metadados === 'string') {
+            try {
+              newMessage.metadados = JSON.parse(newMessage.metadados);
+            } catch (e) {
+              console.error("Erro ao parsear metadados:", e);
+            }
+          }
+
+          // Som de alerta para o suporte (Sempre toca se for mensagem do cliente)
+          if (!newMessage.eh_admin) {
+            marcarComoLidas(chamadoSelecionado.id);
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3')
+              audio.volume = 0.5
+              audio.play().catch(() => {})
+            } catch (e) {}
+          }
+
           setMensagens((prev) => {
-            if (prev.some(m => m.id === payload.new.id)) return prev;
-            return [...prev, payload.new];
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
           });
           scrollToBottom();
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public', 
+          table: 'suporte_mensagens',
+          filter: `chamado_id=eq.${chamadoSelecionado.id}`
+        }, (payload) => {
+          setMensagens((prev) => 
+            prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m)
+          )
         })
         .subscribe();
     }
@@ -92,11 +149,44 @@ export default function App() {
     };
   }, [chamadoSelecionado?.id]);
 
+  async function marcarComoLidas(id: string) {
+    // Marca mensagens do usuário como lidas pelo suporte
+    await supabase
+      .from('suporte_mensagens')
+      .update({ lida: true })
+      .eq('chamado_id', id)
+      .eq('eh_admin', false)
+      .eq('lida', false)
+  }
+
   const scrollToBottom = () => {
     setTimeout(() => {
-      const scrollArea = document.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
-    }, 100);
+      if (chatScrollRef.current) {
+        const viewport = chatScrollRef.current.querySelector('[data-radix-scroll-area-viewport]')
+        if (viewport) {
+          viewport.scrollTo({
+            top: viewport.scrollHeight,
+            behavior: 'smooth'
+          })
+        }
+      }
+    }, 100)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "Arquivo muito grande", description: "O limite é 5MB", variant: "destructive" })
+        return
+      }
+      setSelectedFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   async function carregarChamados() {
@@ -178,26 +268,54 @@ export default function App() {
   }
 
   async function enviarResposta() {
-    if (!novaResposta.trim() || !chamadoSelecionado || isSending) return
+    if ((!novaResposta.trim() && !selectedFile) || !chamadoSelecionado || isSending) return
     setIsSending(true)
     
-    const { data: { user } } = await supabase.auth.getUser()
-    const nomeAdmin = user?.user_metadata?.full_name || "Suporte Central63"
-    
-    const { error } = await supabase.from('suporte_mensagens').insert({
-      chamado_id: chamadoSelecionado.id,
-      remetente_id: user?.id,
-      conteudo: novaResposta,
-      eh_admin: true,
-      metadados: { nome_remetente: nomeAdmin } 
-    })
-    
-    if (!error) {
-      await supabase.from('suporte_chamados').update({ atualizado_em: new Date().toISOString() }).eq('id', chamadoSelecionado.id)
-      setNovaResposta("")
-      scrollToBottom()
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const nomeAdmin = user?.user_metadata?.full_name || "Suporte Central63"
+      
+      let imagem_url = null
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop()
+        const fileName = `support/${chamadoSelecionado.id}/${Date.now()}.${fileExt}`
+        
+        const { error: uploadError } = await supabase.storage
+          .from('user-uploads')
+          .upload(fileName, selectedFile)
+        
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('user-uploads')
+          .getPublicUrl(fileName)
+        
+        imagem_url = publicUrl
+      }
+
+      const { error } = await supabase.from('suporte_mensagens').insert({
+        chamado_id: chamadoSelecionado.id,
+        remetente_id: user?.id,
+        conteudo: novaResposta,
+        eh_admin: true,
+        metadados: { 
+          nome_remetente: nomeAdmin,
+          imagem_url: imagem_url
+        } 
+      })
+      
+      if (!error) {
+        await supabase.from('suporte_chamados').update({ atualizado_em: new Date().toISOString() }).eq('id', chamadoSelecionado.id)
+        setNovaResposta("")
+        setSelectedFile(null)
+        setPreviewUrl(null)
+        scrollToBottom()
+      }
+    } catch (error: any) {
+      toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" })
+    } finally {
+      setIsSending(false)
     }
-    setIsSending(false)
   }
 
   if (isLoading) return <Loading />
@@ -328,7 +446,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-hidden bg-[#F5F5F7]/50">
+                <div className="flex-1 min-h-0 overflow-hidden bg-[#F5F5F7]/50" ref={chatScrollRef}>
                   <ScrollArea className="h-full">
                     <div className="p-8 flex flex-col gap-4 max-w-4xl mx-auto">
                       {mensagens.map((msg) => (
@@ -339,13 +457,33 @@ export default function App() {
                               ? 'bg-[#007AFF] text-white rounded-br-sm'
                               : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
                             }`}>
-                              {msg.conteudo}
+                              {msg.metadados?.imagem_url && (
+                                <div className="mb-2 overflow-hidden rounded-lg">
+                                  <img 
+                                    src={msg.metadados.imagem_url} 
+                                    alt="Anexo" 
+                                    className="max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => window.open(msg.metadados.imagem_url, '_blank')}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex flex-col gap-1">
+                                <span>{msg.conteudo}</span>
+                                {msg.eh_admin && (
+                                  <div className="flex justify-end -mb-1 -mr-1">
+                                    {msg.lida ? (
+                                      <CheckCheck size={14} className="text-blue-200" />
+                                    ) : (
+                                      <Check size={14} className="text-blue-300/70" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-1.5 mt-1.5 px-1">
                               <span className="text-[10px] text-slate-400 font-medium">
                                 {new Date(msg.criado_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
-                              {msg.eh_admin && <CheckCheck size={14} className="text-blue-500" />}
                             </div>
                           </div>
                         </div>
@@ -355,8 +493,33 @@ export default function App() {
                 </div>
 
                 <div className="p-4 border-t border-slate-100 shrink-0 bg-white">
+                  {previewUrl && (
+                    <div className="mb-3 relative inline-block mx-4">
+                      <img src={previewUrl} alt="Preview" className="h-20 w-20 object-cover rounded-xl border-2 border-blue-100 shadow-sm" />
+                      <button 
+                        onClick={() => { setSelectedFile(null); setPreviewUrl(null); }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex gap-2 items-center bg-slate-50 p-1.5 rounded-[1.2rem] border border-slate-200/80 focus-within:bg-white focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
-                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-slate-400 hover:text-slate-600"><Paperclip size={18} /></Button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={handleFileChange}
+                    />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-10 w-10 rounded-full text-slate-400 hover:text-slate-600"
+                    >
+                      <Paperclip size={18} />
+                    </Button>
                     <Input 
                       placeholder="Mensagem..." 
                       value={novaResposta}
@@ -404,7 +567,6 @@ export default function App() {
                           <span className="text-[11px] font-medium text-blue-600 mt-1">{chamadoSelecionado.metadados?.email || `ID: ${chamadoSelecionado.id.substring(0, 12)}`}</span>
                         </div>
                         <div className="space-y-6">
-                          {/* NOVA FUNCIONALIDADE: ATENDIMENTO SELECIONADO */}
                           <div className="space-y-3">
                             <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Atendimento Selecionado</h5>
                             <div className="bg-blue-50/50 p-3 rounded-xl flex flex-col gap-1 border border-blue-100/50">
@@ -482,5 +644,13 @@ export default function App() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <SupportContent />
+    </Suspense>
   )
 }

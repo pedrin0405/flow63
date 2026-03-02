@@ -39,6 +39,7 @@ interface Lead {
   status_dashboard?: string //
   visibleOnDashboard?: boolean
   valueLaunched: number
+  comissao?: number
 }
 
 interface LeadCardProps {

@@ -6,6 +6,7 @@ import './globals.css'
 
 
 import { SuportePopup } from "@/components/central63/support/support-popup"
+import { Toaster } from "@/components/ui/toaster"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -47,6 +48,7 @@ export default function RootLayout({
       >
         {children}
         <SuportePopup />
+        <Toaster />
         <Analytics />
       </body>
     </html>
