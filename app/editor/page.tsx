@@ -671,16 +671,98 @@ function SupportContent() {
     );
   };
 
-  const handleExportPNG = () => {
-    const activeMethods = artboardsMethods.current[activeArtboardId];
-    if (!activeMethods) return;
-    
-    const activeArtboard = artboards.find(a => a.id === activeArtboardId);
-    const link = document.createElement('a'); 
-    link.download = `${canvasTitle}_${activeArtboard?.title || 'art'}.png`; 
-    link.href = activeMethods.exportToImage() || ''; 
-    link.click();
-    toast.success('Download iniciado!');
+  const [showDownloadSettings, setShowDownloadSettings] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'png' | 'jpg' | 'pdf'>('png');
+  const [exportQuality, setExportQuality] = useState(1);
+  const [exportTransparent, setExportTransparent] = useState(false);
+  const [selectedArtboardsForExport, setSelectedArtboardsForExport] = useState<string[]>([]);
+
+  // Sincroniza pranchetas selecionadas quando a lista de pranchetas muda
+  useEffect(() => {
+    setSelectedArtboardsForExport(artboards.map(a => a.id));
+  }, [artboards]);
+
+  const handleExport = async () => {
+    try {
+      setIsSaving(true);
+      const targets = artboards.filter(a => selectedArtboardsForExport.includes(a.id));
+      
+      if (targets.length === 0) {
+        toast.error("Selecione pelo menos uma prancheta para exportar.");
+        setIsSaving(false);
+        return;
+      }
+
+      // Verifica se todos os editores estão prontos
+      const missingMethods = targets.some(a => !artboardsMethods.current[a.id]);
+      if (missingMethods) {
+        toast.error("Algumas pranchetas ainda estão carregando. Por favor, aguarde um momento.");
+        setIsSaving(false);
+        return;
+      }
+
+      if (exportFormat === 'pdf') {
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'px',
+          format: [targets[0].width, targets[0].height]
+        });
+
+        for (let i = 0; i < targets.length; i++) {
+          const artboard = targets[i];
+          const methods = artboardsMethods.current[artboard.id];
+          if (!methods) continue;
+
+          const dataUrl = methods.exportToImage(); 
+          if (!dataUrl) continue;
+
+          if (i > 0) doc.addPage([artboard.width, artboard.height], artboard.width > artboard.height ? 'landscape' : 'portrait');
+          doc.addImage(dataUrl, 'PNG', 0, 0, artboard.width, artboard.height);
+        }
+
+        doc.save(`${canvasTitle}.pdf`);
+        toast.success('PDF gerado com sucesso!');
+      } else {
+        // Exportação de Imagens
+        for (const artboard of targets) {
+          const methods = artboardsMethods.current[artboard.id];
+          if (!methods) continue;
+
+          const canvas = methods.fabricCanvas.current;
+          const originalBg = canvas.backgroundColor;
+          
+          if (exportTransparent && exportFormat === 'png') {
+            canvas.backgroundColor = 'transparent';
+          } else {
+            canvas.backgroundColor = '#ffffff';
+          }
+          canvas.renderAll();
+
+          const dataUrl = canvas.toDataURL({
+            format: exportFormat,
+            quality: 1,
+            multiplier: exportQuality
+          });
+
+          // Restaura fundo
+          canvas.backgroundColor = originalBg;
+          canvas.renderAll();
+
+          const link = document.createElement('a');
+          link.download = `${canvasTitle}_${artboard.title}.${exportFormat}`;
+          link.href = dataUrl;
+          link.click();
+          
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        toast.success(`${targets.length} imagem(ns) exportada(s)!`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao exportar arquivo.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // PROXY PARA O MAGIC FILL:
@@ -832,55 +914,176 @@ function SupportContent() {
                 Novo Design
               </Button>
               
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={(open) => { if(!open) setShowDownloadSettings(false); }}>
                 <DropdownMenuTrigger asChild>
                   <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-sm font-semibold rounded-lg px-6 border-0">
                     <Share className="w-4 h-4 mr-2" /> Compartilhar
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64 p-2 rounded-xl shadow-xl border-slate-200">
-                  <div className="p-2 pb-3">
-                    <h4 className="font-bold text-sm text-slate-800">Opções do Design</h4>
-                    <p className="text-xs text-slate-500">Salve ou exporte sua arte.</p>
-                  </div>
-                  
-                  <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem onClick={handleSave} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 focus:text-blue-700">
-                    <Save className="w-4 h-4 mr-3 text-slate-500" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">Salvar Projeto</span>
-                      <span className="text-[10px] text-slate-500">Guarda todas as pranchetas</span>
+                <DropdownMenuContent align="end" className="w-80 p-0 rounded-xl shadow-2xl border-slate-200 overflow-hidden">
+                  {!showDownloadSettings ? (
+                    <>
+                      <div className="p-4 pb-3">
+                        <h4 className="font-bold text-sm text-slate-800">Opções do Design</h4>
+                        <p className="text-xs text-slate-500">Salve ou exporte sua arte.</p>
+                      </div>
+                      
+                      <DropdownMenuSeparator />
+                      
+                      <div className="p-2 space-y-1">
+                        <DropdownMenuItem onClick={handleSave} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 focus:text-blue-700">
+                          <Save className="w-4 h-4 mr-3 text-slate-500" />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">Salvar Projeto</span>
+                            <span className="text-[10px] text-slate-500">Guarda todas as pranchetas</span>
+                          </div>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem onClick={handleSaveAsTemplate} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 focus:text-blue-700">
+                          <LayoutTemplate className="w-4 h-4 mr-3 text-slate-500" />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">Salvar como Template</span>
+                            <span className="text-[10px] text-slate-500">Para toda a equipe</span>
+                          </div>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator className="my-1" />
+
+                        <DropdownMenuItem onClick={(e) => { e.preventDefault(); setShowDownloadSettings(true); }} className="cursor-pointer py-3 rounded-lg focus:bg-blue-600 focus:text-white group">
+                          <Download className="w-4 h-4 mr-3 text-slate-500 group-focus:text-white" />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">Baixar</span>
+                            <span className="text-[10px] text-slate-500 group-focus:text-blue-100">PNG, JPG, PDF</span>
+                          </div>
+                        </DropdownMenuItem>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col animate-in slide-in-from-right-2 duration-200">
+                      <div className="p-4 border-b flex items-center gap-3">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={(e) => { e.preventDefault(); setShowDownloadSettings(false); }}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                        <h4 className="font-bold text-sm text-slate-800">Baixar</h4>
+                      </div>
+
+                      <div className="p-5 space-y-6">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo de arquivo</Label>
+                          <Select value={exportFormat} onValueChange={(val: any) => setExportFormat(val)}>
+                            <SelectTrigger className="h-11 rounded-xl border-slate-200 focus:ring-blue-100">
+                              <SelectValue placeholder="Selecione o formato" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl shadow-xl border-slate-200">
+                              <SelectItem value="png" className="py-2.5 rounded-lg">PNG <span className="text-[10px] text-slate-400 ml-2">Melhor para imagens</span></SelectItem>
+                              <SelectItem value="jpg" className="py-2.5 rounded-lg">JPG <span className="text-[10px] text-slate-400 ml-2">Melhor para web</span></SelectItem>
+                              <SelectItem value="pdf" className="py-2.5 rounded-lg">PDF <span className="text-[10px] text-slate-400 ml-2">Melhor para impressão</span></SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {exportFormat !== 'pdf' && (
+                          <>
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tamanho</Label>
+                                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{exportQuality}x</span>
+                              </div>
+                              <Slider 
+                                min={0.5} max={3} step={0.5} 
+                                value={[exportQuality]} 
+                                onValueChange={(v) => setExportQuality(v[0])} 
+                                className="py-2"
+                              />
+                              <p className="text-[10px] text-slate-400">Aumente para melhor resolução.</p>
+                            </div>
+
+                            {exportFormat === 'png' && (
+                              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                <div className="space-y-0.5">
+                                  <Label htmlFor="transparency" className="text-xs font-bold text-slate-700">Fundo transparente</Label>
+                                  <p className="text-[10px] text-slate-500">Remove o fundo branco</p>
+                                </div>
+                                <input 
+                                  type="checkbox" 
+                                  id="transparency"
+                                  checked={exportTransparent}
+                                  onChange={(e) => setExportTransparent(e.target.checked)}
+                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selecionar pranchetas</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full h-11 justify-between px-4 rounded-xl border-slate-200 text-slate-700 font-medium">
+                                <span className="truncate">
+                                  {selectedArtboardsForExport.length === artboards.length 
+                                    ? "Todas as pranchetas" 
+                                    : `${selectedArtboardsForExport.length} prancheta(s) selecionada(s)`}
+                                </span>
+                                <ChevronDown className="w-4 h-4 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-2 rounded-xl shadow-xl border-slate-200" align="start">
+                              <div className="max-h-60 overflow-y-auto space-y-1">
+                                <div 
+                                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                                  onClick={() => {
+                                    if (selectedArtboardsForExport.length === artboards.length) setSelectedArtboardsForExport([]);
+                                    else setSelectedArtboardsForExport(artboards.map(a => a.id));
+                                  }}
+                                >
+                                  <input 
+                                    type="checkbox" 
+                                    checked={selectedArtboardsForExport.length === artboards.length}
+                                    onChange={() => {}} 
+                                    className="rounded border-slate-300"
+                                  />
+                                  <span className="text-xs font-bold text-slate-700">Todas ({artboards.length})</span>
+                                </div>
+                                <Separator className="my-1" />
+                                {artboards.map((artboard, idx) => (
+                                  <div 
+                                    key={artboard.id}
+                                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                                    onClick={() => {
+                                      if (selectedArtboardsForExport.includes(artboard.id)) {
+                                        setSelectedArtboardsForExport(prev => prev.filter(id => id !== artboard.id));
+                                      } else {
+                                        setSelectedArtboardsForExport(prev => [...prev, artboard.id]);
+                                      }
+                                    }}
+                                  >
+                                    <input 
+                                      type="checkbox" 
+                                      checked={selectedArtboardsForExport.includes(artboard.id)}
+                                      onChange={() => {}}
+                                      className="rounded border-slate-300"
+                                    />
+                                    <span className="text-xs text-slate-600">{idx + 1}. {artboard.title}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        <Button 
+                          onClick={handleExport}
+                          disabled={selectedArtboardsForExport.length === 0 || isSaving}
+                          className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200"
+                        >
+                          {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                          Baixar
+                        </Button>
+                      </div>
                     </div>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem onClick={handleSaveAsTemplate} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 focus:text-blue-700">
-                    <LayoutTemplate className="w-4 h-4 mr-3 text-slate-500" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">Salvar como Template</span>
-                      <span className="text-[10px] text-slate-500">Para toda a equipe</span>
-                    </div>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem onClick={handleExportPNG} className="cursor-pointer py-3 rounded-lg focus:bg-slate-100">
-                    <Download className="w-4 h-4 mr-3 text-slate-500" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">Baixar PNG</span>
-                      <span className="text-[10px] text-slate-500">Apenas prancheta selecionada</span>
-                    </div>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem onClick={handleExportAllPDF} className="cursor-pointer py-3 rounded-lg focus:bg-slate-100">
-                    <FileDown className="w-4 h-4 mr-3 text-slate-500" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">Baixar Tudo (PDF)</span>
-                      <span className="text-[10px] text-slate-500">Todas as pranchetas num arquivo</span>
-
-
-                    </div>
-                  </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
