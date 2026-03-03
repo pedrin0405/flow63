@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useFabricEditor } from '@/hooks/use-fabric-editor';
 import { cn } from '@/lib/utils';
+import { Layout } from 'lucide-react';
 
 interface ArtboardProps {
   id: string;
@@ -31,26 +32,32 @@ export const Artboard = ({
   const { canvasRef, fabricCanvas, loadFromJson, selectedObject, canUndo, canRedo, changeCount } = methods;
   const isInitialized = useRef(false);
 
-  // Initialize with data if provided
+  // Initialize with data if provided or if canvas is empty
   useEffect(() => {
     let isMounted = true;
     
     const initCanvas = async () => {
-      // Pequena espera inicial para garantir que o Fabric Canvas foi criado pelo hook
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Verifica se o fabricCanvas.current já existe
+      if (!fabricCanvas.current) {
+        if (isMounted) setTimeout(initCanvas, 50);
+        return;
+      }
 
-      if (fabricCanvas.current && !isInitialized.current) {
-        // Verifica se o canvas está realmente pronto (possui contexto)
-        if (!fabricCanvas.current.getContext()) {
-          if (isMounted) setTimeout(initCanvas, 50); // Tenta novamente
-          return;
-        }
+      // Verifica se o canvas está realmente pronto (possui contexto)
+      if (!fabricCanvas.current.getContext()) {
+        if (isMounted) setTimeout(initCanvas, 50);
+        return;
+      }
 
-        if (initialData) {
-          await loadFromJson(initialData);
-        }
-        
-        if (isMounted) {
+      // Carrega dados se for a primeira vez OU se o canvas estiver vazio mas tivermos dados iniciais
+      // Isso protege contra o caso em que o canvas foi reiniciado pelo hook
+      const objects = fabricCanvas.current.getObjects();
+      if (initialData && (objects.length === 0 || !isInitialized.current)) {
+        await loadFromJson(initialData);
+      }
+      
+      if (isMounted) {
+        if (!isInitialized.current) {
           isInitialized.current = true;
           onMethodsReady(id, methods);
         }
@@ -72,37 +79,58 @@ export const Artboard = ({
     }
   }, [width, height]);
 
-  // Notify parent about state changes if active
+  // Notify parent about state changes if active or if context menu is requested
+  // Usamos um useEffect separado para não disparar o onSelect no loop de renderização
   useEffect(() => {
-    if (isActive) {
-      onSelect(id, methods);
+    if (isActive || methods.contextMenuInfo.visible) {
+      // Pequeno delay para garantir que o estado do editor está estável
+      const timer = setTimeout(() => {
+        onSelect(id, methods);
+      }, 10);
+      return () => clearTimeout(timer);
     }
-  }, [selectedObject, canUndo, canRedo, changeCount, isActive, id, onSelect, methods]);
+  }, [selectedObject, canUndo, canRedo, changeCount, isActive, id, methods.contextMenuInfo.visible]);
 
   return (
-    <div className="flex flex-col gap-2 mb-12 last:mb-0 items-center">
-      <div className="flex items-center justify-between w-full max-w-full px-1">
-        <span className={cn(
-          "text-[11px] font-bold uppercase tracking-wider transition-colors",
-          isActive ? "text-blue-600" : "text-slate-400"
-        )}>
-          {title} — {width}x{height}px
-        </span>
+    <div className="flex flex-col gap-3 mb-16 last:mb-0 items-center">
+      <div className="flex items-center justify-between w-full max-w-full px-2">
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all",
+            isActive 
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-200 ring-4 ring-blue-50" 
+              : "bg-slate-200 text-slate-500 shadow-sm"
+          )}>
+            <Layout className="w-3 h-3" />
+            {title}
+          </div>
+          <span className="text-[10px] font-medium text-slate-400">
+            {width} × {height}px
+          </span>
+        </div>
       </div>
       
       <div 
         className={cn(
-          "relative transition-all duration-200 ease-out cursor-pointer",
-          isActive ? "ring-2 ring-blue-500 shadow-2xl z-10" : "ring-1 ring-slate-200 shadow-md hover:ring-slate-300"
+          "relative transition-all duration-300 ease-out cursor-pointer",
+          isActive 
+            ? "ring-4 ring-blue-500/30 shadow-[0_20px_50px_rgba(59,130,246,0.15)] z-10 scale-[1.002]" 
+            : "ring-1 ring-slate-200 shadow-xl hover:ring-slate-300 hover:shadow-2xl"
         )}
         onClick={() => onSelect(id, methods)}
+        onContextMenu={(e) => {
+          onSelect(id, methods);
+        }}
         style={{ 
           width: width * zoomLevel, 
           height: height * zoomLevel 
         }}
       >
+        {/* Background layer to prevent transparency bleed */}
+        <div className="absolute inset-0 bg-white" />
+        
         <div 
-          className="absolute top-0 left-0 bg-white overflow-hidden"
+          className="absolute top-0 left-0 overflow-hidden"
           style={{
             width: width,
             height: height,

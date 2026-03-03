@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -163,14 +164,18 @@ export function MagicFill({ selectedObject, onUpdate, onInjectImage }: MagicFill
       onInjectImage(value.toString());
     } 
     else {
-      alert(`Selecione um elemento de ${type === 'text' ? 'texto' : 'imagem/moldura'} no Canvas para injetar este dado.`);
+      toast.error(`Ação necessária`, {
+        description: `Selecione um elemento de ${type === 'text' ? 'texto' : 'imagem/moldura'} no Canvas para injetar este dado.`
+      });
     }
   };
 
   // 8. BUSCAR FOTOS DO IMÓVEL (Galeria)
   const openGalleryModal = async (itemSource: DataSource, itemData: any) => {
     if (!selectedObject || (!selectedObject.isFrame && selectedObject.type !== 'rect' && selectedObject.type !== 'circle')) {
-      alert("Selecione primeiro uma moldura ou forma no Canvas para injetar a imagem.");
+      toast.error("Alvo inválido", {
+        description: "Selecione primeiro uma moldura ou forma no Canvas para injetar a imagem."
+      });
       return;
     }
 
