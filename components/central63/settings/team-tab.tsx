@@ -352,6 +352,7 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl p-2 border-border/40 backdrop-blur-xl">
                         <SelectItem value="Secretária" className="rounded-xl py-3 font-semibold">Secretária</SelectItem>
+                        <SelectItem value="Corretor" className="rounded-xl py-3 font-semibold">Corretor</SelectItem>
                         <SelectItem value="Gestor" className="rounded-xl py-3 font-semibold">Gestor</SelectItem>
                         <SelectItem value="Diretor" className="rounded-xl py-3 font-semibold">Diretor</SelectItem>
                         <SelectItem value="Marketing" className="rounded-xl py-3 font-semibold">Marketing</SelectItem>

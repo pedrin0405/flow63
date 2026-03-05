@@ -20,6 +20,7 @@ import {
   UserCog,
   FileSpreadsheet,
   Library,
+  CreditCard,
   type LucideIcon, 
   House,
   Palette
@@ -357,6 +358,26 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               onClick={() => handleNavigation("unidades", "/units")}
               collapsed={isCollapsed}
             />
+
+            {(userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Admin') && (
+              <SidebarItem 
+                icon={CreditCard} 
+                label="Gestão de Cartões" 
+                active={isActive("benefit-cards-admin", "/admin/benefit-cards")} 
+                onClick={() => handleNavigation("benefit-cards-admin", "/admin/benefit-cards")}
+                collapsed={isCollapsed}
+              />
+            )}
+
+            {userData?.role === 'Corretor' && (
+              <SidebarItem 
+                icon={CreditCard} 
+                label="Meu Cartão" 
+                active={isActive("my-benefit-card", "/brokers/my-card")} 
+                onClick={() => handleNavigation("my-benefit-card", "/brokers/my-card")}
+                collapsed={isCollapsed}
+              />
+            )}
 
             {!isCollapsed && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">

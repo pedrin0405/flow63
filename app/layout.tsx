@@ -48,13 +48,14 @@ export const metadata: Metadata = {
   },
 }
 
+// v1.0.1 - Refresh layout chunks
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <body 
         className={`font-sans antialiased ${montserrat.variable} ${playfair.variable} ${poppins.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${oswald.variable} ${raleway.variable} ${nunito.variable} ${merriweather.variable} ${bebasNeue.variable} ${dancingScript.variable}`}
         suppressHydrationWarning={true}
