@@ -7,6 +7,7 @@ import './globals.css'
 
 import { SuportePopup } from "@/components/central63/support/support-popup"
 import { Toaster } from "@/components/ui/toaster"
+import { ThemeProvider } from "@/components/theme-provider"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -54,15 +55,22 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <body 
         className={`font-sans antialiased ${montserrat.variable} ${playfair.variable} ${poppins.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${oswald.variable} ${raleway.variable} ${nunito.variable} ${merriweather.variable} ${bebasNeue.variable} ${dancingScript.variable}`}
-        suppressHydrationWarning={true}
+        suppressHydrationWarning
       >
-        {children}
-        <SuportePopup />
-        <Toaster />
-        <Analytics />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <SuportePopup />
+          <Toaster />
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -10,11 +10,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { 
   Loader2, Save, Camera, Lock, Key, RefreshCw, User, Mail, 
   ShieldCheck, UploadCloud, AtSign, CheckCircle2, BadgeCheck, 
-  Fingerprint, Sparkles, UserCircle, Eye, EyeOff, ShieldAlert
+  Fingerprint, Sparkles, UserCircle, Eye, EyeOff, ShieldAlert,
+  Moon, Sun, Monitor
 } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { useTheme } from "next-themes"
 import {
   Dialog,
   DialogContent,
@@ -166,6 +170,12 @@ export function ProfileTab({ profile, setProfile, onRefresh }: ProfileTabProps) 
     }
   }
 
+  const { theme, setTheme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // Prevenir erros de hidratação
+  useEffect(() => { setMounted(true) }, [])
+
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 animate-in fade-in duration-700 pb-16 px-4 sm:px-0">
       
@@ -221,9 +231,26 @@ export function ProfileTab({ profile, setProfile, onRefresh }: ProfileTabProps) 
                 </Button>
               </div>
 
-              <div className="space-y-1 mb-6 min-w-0">
+              <div className="space-y-1 mb-6 min-w-0 text-center">
                 <h3 className="font-black text-lg tracking-tight text-foreground truncate px-2">{profile.name || "Configurar Nome"}</h3>
-                <p className="text-[11px] font-bold text-muted-foreground/50 truncate tracking-wide uppercase">{profile.email}</p>
+                <p className="text-[11px] font-bold text-muted-foreground/50 truncate tracking-wide uppercase mb-2">{profile.email}</p>
+                
+                {/* Toggle Modo Escuro Compacto */}
+                {mounted && (
+                  <div className="flex flex-col items-center justify-center pt-1 border-t border-border/30 mt-3">
+                    <div className="flex items-center gap-3 bg-muted/40 px-3 py-1.5 rounded-full border border-border/50 shadow-sm transition-all hover:bg-muted/60">
+                      <Sun className={cn("h-3.5 w-3.5 transition-colors", resolvedTheme === 'light' ? "text-orange-500" : "text-muted-foreground/40")} />
+                      <Switch 
+                        checked={resolvedTheme === 'dark'} 
+                        onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} 
+                        className="scale-75 data-[state=checked]:bg-primary"
+                      />
+                      <Moon className={cn("h-3.5 w-3.5 transition-colors", resolvedTheme === 'dark' ? "text-primary" : "text-muted-foreground/40")} />
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mt-1.5">Modo Escuro</span>
+                  </div>
+                )}
+
                 <div className="pt-3 flex justify-center">
                   <Badge className={`rounded-full px-4 py-0.5 font-black text-[9px] uppercase tracking-[0.15em] border-none ${
                     profile.role === 'Diretor' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
