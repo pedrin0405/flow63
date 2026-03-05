@@ -35,20 +35,21 @@ import { motion, Variants, AnimatePresence } from 'framer-motion';
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import Loading from "../loading"
+import { useTheme } from "next-themes";
 
 Chart.register(...registerables);
 
 // --- Componentes de Apoio ---
 
 const StatCard = ({ title, value, icon: Icon, color, subValue }: any) => (
-  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden hover:translate-y-[-2px] transition-all">
+  <div className="bg-card p-6 rounded-2xl shadow-sm border border-border relative overflow-hidden hover:translate-y-[-2px] transition-all">
     <div className="relative z-10 flex flex-col">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-gray-500 text-sm font-medium">{title}</span>
+        <span className="text-muted-foreground text-sm font-medium">{title}</span>
         <Icon className="w-5 h-5" style={{ color }} />
       </div>
-      <span className="text-3xl font-extrabold text-gray-900">{value}</span>
-      {subValue && <span className="text-xs text-gray-400 mt-1">{subValue}</span>}
+      <span className="text-3xl font-extrabold text-foreground">{value}</span>
+      {subValue && <span className="text-xs text-muted-foreground mt-1">{subValue}</span>}
     </div>
     <div 
       className="absolute bottom-[-20px] right-[-20px] w-24 h-24 rounded-full opacity-5" 
@@ -103,25 +104,25 @@ const ExportModal = ({ isOpen, onClose, dashboardData }: { isOpen: boolean, onCl
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm print:hidden" />
-        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden print:hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-50/30">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-background/60 backdrop-blur-sm print:hidden" />
+        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-card rounded-3xl shadow-2xl w-full max-w-md overflow-hidden print:hidden border border-border">
+          <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Exportar Dados</h3>
-              <p className="text-xs text-gray-500">Escolha o formato de saída</p>
+              <h3 className="text-lg font-bold text-foreground">Exportar Dados</h3>
+              <p className="text-xs text-muted-foreground">Escolha o formato de saída</p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors"><X size={20} className="text-gray-400" /></button>
+            <button onClick={onClose} className="p-2 hover:bg-muted rounded-full transition-colors"><X size={20} className="text-muted-foreground" /></button>
           </div>
           <div className="p-4 space-y-2">
             {exportOptions.map((opt, i) => (
               /* @ts-ignore */
-              <button key={i} onClick={() => { opt.action(); if (opt.name !== 'Relatório em PDF') onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100 group text-left">
-                <div className="w-12 h-12 rounded-xl bg-indigo-100/50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+              <button key={i} onClick={() => { opt.action(); if (opt.name !== 'Relatório em PDF') onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-muted transition-all border border-transparent hover:border-border group text-left">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                   <opt.icon size={24} />
                 </div>
                 <div>
-                  <p className="font-bold text-gray-800">{opt.name}</p>
-                  <p className="text-xs text-gray-500">{opt.desc}</p>
+                  <p className="font-bold text-foreground">{opt.name}</p>
+                  <p className="text-xs text-muted-foreground">{opt.desc}</p>
                 </div>
               </button>
             ))}
@@ -134,14 +135,16 @@ const ExportModal = ({ isOpen, onClose, dashboardData }: { isOpen: boolean, onCl
 
 // --- Tipos para ícones dinâmicos ---
 import { LucideIcon, FileSpreadsheet, FileImage } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function IndicatorsPage() {
+  const { resolvedTheme } = useTheme();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showAllMidia, setShowAllMidia] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  // Instância e Unidade selecionadas (gerenciadas via Filters, mas refletidas aqui)
+  // Instância e Unidade selecionadas
   const [selectedInstance, setSelectedInstance] = useState<string>("");
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
 
@@ -163,10 +166,6 @@ export default function IndicatorsPage() {
     return filtersObj;
   };
 
-  /**
-   * FUNÇÃO PRINCIPAL DE CARREGAMENTO
-   * Agora ela captura a instância e unidade direto da string de filtros ou estados
-   */
   const fetchDashboardData = useCallback(async (filterString: string) => {
     setLoading(true);
     lastFilters.current = filterString;
@@ -174,14 +173,10 @@ export default function IndicatorsPage() {
     
     const filters = parseFilterString(filterString);
     
-    // Atualiza estados locais de controle se vierem no filtro
     if (filters.instanceName) setSelectedInstance(filters.instanceName);
     if (filters.CodigoUnidade) setSelectedUnitId(filters.CodigoUnidade);
 
     const params = new URLSearchParams(filterString);
-
-    setLoading(true);
-    lastFilters.current = filterString;
 
     try {
       const response = await fetch('/api/imoview/indicators', {
@@ -202,9 +197,8 @@ export default function IndicatorsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedInstance]);
+  }, []);
 
-  // Atualização periódica (10 min)
   useEffect(() => {
     const interval = setInterval(() => {
       if (lastFilters.current) fetchDashboardData(lastFilters.current);
@@ -212,10 +206,13 @@ export default function IndicatorsPage() {
     return () => clearInterval(interval);
   }, [fetchDashboardData]);
 
-  // Lógica de Renderização dos Gráficos (Chart.js)
   useEffect(() => {
     if (!data) return;
     Object.values(chartsInstance.current).forEach(chart => chart?.destroy());
+
+    const isDark = resolvedTheme === 'dark';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+    const textColor = isDark ? '#94a3b8' : '#64748b';
 
     if (chartRefs.tipoAtendimento.current && data.dadosGraficos.tipoAtendimento) {
       const colors = ['#6366F1', '#c55cf6', '#EC4899', '#06B6D4', '#F59E0B'];
@@ -230,7 +227,14 @@ export default function IndicatorsPage() {
             hoverOffset: 10,
           }]
         },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { display: false } } }
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: false, 
+          cutout: '75%', 
+          plugins: { 
+            legend: { display: false } 
+          } 
+        }
       });
     }
 
@@ -249,7 +253,21 @@ export default function IndicatorsPage() {
             { label: 'Negócios', data: chartData.map((item: any) => item.negocios), borderColor: '#10B981', tension: 0.4 }
           ]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', align: 'end' } } }
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: false, 
+          plugins: { 
+            legend: { 
+              position: 'top', 
+              align: 'end',
+              labels: { color: textColor, font: { weight: '600' } } 
+            } 
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textColor } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor } }
+          }
+        }
       });
     }
 
@@ -266,10 +284,20 @@ export default function IndicatorsPage() {
             { label: 'Negócios', data: chartData.map((item: any) => item.negocios), borderColor: '#10B981', fill: true, tension: 0.4 }
           ]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: textColor } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textColor } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor } }
+          }
+        }
       });
     }
-  }, [data]);
+  }, [data, resolvedTheme]);
 
   const getMetricValue = (array: any[], key: string) => {
     const item = array?.find(i => i.categoria === key);
@@ -280,7 +308,6 @@ export default function IndicatorsPage() {
     ? [...data.dadosGraficos.midiaDeOrigem].sort((a: any, b: any) => b.valor - a.valor)
     : [];
   const maxMidiaValue = sortedMidia.length > 0 ? sortedMidia[0].valor : 1;
-  const displayedMidia = showAllMidia ? sortedMidia : sortedMidia.slice(0, 5);
 
   const lastActiveIndex = data?.etapasAtendimento?.reduce((last: number, curr: any, idx: number) => {
     return curr.quantidade > 0 ? idx : last;
@@ -303,18 +330,18 @@ export default function IndicatorsPage() {
 
   const getTempStyle = (label: string) => {
     const l = label.toLowerCase();
-    if (l.includes('frio')) return { color: 'text-blue-500', bg: 'bg-blue-500', bgLight: 'bg-blue-50', icon: Snowflake };
-    if (l.includes('morno')) return { color: 'text-orange-500', bg: 'bg-orange-500', bgLight: 'bg-orange-50', icon: ThermometerSun };
-    if (l.includes('quente')) return { color: 'text-red-500', bg: 'bg-red-500', bgLight: 'bg-red-50', icon: Flame };
-    return { color: 'text-gray-500', bg: 'bg-gray-500', bgLight: 'bg-gray-50', icon: ThermometerSun };
+    if (l.includes('frio')) return { color: 'text-blue-500', bg: 'bg-blue-500', bgLight: 'bg-blue-500/10', icon: Snowflake };
+    if (l.includes('morno')) return { color: 'text-orange-500', bg: 'bg-orange-500', bgLight: 'bg-orange-500/10', icon: ThermometerSun };
+    if (l.includes('quente')) return { color: 'text-red-500', bg: 'bg-red-500', bgLight: 'bg-red-500/10', icon: Flame };
+    return { color: 'text-muted-foreground', bg: 'bg-muted-foreground', bgLight: 'bg-muted', icon: ThermometerSun };
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#fafafa] print:bg-white print:h-auto print:overflow-visible">
+    <div className="flex h-screen overflow-hidden bg-background print:bg-white print:h-auto print:overflow-visible text-foreground font-sans">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={(tab: string) => { setActiveTab(tab); setSidebarOpen(false); }} />
 
       <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar ">
-        <header className="sticky top-0 z-30 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-4 flex items-center justify-between shadow-sm print:hidden">
+        <header className="sticky top-0 z-30 w-full bg-background/80 backdrop-blur-md border-b border-border px-4 lg:px-8 py-4 flex items-center justify-between shadow-sm print:hidden">
             <div className="flex items-center gap-3">
                 <button 
                     className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors" 
@@ -323,14 +350,14 @@ export default function IndicatorsPage() {
                     <Menu size={20} />
                 </button>                
                 <ChartPie className="text-primary hidden sm:block" />
-                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">Painel de Indicadores</h2>
+                <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">Painel de Indicadores</h2>
                 <p className="text-primary hidden sm:block">| Sincronização direta Imoview</p>
             </div>
             
             <div className="flex items-center gap-2">
               <button 
                   onClick={() => setIsShareModalOpen(true)}
-                  className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                  className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
               >
                   <Download size={18} />
                   <span className="hidden sm:inline">Exportar</span>
@@ -346,17 +373,15 @@ export default function IndicatorsPage() {
 
         <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6">
           
-          {/* COMPONENTE DE FILTROS INTEGRADO */}
           <IndicatorsFilters onFilterChange={fetchDashboardData} />
 
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24 space-y-4">
-              <p className="text-gray-500 animate-pulse">Sincronizando dados com Imoview...</p>
+              <p className="text-muted-foreground animate-pulse font-medium">Sincronizando dados com Imoview...</p>
             </div>
           ) : data ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
               
-              {/* KPIs Principais */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard title="Total Atendimentos" value={data.indicadoresGerais?.totalAtendimentos || 0} icon={Phone} color="#4F46E5" />
                 <StatCard title="Visitas Realizadas" value={data.funilDeVendasTotal?.visitas || 0} icon={Home} color="#8B5CF6" />
@@ -364,19 +389,18 @@ export default function IndicatorsPage() {
                 <StatCard title="Negócios" value={data.funilDeVendasTotal?.negocios || 0} icon={TrendingUp} color="#10B981" />
               </div>
 
-              {/* JORNADA DE ATENDIMENTO */}
-              <Card className="rounded-2xl border-none shadow-xl bg-gradient-to-br from-white via-indigo-50/30 to-purple-50/20 backdrop-blur-sm overflow-hidden">
-                <CardHeader className="pb-4 border-b border-indigo-50/50">
+              <Card className="rounded-2xl border border-border shadow-xl bg-card backdrop-blur-sm overflow-hidden">
+                <CardHeader className="pb-4 border-b border-border bg-muted/10">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-gray-700 text-lg flex items-center gap-2 font-bold tracking-tight">
-                      <div className="p-2 bg-indigo-100/50 rounded-lg"><TrendingUp className="w-5 h-5 text-indigo-600" /></div>
+                    <CardTitle className="text-foreground text-lg flex items-center gap-2 font-bold tracking-tight">
+                      <div className="p-2 bg-primary/10 rounded-lg"><TrendingUp className="w-5 h-5 text-primary" /></div>
                       Jornada de Atendimento
                     </CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-8 pb-8">
                   <div className="relative mx-4">
-                    <div className="absolute top-[22px] left-0 w-full h-1.5 bg-gray-100 rounded-full z-0 overflow-hidden">
+                    <div className="absolute top-[22px] left-0 w-full h-1.5 bg-muted rounded-full z-0 overflow-hidden">
                        <motion.div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-rose-500 rounded-full shadow-md" initial={{ width: 0 }} animate={{ width: `${progressPercentage}%` }} transition={{ duration: 1.5, ease: "circOut", delay: 0.5 }} />
                     </div>
                     <motion.div className="flex justify-between items-start relative z-10 overflow-x-auto no-scrollbar pb-2" variants={containerVariants} initial="hidden" animate="show">
@@ -388,12 +412,12 @@ export default function IndicatorsPage() {
                           <motion.div key={idx} variants={itemVariants} className="flex flex-col items-center group cursor-default w-full min-w-[100px]">
                             <div className="relative">
                               {isLastActive && (<span className={`absolute -inset-2 rounded-full opacity-30 animate-ping pointer-events-none ${theme.bg.replace('50', '400')}`} />)}
-                              {isActive && (<span className={`absolute -inset-1 rounded-full blur-sm -z-10 transition-all ${theme.bg}`} />)}
-                              <motion.div className={`w-12 h-12 rounded-full flex items-center justify-center border-4 transition-all duration-300 relative ${isActive ? `bg-gradient-to-br ${theme.from} ${theme.to} border-white ring-2 ${theme.ring} shadow-lg ${theme.shadow}` : 'bg-white border-gray-100 text-gray-300 shadow-sm'}`} whileHover={{ scale: 1.15, y: -2 }} whileTap={{ scale: 0.95 }}>
-                                {isActive ? (<span className="text-sm font-bold text-white drop-shadow-md">{etapa.quantidade}</span>) : (<div className="w-2 h-2 rounded-full bg-gray-200" />)}
+                              {isActive && (<span className={`absolute -inset-1 rounded-full blur-sm -z-10 transition-all ${theme.bg.replace('bg-', 'bg-opacity-20 bg-')}`} />)}
+                              <motion.div className={`w-12 h-12 rounded-full flex items-center justify-center border-4 transition-all duration-300 relative ${isActive ? `bg-gradient-to-br ${theme.from} ${theme.to} border-white dark:border-slate-800 ring-2 ${theme.ring.replace('50', '500/20')} shadow-lg ${theme.shadow.replace('200', '500/20')}` : 'bg-card border-border text-muted-foreground shadow-sm'}`} whileHover={{ scale: 1.15, y: -2 }} whileTap={{ scale: 0.95 }}>
+                                {isActive ? (<span className="text-sm font-bold text-white drop-shadow-md">{etapa.quantidade}</span>) : (<div className="w-2 h-2 rounded-full bg-muted" />)}
                               </motion.div>
                             </div>
-                            <motion.div className={`mt-3 px-3 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-wide text-center transition-all duration-300 border ${isActive ? `${theme.text} ${theme.bg} ${theme.border} shadow-sm transform translate-y-0 opacity-100` : 'text-gray-400 bg-transparent border-transparent translate-y-2 opacity-60 group-hover:opacity-100 group-hover:translate-y-0'}`}>
+                            <motion.div className={`mt-3 px-3 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-wide text-center transition-all duration-300 border ${isActive ? `${theme.text} ${theme.bg.replace('bg-', 'bg-opacity-10 bg-')} ${theme.border} shadow-sm transform translate-y-0 opacity-100` : 'text-muted-foreground bg-transparent border-transparent translate-y-2 opacity-60 group-hover:opacity-100 group-hover:translate-y-0'}`}>
                               {etapa.nome}
                             </motion.div>
                           </motion.div>
@@ -404,12 +428,11 @@ export default function IndicatorsPage() {
                 </CardContent>
               </Card>
 
-              {/* GRÁFICOS PRINCIPAIS */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="rounded-2xl border-none shadow-sm flex flex-col h-[530px] print:h-[930px] print:max-h-[930px] print:col-span-1"> 
-                <CardHeader className="border-b border-gray-50 pb-4 shrink-0">
-                  <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
-                    <Target className="w-5 h-5 text-indigo-600" />
+                <Card className="rounded-2xl border border-border shadow-sm flex flex-col h-[530px] print:h-auto print:col-span-1 bg-card"> 
+                <CardHeader className="border-b border-border pb-4 shrink-0 bg-muted/10">
+                  <CardTitle className="text-foreground flex items-center gap-2 font-bold">
+                    <Target className="w-5 h-5 text-primary" />
                     Mídia de Origem
                   </CardTitle>
                 </CardHeader>
@@ -417,33 +440,29 @@ export default function IndicatorsPage() {
                 <CardContent className="flex-1 overflow-hidden relative p-0 print:overflow-visible">
                   <div className="h-full overflow-y-auto custom-scrollbar pb-10 print:overflow-visible print:h-auto">
                     <div className="flex flex-col">
-                      {/* Mapeamos a lista completa para o print ler os itens extras */}
                       {sortedMidia.map((item: any, idx: number) => {
-                        const percent = (item.valor / maxMidiaValue) * 100;
-                        
-                        // Lógica de visibilidade:
-                        // Na tela: segue o estado 'showAllMidia' (limite 5)
-                        // No print: mostra até o índice 9 (total 10 itens) independente do botão
+                        const maxVal = sortedMidia[0]?.valor || 1;
+                        const percent = (item.valor / maxVal) * 100;
                         const isHiddenOnScreen = !showAllMidia && idx > 4;
                         const isVisibleOnPrint = idx < 10; 
 
                         return (
                           <div 
                             key={idx} 
-                            className={`relative py-4 px-6 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors group
+                            className={`relative py-4 px-6 border-b border-border last:border-0 hover:bg-muted/50 transition-colors group
                               ${isHiddenOnScreen ? 'hidden' : 'flex'} 
                               ${isVisibleOnPrint ? 'print:flex' : 'print:hidden'} flex-col`}
                           >
                             <div className="flex justify-between items-center mb-2 relative z-10">
-                              <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                <span className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-black ${idx < 3 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>{idx + 1}</span>
+                              <span className="text-sm font-bold text-foreground flex items-center gap-2">
+                                <span className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-black ${idx < 3 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{idx + 1}</span>
                                 {item.categoria}
                               </span>
-                              <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{item.valor}</span>
+                              <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">{item.valor}</span>
                             </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                               <motion.div 
-                                className={`h-full rounded-full ${idx < 3 ? 'bg-gradient-to-r from-indigo-500 to-purple-500' : 'bg-gray-400'}`} 
+                                className={`h-full rounded-full ${idx < 3 ? 'bg-gradient-to-r from-primary to-purple-500' : 'bg-slate-400'}`} 
                                 initial={{ width: 0 }} 
                                 animate={{ width: `${percent}%` }} 
                                 transition={{ duration: 1, delay: idx * 0.1, ease: "easeOut" }} 
@@ -455,10 +474,9 @@ export default function IndicatorsPage() {
                     </div>
                   </div>
 
-                  {/* Botão original: print:hidden para não aparecer na impressão */}
                   {sortedMidia.length > 5 && (
-                    <div className="absolute bottom-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-6 pb-2 flex justify-center z-20 print:hidden">
-                        <button onClick={() => setShowAllMidia(!showAllMidia)} className="flex items-center gap-1.5 px-4 py-1.5 bg-white border border-gray-200 shadow-sm rounded-full text-xs font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all transform hover:scale-105">
+                    <div className="absolute bottom-0 w-full bg-gradient-to-t from-card via-card to-transparent pt-6 pb-2 flex justify-center z-20 print:hidden">
+                        <button onClick={() => setShowAllMidia(!showAllMidia)} className="flex items-center gap-1.5 px-4 py-1.5 bg-card border border-border shadow-sm rounded-full text-xs font-bold text-primary hover:bg-muted hover:border-primary/50 transition-all transform hover:scale-105">
                           {showAllMidia ? (<>Ver menos <ChevronUp className="w-3 h-3" /></>) : (<>Ver mais ({sortedMidia.length - 5}) <ChevronDown className="w-3 h-3" /></>)}
                         </button>
                     </div>
@@ -466,10 +484,10 @@ export default function IndicatorsPage() {
                 </CardContent>
               </Card>
 
-                <Card className="rounded-2xl border-none shadow-sm h-[530px] flex flex-col">
-                  <CardHeader className="border-b border-gray-50 pb-4 shrink-0">
-                    <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
-                      <ThermometerSun className="w-5 h-5 text-indigo-600" />
+                <Card className="rounded-2xl border border-border shadow-sm h-[530px] flex flex-col bg-card">
+                  <CardHeader className="border-b border-border pb-4 shrink-0 bg-muted/10">
+                    <CardTitle className="text-foreground flex items-center gap-2 font-bold">
+                      <ThermometerSun className="w-5 h-5 text-primary" />
                       Temperatura do Lead
                     </CardTitle>
                   </CardHeader>
@@ -488,13 +506,13 @@ export default function IndicatorsPage() {
                                   <Icon size={20} />
                                 </div>
                                 <div>
-                                  <p className="text-sm font-bold text-gray-700">{item.categoria}</p>
-                                  <p className="text-xs text-gray-400 font-medium">{percent.toFixed(1)}% do total</p>
+                                  <p className="text-sm font-bold text-foreground">{item.categoria}</p>
+                                  <p className="text-xs text-muted-foreground font-medium">{percent.toFixed(1)}% do total</p>
                                 </div>
                               </div>
                               <span className={`text-xl font-black ${style.color}`}>{item.valor}</span>
                             </div>
-                            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden p-0.5">
+                            <div className="w-full h-3 bg-muted rounded-full overflow-hidden p-0.5">
                               <motion.div className={`h-full rounded-full ${style.bg} shadow-sm`} initial={{ width: 0 }} animate={{ width: `${percent}%` }} transition={{ duration: 1, ease: "easeOut", delay: idx * 0.1 }} />
                             </div>
                           </div>
@@ -505,18 +523,16 @@ export default function IndicatorsPage() {
                 </Card>
               </div>
 
-              {/* KPIs de Alerta */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                  <StatCard title="Leads sem Atividade" value={data.atividades?.Sematividadeprogramada?.atendimento || 0} icon={PauseCircle} color="#F59E0B" subValue="Atenção Necessária" />
                  <StatCard title="Atividades Vencidas" value={data.atividades?.Atividadesvencidas?.atividade || 0} icon={AlertTriangle} color="#EF4444" subValue="Prioridade Alta" />
                  <StatCard title="Leads Estagnados (+45d)" value={getMetricValue(data.dadosGraficos?.ultimaInteracao, 'acima de 45 dias')} icon={TimerOff} color="#64748B" subValue="Sem interação recente" />
               </div>
 
-              {/* GRÁFICOS SECUNDÁRIOS */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="rounded-2xl border-none shadow-sm flex flex-col h-[400px]">
-                  <CardHeader className="border-b border-gray-50 pb-4">
-                    <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
+                <Card className="rounded-2xl border border-border shadow-sm flex flex-col h-[400px] bg-card">
+                  <CardHeader className="border-b border-border pb-4 bg-muted/10">
+                    <CardTitle className="text-foreground flex items-center gap-2 font-bold">
                       <X className="w-5 h-5 text-rose-500" />
                       Motivos de Descarte
                     </CardTitle>
@@ -527,12 +543,12 @@ export default function IndicatorsPage() {
                           const maxVal = data.dadosGraficos.motivoDescarte[0]?.valor || 1;
                           const percent = (item.valor / maxVal) * 100;
                           return (
-                            <div key={idx} className="relative py-3 px-6 hover:bg-rose-50/30 border-b border-gray-50 last:border-0 group">
+                            <div key={idx} className="relative py-3 px-6 hover:bg-rose-500/10 border-b border-border last:border-0 group">
                                <div className="flex justify-between items-center mb-1.5 relative z-10">
-                                  <span className="text-xs font-bold text-gray-700 truncate max-w-[80%]" title={item.categoria}>{item.categoria}</span>
-                                  <span className="text-xs font-black text-rose-600">{item.valor}</span>
+                                  <span className="text-xs font-bold text-foreground truncate max-w-[80%]" title={item.categoria}>{item.categoria}</span>
+                                  <span className="text-xs font-black text-rose-500">{item.valor}</span>
                                </div>
-                               <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                               <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                                   <motion.div className="h-full rounded-full bg-gradient-to-r from-rose-400 to-red-500 shadow-sm" initial={{ width: 0 }} animate={{ width: `${percent}%` }} transition={{ duration: 1, ease: "easeOut", delay: idx * 0.05 }} />
                                </div>
                             </div>
@@ -542,10 +558,10 @@ export default function IndicatorsPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-2xl border-none shadow-sm flex flex-col h-[400px]">
-                  <CardHeader className="border-b border-gray-50 pb-4">
-                    <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
-                      <PieChart className="w-5 h-5 text-indigo-600" />
+                <Card className="rounded-2xl border border-border shadow-sm flex flex-col h-[400px] bg-card">
+                  <CardHeader className="border-b border-border pb-4 bg-muted/10">
+                    <CardTitle className="text-foreground flex items-center gap-2 font-bold">
+                      <PieChart className="w-5 h-5 text-primary" />
                       Canais de Atendimento
                     </CardTitle>
                   </CardHeader>
@@ -553,26 +569,26 @@ export default function IndicatorsPage() {
                     <div className="flex w-full items-center gap-4">
                       <div className="w-1/2 h-[220px] relative">
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                           <span className="text-3xl font-black text-gray-800">{data?.dadosGraficos?.tipoAtendimento?.reduce((a:any, b:any) => a + b.valor, 0)}</span>
-                           <span className="text-[10px] uppercase text-gray-400 font-bold tracking-wider">Total</span>
+                           <span className="text-3xl font-black text-foreground">{data?.dadosGraficos?.tipoAtendimento?.reduce((a:any, b:any) => a + b.valor, 0)}</span>
+                           <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Total</span>
                         </div>
                         <canvas ref={chartRefs.tipoAtendimento}></canvas>
                       </div>
-                      <div className="w-1/2 flex flex-col justify-center gap-3 pl-4 border-l border-gray-100">
+                      <div className="w-1/2 flex flex-col justify-center gap-3 pl-4 border-l border-border">
                         {data?.dadosGraficos?.tipoAtendimento?.map((item: any, idx: number) => {
                           const colors = ['bg-indigo-500', 'bg-violet-500', 'bg-pink-500', 'bg-cyan-500', 'bg-amber-500'];
                           const colorClass = colors[idx % colors.length];
                           const total = data.dadosGraficos.tipoAtendimento.reduce((a:any, b:any) => a + b.valor, 0);
-                          const percent = ((item.valor / total) * 100).toFixed(0);
+                          const percent = total > 0 ? ((item.valor / total) * 100).toFixed(0) : 0;
                           return (
                             <div key={idx} className="flex items-center justify-between group cursor-default">
                               <div className="flex items-center gap-2">
-                                <span className={`w-3 h-3 rounded-full ${colorClass} ring-2 ring-white shadow-sm`}></span>
-                                <span className="text-xs font-semibold text-gray-600 group-hover:text-gray-900 transition-colors">{item.categoria}</span>
+                                <span className={`w-3 h-3 rounded-full ${colorClass} ring-2 ring-background shadow-sm`}></span>
+                                <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">{item.categoria}</span>
                               </div>
                               <div className="text-right">
-                                <span className="block text-xs font-bold text-gray-900">{item.valor}</span>
-                                <span className="block text-[10px] text-gray-400">{percent}%</span>
+                                <span className="block text-xs font-bold text-foreground">{item.valor}</span>
+                                <span className="block text-[10px] text-muted-foreground">{percent}%</span>
                               </div>
                             </div>
                           )
@@ -583,34 +599,31 @@ export default function IndicatorsPage() {
                 </Card>
               </div>
 
-              {/* TENDÊNCIA DE DESEMPENHO SEMANAL */}
-              <Card className="rounded-2xl border-none shadow-sm overflow-hidden">
-                <CardHeader className="border-b border-gray-50 flex flex-row items-center justify-between">
-                  <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
-                    <LineChart className="w-5 h-5 text-indigo-600" />
+              <Card className="rounded-2xl border border-border shadow-sm overflow-hidden bg-card">
+                <CardHeader className="border-b border-border flex flex-row items-center justify-between bg-muted/10">
+                  <CardTitle className="text-foreground flex items-center gap-2 font-bold">
+                    <LineChart className="w-5 h-5 text-primary" />
                     Tendência de Desempenho Semanal (Funil)
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="h-[250px] pt-6"><canvas ref={chartRefs.desempenhoLinha}></canvas></CardContent>
+                <CardContent className="h-[250px] pt-6 bg-card"><canvas ref={chartRefs.desempenhoLinha}></canvas></CardContent>
               </Card>
 
-              {/* VOLUME DE RESULTADOS SEMANAL */}
-              <Card className="rounded-2xl border-none shadow-sm overflow-hidden">
-                <CardHeader className="border-b border-gray-50 flex flex-row items-center justify-between">
-                  <CardTitle className="text-gray-700 flex items-center gap-2 font-bold">
+              <Card className="rounded-2xl border border-border shadow-sm overflow-hidden bg-card">
+                <CardHeader className="border-b border-border flex flex-row items-center justify-between bg-muted/10">
+                  <CardTitle className="text-foreground flex items-center gap-2 font-bold">
                     <AreaChart className="w-5 h-5 text-emerald-600" />
                     Volume de Resultados Semanal (Visitas vs Negócios)
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="h-[250px] pt-6"><canvas ref={chartRefs.volumeAtividadesSemanal}></canvas></CardContent>
+                <CardContent className="h-[250px] pt-6 bg-card"><canvas ref={chartRefs.volumeAtividadesSemanal}></canvas></CardContent>
               </Card>
 
-              {/* TABELA SEMANAL */}
-              <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden">
-                <CardHeader className="px-6 py-5 border-b border-gray-100 bg-white flex flex-row items-center justify-between">
+              <Card className="rounded-2xl border border-border shadow-sm bg-card overflow-hidden">
+                <CardHeader className="px-6 py-5 border-b border-border bg-muted/20 flex flex-row items-center justify-between">
                   <div className="flex flex-col gap-1">
-                    <CardTitle className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                      <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                    <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <div className="p-2 bg-primary/10 rounded-lg text-primary">
                         <TableIcon size={18} />
                       </div>
                       Detalhamento Semanal
@@ -619,7 +632,7 @@ export default function IndicatorsPage() {
                 </CardHeader>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50/50 text-gray-500 font-medium border-b border-gray-100">
+                    <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border">
                       <tr>
                         <th className="py-4 px-6 font-semibold">Semana</th>
                         <th className="py-4 px-6 text-right font-semibold">Atendimentos</th>
@@ -628,32 +641,32 @@ export default function IndicatorsPage() {
                         <th className="py-4 px-6 text-right font-semibold">Negócios</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-border/50">
                       {data.funilDeVendasSemanal?.map((row: any, i: number) => {
                         const isTotal = row.semana === 'Total';
                         if (isTotal) return null; 
                         return (
-                          <tr key={i} className="hover:bg-gray-50 transition-colors group">
-                            <td className="py-4 px-6 font-medium text-gray-900">
+                          <tr key={i} className="hover:bg-muted/30 transition-colors group">
+                            <td className="py-4 px-6 font-medium text-foreground">
                               <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-gray-300 group-hover:bg-indigo-500 transition-colors"></span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-border group-hover:bg-primary transition-colors"></span>
                                 {row.semana}
                               </div>
                             </td>
-                            <td className="py-4 px-6 text-right tabular-nums text-gray-600 group-hover:text-indigo-600 transition-colors">{row.atendimentos}</td>
-                            <td className="py-4 px-6 text-right tabular-nums text-gray-600 group-hover:text-indigo-600 transition-colors">{row.visitas}</td>
-                            <td className="py-4 px-6 text-right tabular-nums text-gray-600 group-hover:text-indigo-600 transition-colors">{row.propostas}</td>
-                            <td className="py-4 px-6 text-right tabular-nums font-semibold text-gray-900">{row.negocios}</td>
+                            <td className="py-4 px-6 text-right tabular-nums text-muted-foreground group-hover:text-primary transition-colors">{row.atendimentos}</td>
+                            <td className="py-4 px-6 text-right tabular-nums text-muted-foreground group-hover:text-primary transition-colors">{row.visitas}</td>
+                            <td className="py-4 px-6 text-right tabular-nums text-muted-foreground group-hover:text-primary transition-colors">{row.propostas}</td>
+                            <td className="py-4 px-6 text-right tabular-nums font-semibold text-foreground">{row.negocios}</td>
                           </tr>
                         );
                       })}
                       {data.funilDeVendasSemanal?.filter((r:any) => r.semana === 'Total').map((row: any, i: number) => (
-                         <tr key={'total'} className="bg-indigo-50/50 border-t border-indigo-100">
-                            <td className="py-4 px-6 font-bold text-indigo-900">TOTAL</td>
-                            <td className="py-4 px-6 text-right font-bold text-indigo-900 tabular-nums">{row.atendimentos}</td>
-                            <td className="py-4 px-6 text-right font-bold text-indigo-900 tabular-nums">{row.visitas}</td>
-                            <td className="py-4 px-6 text-right font-bold text-indigo-900 tabular-nums">{row.propostas}</td>
-                            <td className="py-4 px-6 text-right font-bold text-indigo-900 tabular-nums">{row.negocios}</td>
+                         <tr key={'total'} className="bg-primary/5 border-t border-primary/10">
+                            <td className="py-4 px-6 font-bold text-primary">TOTAL</td>
+                            <td className="py-4 px-6 text-right font-bold text-primary tabular-nums">{row.atendimentos}</td>
+                            <td className="py-4 px-6 text-right font-bold text-primary tabular-nums">{row.visitas}</td>
+                            <td className="py-4 px-6 text-right font-bold text-primary tabular-nums">{row.propostas}</td>
+                            <td className="py-4 px-6 text-right font-bold text-primary tabular-nums">{row.negocios}</td>
                          </tr>
                       ))}
                     </tbody>
@@ -663,7 +676,7 @@ export default function IndicatorsPage() {
 
             </div>
           ) : (
-             <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
                 <Database size={48} className="mb-4 opacity-20" />
                 <p className="font-bold">Aguardando definição de filtros para carregar dados.</p>
              </div>
