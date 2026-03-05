@@ -19,6 +19,17 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { jsPDF } from 'jspdf';
+import {
   Type as TypeIcon, Image as ImageIcon, Download, Save, Trash2,
   MousePointer2, Layers, Sparkles, FlipHorizontal, FlipVertical,
   Maximize, ArrowUpToLine, ArrowDownToLine, CircleDashed, SquareDashed, ImagePlus,
@@ -26,7 +37,8 @@ import {
   CornerUpLeft, CornerUpRight, CornerDownLeft, CornerDownRight, Loader2, Share, Menu, Crop,
   ZoomIn, ZoomOut, Focus, LockOpen, Unlink, Move, Scissors, Check, X,
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ArrowRightToLine, Type, Paintbrush, Undo2, Redo2, Plus, Copy, ChevronUp, ChevronDown, Files
+  List, ArrowRightToLine, Type, Paintbrush, Undo2, Redo2, Plus, Copy, ChevronUp, ChevronDown, Files, Edit3, FileDown,
+  Eye, EyeOff, Square, Circle, Triangle, Minus, Grab, MoreVertical
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
@@ -51,7 +63,7 @@ function SupportContent() {
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('editor'); 
-  const [zoomLevel, setZoomLevel] = useState(0.6);
+  const [zoomLevel, setZoomLevel] = useState(0.5);
 
   const workspaceRef = useRef<HTMLElement>(null);
 
@@ -72,8 +84,77 @@ function SupportContent() {
     { id: uuidv4(), title: 'Prancheta 1', width: 1080, height: 1080 }
   ]);
   const [activeArtboardId, setActiveArtboardId] = useState<string>(artboards[0].id);
+  const [editingArtboardId, setEditingArtboardId] = useState<string | null>(null);
+  const [expandedArtboardId, setExpandedArtboardId] = useState<string | null>(null);
+  const [editingObjectId, setEditingObjectId] = useState<string | null>(null);
+  const [resizeAllArtboards, setResizeAllArtboards] = useState(false);
   const artboardsMethods = useRef<Record<string, any>>({});
   const [activeEditor, setActiveEditor] = useState<any>(null);
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'default' | 'destructive';
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    variant: 'default'
+  });
+
+  const showConfirm = (title: string, description: string, onConfirm: () => void, variant: 'default' | 'destructive' = 'destructive') => {
+    setConfirmDialog({ isOpen: true, title, description, onConfirm, variant });
+  };
+
+  const handleSelectItem = (artboardId: string, obj: any) => {
+    const methods = artboardsMethods.current[artboardId];
+    if (methods && methods.fabricCanvas.current) {
+      if (activeArtboardId !== artboardId) {
+        handleSelectArtboard(artboardId, methods);
+      }
+      methods.fabricCanvas.current.setActiveObject(obj);
+      methods.fabricCanvas.current.renderAll();
+    }
+  };
+
+  const getObjectIcon = (type: string) => {
+    switch (type) {
+      case 'i-text':
+      case 'text': return <TypeIcon className="w-3.5 h-3.5" />;
+      case 'image': return <ImageIcon className="w-3.5 h-3.5" />;
+      case 'rect': return <Square className="w-3.5 h-3.5" />;
+      case 'circle': return <Circle className="w-3.5 h-3.5" />;
+      case 'triangle': return <Triangle className="w-3.5 h-3.5" />;
+      case 'line': return <Minus className="w-3.5 h-3.5" />;
+      default: return <Shapes className="w-3.5 h-3.5" />;
+    }
+  };
+
+  const getObjectName = (obj: any) => {
+    if (obj.customName) return obj.customName;
+    if (obj.isFrame) return obj.frameType === 'circle' ? 'Moldura Circular' : 'Moldura Retangular';
+    switch (obj.type) {
+      case 'i-text':
+      case 'text': return obj.text?.substring(0, 20) || 'Texto';
+      case 'image': return 'Imagem';
+      case 'rect': return 'Retângulo';
+      case 'circle': return 'Círculo';
+      case 'triangle': return 'Triângulo';
+      case 'line': return 'Linha';
+      default: return 'Elemento';
+    }
+  };
+
+  const handleRenameObject = (artboardId: string, obj: any, newName: string) => {
+    const methods = artboardsMethods.current[artboardId];
+    if (methods && methods.renameObject) {
+      methods.renameObject(obj, newName);
+    }
+    setEditingObjectId(null);
+  };
 
   // Destruturação segura dos métodos do editor ativo
   const {
@@ -121,7 +202,12 @@ function SupportContent() {
     canUndo = false, 
     canRedo = false,
     setCanvasProperty = (key: string, val: any) => {},
-    changeCount = 0
+    changeCount = 0,
+    toggleObjectVisibility = (o: any) => {},
+    toggleObjectLock = (o: any) => {},
+    deleteObject = (o: any) => {},
+    moveObject = (o: any, d: any) => {},
+    renameObject = (o: any, n: any) => {}
   } = activeEditor || {};
 
   const handleRegisterMethods = useCallback((id: string, methods: any) => {
@@ -133,8 +219,6 @@ function SupportContent() {
 
   const handleSelectArtboard = useCallback((id: string, methods: any) => {
     setActiveArtboardId(id);
-    // Forçamos uma nova referência do objeto de métodos para que o React 
-    // perceba a mudança e atualize a barra lateral e painéis.
     setActiveEditor({ ...methods }); 
     setUpdateTrigger(prev => prev + 1);
   }, []);
@@ -194,29 +278,156 @@ function SupportContent() {
       return;
     }
 
-    const newArtboards = artboards.filter(a => a.id !== id);
-    setArtboards(newArtboards);
-    delete artboardsMethods.current[id];
+    showConfirm(
+      "Excluir Prancheta",
+      "Tem certeza que deseja apagar esta prancheta permanentemente? Esta ação não pode ser desfeita.",
+      () => {
+        // Sincroniza as outras pranchetas antes de remover uma para evitar perda de dados no re-render
+        const newArtboards = artboards
+          .filter(a => a.id !== id)
+          .map(a => {
+            const methods = artboardsMethods.current[a.id];
+            if (methods) {
+              try {
+                return { ...a, data: JSON.parse(methods.saveToJson()) };
+              } catch (e) { console.error(e); }
+            }
+            return a;
+          });
 
-    if (activeArtboardId === id) {
-      const nextActive = newArtboards[0];
-      setActiveArtboardId(nextActive.id);
-      setActiveEditor(artboardsMethods.current[nextActive.id]);
-    }
-    toast.success('Prancheta removida.');
+        setArtboards(newArtboards);
+        delete artboardsMethods.current[id];
+
+        if (activeArtboardId === id) {
+          const nextActive = newArtboards[0];
+          setActiveArtboardId(nextActive.id);
+          setActiveEditor(artboardsMethods.current[nextActive.id]);
+        }
+        toast.success('Prancheta removida.');
+      }
+    );
   };
 
   const handleMoveArtboard = (id: string, direction: 'up' | 'down') => {
-    const index = artboards.findIndex(a => a.id === id);
+    // Sincroniza o estado atual de todas as pranchetas antes de reordenar
+    const syncedArtboards = artboards.map(artboard => {
+      const methods = artboardsMethods.current[artboard.id];
+      if (methods) {
+        try {
+          return {
+            ...artboard,
+            data: JSON.parse(methods.saveToJson())
+          };
+        } catch (e) {
+          console.error("Erro ao sincronizar prancheta antes de mover:", e);
+        }
+      }
+      return artboard;
+    });
+
+    const index = syncedArtboards.findIndex(a => a.id === id);
     if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === artboards.length - 1) return;
+    if (direction === 'down' && index === syncedArtboards.length - 1) return;
 
     const newIndex = direction === 'up' ? index - 1 : index + 1;
-    const newArtboards = [...artboards];
-    const [removed] = newArtboards.splice(index, 1);
-    newArtboards.splice(newIndex, 0, removed);
-    setArtboards(newArtboards);
+    const reorderedArtboards = [...syncedArtboards];
+    const [removed] = reorderedArtboards.splice(index, 1);
+    reorderedArtboards.splice(newIndex, 0, removed);
+    
+    setArtboards(reorderedArtboards);
+    toast.info(`Prancheta movida para ${direction === 'up' ? 'cima' : 'baixo'}`);
   };
+
+  const handleRenameArtboard = (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    
+    // Sincroniza antes de atualizar para evitar perda de dados no re-render
+    setArtboards(prev => prev.map(a => {
+      const methods = artboardsMethods.current[a.id];
+      const base = a.id === id ? { ...a, title: newTitle } : a;
+      if (methods) {
+        try {
+          return { ...base, data: JSON.parse(methods.saveToJson()) };
+        } catch (e) { console.error(e); }
+      }
+      return base;
+    }));
+    
+    setEditingArtboardId(null);
+    toast.success("Prancheta renomeada");
+  };
+
+  const handleExportAllPDF = async () => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [1080, 1080]
+      });
+
+      for (let i = 0; i < artboards.length; i++) {
+        const artboard = artboards[i];
+        const methods = artboardsMethods.current[artboard.id];
+        if (!methods) continue;
+
+        const dataUrl = methods.exportToImage();
+        if (!dataUrl) continue;
+
+        if (i > 0) doc.addPage([artboard.width, artboard.height], artboard.width > artboard.height ? 'landscape' : 'portrait');
+        else {
+          // doc.deletePage(1) doesn't work well if only 1 page exists, so we just set the size of the first page
+          // But jsPDF constructor already set it. Let's just adjust if needed.
+          // Better: just always add and remove the initial empty page if it's not the right size.
+        }
+
+        doc.addImage(dataUrl, 'PNG', 0, 0, artboard.width, artboard.height);
+      }
+
+      doc.save(`${canvasTitle}.pdf`);
+      toast.success('PDF com todas as pranchetas gerado!');
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao gerar PDF.');
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input or textarea
+      if (
+        document.activeElement?.tagName === 'INPUT' || 
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        (document.activeElement as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
+      // Delete key
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedObject && !selectedObject.isEditing) {
+          deleteSelected();
+        }
+      }
+
+      // Ctrl/Cmd + Z (Undo)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+
+      // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y (Redo)
+      if (
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
+        ((e.ctrlKey || e.metaKey) && e.key === 'y')
+      ) {
+        e.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedObject, undo, redo, deleteSelected]);
 
   const fetchModels = async () => {
     setIsLoadingModels(true);
@@ -271,11 +482,24 @@ function SupportContent() {
   };
 
   const handleResizeCanvas = (width: number, height: number) => {
-    const newArtboards = artboards.map(a => 
-      a.id === activeArtboardId ? { ...a, width, height } : a
-    );
-    setArtboards(newArtboards);
-    toast.success(`Prancheta redimensionada.`);
+    const syncedArtboards = artboards.map(artboard => {
+      const methods = artboardsMethods.current[artboard.id];
+      const base = (resizeAllArtboards || artboard.id === activeArtboardId) ? { ...artboard, width, height } : artboard;
+      if (methods) {
+        try {
+          return {
+            ...base,
+            data: JSON.parse(methods.saveToJson())
+          };
+        } catch (e) {
+          console.error("Erro ao sincronizar prancheta antes de redimensionar:", e);
+        }
+      }
+      return base;
+    });
+
+    setArtboards(syncedArtboards);
+    toast.success(`Prancheta${resizeAllArtboards ? 's' : ''} redimensionada${resizeAllArtboards ? 's' : ''}.`);
   };
 
   const handleZoomIn = () => {
@@ -305,7 +529,6 @@ function SupportContent() {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error("Precisa fazer login para guardar modelos.");
 
-      // Exporta a primeira prancheta como thumbnail
       const firstMethods = artboardsMethods.current[artboards[0].id];
       const thumbnailUrl = firstMethods?.exportToImage(); 
       let savedThumbnailUrl = null;
@@ -403,7 +626,6 @@ function SupportContent() {
       setArtboards(model.data.artboards);
       setActiveArtboardId(model.data.artboards[0].id);
     } else {
-      // Compatibilidade com modelos antigos de prancheta única
       const newId = uuidv4();
       setArtboards([{ 
         id: newId, 
@@ -428,33 +650,119 @@ function SupportContent() {
 
   const handleDeleteModel = async (id: string, e: React.MouseEvent, table: 'design_models' | 'design_templates') => {
     e.stopPropagation(); 
-    const confirmDelete = window.confirm("Tem certeza que deseja apagar permanentemente?");
-    if (!confirmDelete) return;
+    
+    showConfirm(
+      "Apagar Design Permanentemente?",
+      "Tem certeza que deseja apagar permanentemente este design? Esta ação removerá o arquivo de nossos servidores e não poderá ser desfeita.",
+      async () => {
+        try {
+          const { error } = await supabase.from(table).delete().eq('id', id);
+          if (error) throw error;
 
-    try {
-      const { error } = await supabase.from(table).delete().eq('id', id);
-      if (error) throw error;
-
-      toast.success('Apagado com sucesso!');
-      if (currentModelId === id && table === 'design_models') {
-        handleCreateNew(); 
+          toast.success('Design apagado com sucesso!');
+          if (currentModelId === id && table === 'design_models') {
+            handleCreateNew(); 
+          }
+          fetchModels();
+        } catch (error: any) {
+          toast.error("Erro ao apagar: " + error.message);
+        }
       }
-      fetchModels();
-    } catch (error: any) {
-      toast.error("Erro ao apagar: " + error.message);
-    }
+    );
   };
 
-  const handleExportPNG = () => {
-    const activeMethods = artboardsMethods.current[activeArtboardId];
-    if (!activeMethods) return;
-    
-    const activeArtboard = artboards.find(a => a.id === activeArtboardId);
-    const link = document.createElement('a'); 
-    link.download = `${canvasTitle}_${activeArtboard?.title || 'art'}.png`; 
-    link.href = activeMethods.exportToImage() || ''; 
-    link.click();
-    toast.success('Download iniciado!');
+  const [showDownloadSettings, setShowDownloadSettings] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'png' | 'jpg' | 'pdf'>('png');
+  const [exportQuality, setExportQuality] = useState(1);
+  const [exportTransparent, setExportTransparent] = useState(false);
+  const [selectedArtboardsForExport, setSelectedArtboardsForExport] = useState<string[]>([]);
+
+  // Sincroniza pranchetas selecionadas quando a lista de pranchetas muda
+  useEffect(() => {
+    setSelectedArtboardsForExport(artboards.map(a => a.id));
+  }, [artboards]);
+
+  const handleExport = async () => {
+    try {
+      setIsSaving(true);
+      const targets = artboards.filter(a => selectedArtboardsForExport.includes(a.id));
+      
+      if (targets.length === 0) {
+        toast.error("Selecione pelo menos uma prancheta para exportar.");
+        setIsSaving(false);
+        return;
+      }
+
+      // Verifica se todos os editores estão prontos
+      const missingMethods = targets.some(a => !artboardsMethods.current[a.id]);
+      if (missingMethods) {
+        toast.error("Algumas pranchetas ainda estão carregando. Por favor, aguarde um momento.");
+        setIsSaving(false);
+        return;
+      }
+
+      if (exportFormat === 'pdf') {
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'px',
+          format: [targets[0].width, targets[0].height]
+        });
+
+        for (let i = 0; i < targets.length; i++) {
+          const artboard = targets[i];
+          const methods = artboardsMethods.current[artboard.id];
+          if (!methods) continue;
+
+          const dataUrl = methods.exportToImage(); 
+          if (!dataUrl) continue;
+
+          if (i > 0) doc.addPage([artboard.width, artboard.height], artboard.width > artboard.height ? 'landscape' : 'portrait');
+          doc.addImage(dataUrl, 'PNG', 0, 0, artboard.width, artboard.height);
+        }
+
+        doc.save(`${canvasTitle}.pdf`);
+        toast.success('PDF gerado com sucesso!');
+      } else {
+        // Exportação de Imagens
+        for (const artboard of targets) {
+          const methods = artboardsMethods.current[artboard.id];
+          if (!methods) continue;
+
+          const canvas = methods.fabricCanvas.current;
+          const originalBg = canvas.backgroundColor;
+          
+          if (exportTransparent && exportFormat === 'png') {
+            canvas.backgroundColor = 'transparent';
+          } else {
+            canvas.backgroundColor = '#ffffff';
+          }
+          canvas.renderAll();
+
+          const dataUrl = canvas.toDataURL({
+            format: exportFormat,
+            quality: 1,
+            multiplier: exportQuality
+          });
+
+          // Restaura fundo
+          canvas.backgroundColor = originalBg;
+          canvas.renderAll();
+
+          const link = document.createElement('a');
+          link.download = `${canvasTitle}_${artboard.title}.${exportFormat}`;
+          link.href = dataUrl;
+          link.click();
+          
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        toast.success(`${targets.length} imagem(ns) exportada(s)!`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao exportar arquivo.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // PROXY PARA O MAGIC FILL:
@@ -574,12 +882,24 @@ function SupportContent() {
                       </div>
                     </div>
                   </div>
+
+                  <div className="flex items-center gap-2 mb-4">
+                    <input 
+                      type="checkbox" 
+                      id="resize-all" 
+                      checked={resizeAllArtboards} 
+                      onChange={(e) => setResizeAllArtboards(e.target.checked)}
+                      className="w-3 h-3 rounded text-blue-600"
+                    />
+                    <label htmlFor="resize-all" className="text-[10px] font-medium text-slate-600">Aplicar em todas</label>
+                  </div>
+
                   <Button className="w-full h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg" onClick={() => {
                     const w = Number((document.getElementById('custom-width') as HTMLInputElement).value);
                     const h = Number((document.getElementById('custom-height') as HTMLInputElement).value);
                     handleResizeCanvas(w, h);
                   }}>
-                    Redimensionar Ativa
+                    Redimensionar {resizeAllArtboards ? 'Todas' : 'Ativa'}
                   </Button>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Button variant="outline" className="h-8 text-[10px] font-medium border-slate-200 text-slate-600 hover:text-blue-600" onClick={() => handleResizeCanvas(1080, 1080)}>Feed Quad.</Button>
@@ -594,45 +914,176 @@ function SupportContent() {
                 Novo Design
               </Button>
               
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={(open) => { if(!open) setShowDownloadSettings(false); }}>
                 <DropdownMenuTrigger asChild>
                   <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-sm font-semibold rounded-lg px-6 border-0">
                     <Share className="w-4 h-4 mr-2" /> Compartilhar
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64 p-2 rounded-xl shadow-xl border-slate-200">
-                  <div className="p-2 pb-3">
-                    <h4 className="font-bold text-sm text-slate-800">Opções do Design</h4>
-                    <p className="text-xs text-slate-500">Salve ou exporte sua arte.</p>
-                  </div>
-                  
-                  <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem onClick={handleSave} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 focus:text-blue-700">
-                    <Save className="w-4 h-4 mr-3 text-slate-500" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">Salvar Projeto</span>
-                      <span className="text-[10px] text-slate-500">Guarda todas as pranchetas</span>
-                    </div>
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-80 p-0 rounded-xl shadow-2xl border-slate-200 overflow-hidden">
+                  {!showDownloadSettings ? (
+                    <>
+                      <div className="p-4 pb-3">
+                        <h4 className="font-bold text-sm text-slate-800">Opções do Design</h4>
+                        <p className="text-xs text-slate-500">Salve ou exporte sua arte.</p>
+                      </div>
+                      
+                      <DropdownMenuSeparator />
+                      
+                      <div className="p-2 space-y-1">
+                        <DropdownMenuItem onClick={handleSave} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 focus:text-blue-700">
+                          <Save className="w-4 h-4 mr-3 text-slate-500" />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">Salvar Projeto</span>
+                            <span className="text-[10px] text-slate-500">Guarda todas as pranchetas</span>
+                          </div>
+                        </DropdownMenuItem>
 
-                  <DropdownMenuItem onClick={handleSaveAsTemplate} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 focus:text-blue-700">
-                    <LayoutTemplate className="w-4 h-4 mr-3 text-slate-500" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">Salvar como Template</span>
-                      <span className="text-[10px] text-slate-500">Para toda a equipe</span>
-                    </div>
-                  </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleSaveAsTemplate} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 focus:text-blue-700">
+                          <LayoutTemplate className="w-4 h-4 mr-3 text-slate-500" />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">Salvar como Template</span>
+                            <span className="text-[10px] text-slate-500">Para toda a equipe</span>
+                          </div>
+                        </DropdownMenuItem>
 
-                  <DropdownMenuSeparator />
+                        <DropdownMenuSeparator className="my-1" />
 
-                  <DropdownMenuItem onClick={handleExportPNG} className="cursor-pointer py-3 rounded-lg focus:bg-slate-100">
-                    <Download className="w-4 h-4 mr-3 text-slate-500" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">Baixar PNG</span>
-                      <span className="text-[10px] text-slate-500">Apenas prancheta selecionada</span>
+                        <DropdownMenuItem onClick={(e) => { e.preventDefault(); setShowDownloadSettings(true); }} className="cursor-pointer py-3 rounded-lg focus:bg-blue-600 focus:text-white group">
+                          <Download className="w-4 h-4 mr-3 text-slate-500 group-focus:text-white" />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">Baixar</span>
+                            <span className="text-[10px] text-slate-500 group-focus:text-blue-100">PNG, JPG, PDF</span>
+                          </div>
+                        </DropdownMenuItem>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col animate-in slide-in-from-right-2 duration-200">
+                      <div className="p-4 border-b flex items-center gap-3">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={(e) => { e.preventDefault(); setShowDownloadSettings(false); }}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                        <h4 className="font-bold text-sm text-slate-800">Baixar</h4>
+                      </div>
+
+                      <div className="p-5 space-y-6">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo de arquivo</Label>
+                          <Select value={exportFormat} onValueChange={(val: any) => setExportFormat(val)}>
+                            <SelectTrigger className="h-11 rounded-xl border-slate-200 focus:ring-blue-100">
+                              <SelectValue placeholder="Selecione o formato" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl shadow-xl border-slate-200">
+                              <SelectItem value="png" className="py-2.5 rounded-lg">PNG <span className="text-[10px] text-slate-400 ml-2">Melhor para imagens</span></SelectItem>
+                              <SelectItem value="jpg" className="py-2.5 rounded-lg">JPG <span className="text-[10px] text-slate-400 ml-2">Melhor para web</span></SelectItem>
+                              <SelectItem value="pdf" className="py-2.5 rounded-lg">PDF <span className="text-[10px] text-slate-400 ml-2">Melhor para impressão</span></SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {exportFormat !== 'pdf' && (
+                          <>
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tamanho</Label>
+                                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{exportQuality}x</span>
+                              </div>
+                              <Slider 
+                                min={0.5} max={3} step={0.5} 
+                                value={[exportQuality]} 
+                                onValueChange={(v) => setExportQuality(v[0])} 
+                                className="py-2"
+                              />
+                              <p className="text-[10px] text-slate-400">Aumente para melhor resolução.</p>
+                            </div>
+
+                            {exportFormat === 'png' && (
+                              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                <div className="space-y-0.5">
+                                  <Label htmlFor="transparency" className="text-xs font-bold text-slate-700">Fundo transparente</Label>
+                                  <p className="text-[10px] text-slate-500">Remove o fundo branco</p>
+                                </div>
+                                <input 
+                                  type="checkbox" 
+                                  id="transparency"
+                                  checked={exportTransparent}
+                                  onChange={(e) => setExportTransparent(e.target.checked)}
+                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selecionar pranchetas</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full h-11 justify-between px-4 rounded-xl border-slate-200 text-slate-700 font-medium">
+                                <span className="truncate">
+                                  {selectedArtboardsForExport.length === artboards.length 
+                                    ? "Todas as pranchetas" 
+                                    : `${selectedArtboardsForExport.length} prancheta(s) selecionada(s)`}
+                                </span>
+                                <ChevronDown className="w-4 h-4 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-2 rounded-xl shadow-xl border-slate-200" align="start">
+                              <div className="max-h-60 overflow-y-auto space-y-1">
+                                <div 
+                                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                                  onClick={() => {
+                                    if (selectedArtboardsForExport.length === artboards.length) setSelectedArtboardsForExport([]);
+                                    else setSelectedArtboardsForExport(artboards.map(a => a.id));
+                                  }}
+                                >
+                                  <input 
+                                    type="checkbox" 
+                                    checked={selectedArtboardsForExport.length === artboards.length}
+                                    onChange={() => {}} 
+                                    className="rounded border-slate-300"
+                                  />
+                                  <span className="text-xs font-bold text-slate-700">Todas ({artboards.length})</span>
+                                </div>
+                                <Separator className="my-1" />
+                                {artboards.map((artboard, idx) => (
+                                  <div 
+                                    key={artboard.id}
+                                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                                    onClick={() => {
+                                      if (selectedArtboardsForExport.includes(artboard.id)) {
+                                        setSelectedArtboardsForExport(prev => prev.filter(id => id !== artboard.id));
+                                      } else {
+                                        setSelectedArtboardsForExport(prev => [...prev, artboard.id]);
+                                      }
+                                    }}
+                                  >
+                                    <input 
+                                      type="checkbox" 
+                                      checked={selectedArtboardsForExport.includes(artboard.id)}
+                                      onChange={() => {}}
+                                      className="rounded border-slate-300"
+                                    />
+                                    <span className="text-xs text-slate-600">{idx + 1}. {artboard.title}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        <Button 
+                          onClick={handleExport}
+                          disabled={selectedArtboardsForExport.length === 0 || isSaving}
+                          className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200"
+                        >
+                          {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                          Baixar
+                        </Button>
+                      </div>
                     </div>
-                  </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -641,7 +1092,7 @@ function SupportContent() {
           <div className="flex flex-1 overflow-hidden">
             
             <aside className="w-[380px] bg-white border-r flex flex-col overflow-hidden shrink-0 z-10">
-              <Tabs defaultValue="projetos" className="flex flex-row w-full h-full">
+              <Tabs defaultValue="pranchetas" className="flex flex-row w-full h-full">
                 
                 <TabsList className="flex flex-col h-full w-[80px] shrink-0 bg-gradient-to-b from-blue-600 to-indigo-600 text-white justify-start py-4 gap-3 rounded-none h-auto border-none">
                   
@@ -686,38 +1137,180 @@ function SupportContent() {
                     </div>
                     
                     <div className="space-y-3">
-                      {artboards.map((artboard, index) => (
-                        <div 
-                          key={artboard.id}
-                          className={cn(
-                            "group p-3 rounded-xl border-2 transition-all flex items-center justify-between cursor-pointer",
-                            activeArtboardId === artboard.id ? "border-blue-600 bg-blue-50/50" : "border-slate-100 hover:border-slate-200 bg-white"
-                          )}
-                          onClick={() => {
-                            const methods = artboardsMethods.current[artboard.id];
-                            if (methods) handleSelectArtboard(artboard.id, methods);
-                          }}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-md bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                              {index + 1}
+                      {artboards.map((artboard, index) => {
+                        const methods = artboardsMethods.current[artboard.id];
+                        const objects = methods?.fabricCanvas.current?.getObjects() || [];
+                        const isExpanded = expandedArtboardId === artboard.id;
+
+                        return (
+                          <div key={artboard.id} className="space-y-1">
+                            <div 
+                              className={cn(
+                                "group p-3 rounded-xl border-2 transition-all flex items-center justify-between cursor-pointer",
+                                activeArtboardId === artboard.id ? "border-blue-600 bg-blue-50/50 shadow-sm" : "border-slate-100 hover:border-slate-200 bg-white"
+                              )}
+                              onClick={() => {
+                                if (methods) handleSelectArtboard(artboard.id, methods);
+                              }}
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div 
+                                  className="flex items-center gap-2"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedArtboardId(isExpanded ? null : artboard.id);
+                                  }}
+                                >
+                                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronUp className="w-3.5 h-3.5 text-slate-400 -rotate-90" />}
+                                  <div className={cn(
+                                    "w-7 h-7 rounded-lg border flex items-center justify-center text-[11px] font-bold shrink-0 transition-colors shadow-sm",
+                                    activeArtboardId === artboard.id ? "bg-blue-600 border-blue-700 text-white" : "bg-slate-100 border-slate-200 text-slate-500"
+                                  )}>
+                                    {index + 1}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    {editingArtboardId === artboard.id ? (
+                                      <Input
+                                        autoFocus
+                                        defaultValue={artboard.title}
+                                        className="h-7 text-sm font-bold px-1 py-0 rounded-sm border-blue-400"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onBlur={(e) => handleRenameArtboard(artboard.id, e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') handleRenameArtboard(artboard.id, (e.target as HTMLInputElement).value);
+                                          if (e.key === 'Escape') setEditingArtboardId(null);
+                                        }}
+                                      />
+                                    ) : (
+                                      <span 
+                                        className={cn(
+                                          "text-sm font-bold truncate cursor-text hover:text-blue-600 transition-colors",
+                                          activeArtboardId === artboard.id ? "text-blue-700" : "text-slate-800"
+                                        )}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingArtboardId(artboard.id);
+                                        }}
+                                      >
+                                        {artboard.title}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-medium">{artboard.width}x{artboard.height}px</span>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 rounded-lg" onClick={(e) => e.stopPropagation()}>
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48 p-2 rounded-xl shadow-xl">
+                                    <DropdownMenuItem onClick={() => setEditingArtboardId(artboard.id)} className="rounded-lg">
+                                      <Edit3 className="w-4 h-4 mr-2 text-slate-500" /> Renomear
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleMoveArtboard(artboard.id, 'up')} disabled={index === 0} className="rounded-lg">
+                                      <ChevronUp className="w-4 h-4 mr-2 text-slate-500" /> Mover para cima
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleMoveArtboard(artboard.id, 'down')} disabled={index === artboards.length - 1} className="rounded-lg">
+                                      <ChevronDown className="w-4 h-4 mr-2 text-slate-500" /> Mover para baixo
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDuplicateArtboard(artboard.id)} className="rounded-lg">
+                                      <Copy className="w-4 h-4 mr-2 text-slate-500" /> Duplicar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700 rounded-lg" onClick={(e) => { e.stopPropagation(); handleDeleteArtboard(artboard.id); }}>
+                                      <Trash2 className="w-4 h-4 mr-2" /> Excluir
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </div>
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold text-slate-800">{artboard.title}</span>
-                              <span className="text-[10px] text-slate-500">{artboard.width}x{artboard.height}px</span>
-                            </div>
+
+                            {isExpanded && (
+                              <div className="pl-8 pr-2 py-1 space-y-1 bg-slate-50/50 rounded-b-xl border-x border-b border-slate-100">
+                                {objects.length === 0 ? (
+                                  <p className="text-[10px] text-slate-400 py-2 italic text-center">Nenhum item nesta prancheta</p>
+                                ) : (
+                                  [...objects].reverse().map((obj: any, objIdx) => (
+                                    <div 
+                                      key={objIdx}
+                                      className={cn(
+                                        "group/item flex items-center justify-between p-2 rounded-lg transition-colors border",
+                                        selectedObject === obj ? "bg-white border-blue-200 shadow-sm" : "border-transparent hover:bg-white hover:border-slate-200"
+                                      )}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSelectItem(artboard.id, obj);
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <div className="text-slate-400">{getObjectIcon(obj.type)}</div>
+                                        <div className="flex-1 min-w-0">
+                                          {editingObjectId === `${artboard.id}-${objIdx}` ? (
+                                            <Input
+                                              autoFocus
+                                              defaultValue={getObjectName(obj)}
+                                              className="h-5 text-[10px] px-1 py-0 rounded-sm border-blue-400"
+                                              onClick={(e) => e.stopPropagation()}
+                                              onBlur={(e) => handleRenameObject(artboard.id, obj, e.target.value)}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleRenameObject(artboard.id, obj, (e.target as HTMLInputElement).value);
+                                                if (e.key === 'Escape') setEditingObjectId(null);
+                                              }}
+                                            />
+                                          ) : (
+                                            <span className="text-[10px] font-medium text-slate-600 truncate block">
+                                              {getObjectName(obj)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                        <Button 
+                                          variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-blue-600" 
+                                          onClick={(e) => { e.stopPropagation(); toggleObjectVisibility(obj); }}
+                                          title={obj.visible ? "Ocultar" : "Mostrar"}
+                                        >
+                                          {obj.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-red-400" />}
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-amber-600" 
+                                          onClick={(e) => { e.stopPropagation(); toggleObjectLock(obj); }}
+                                          title={obj.locked ? "Destravar" : "Travar"}
+                                        >
+                                          {obj.locked ? <Lock className="w-3 h-3 text-amber-500" /> : <LockOpen className="w-3 h-3" />}
+                                        </Button>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600" onClick={(e) => e.stopPropagation()}>
+                                              <Grab className="w-3 h-3" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-40">
+                                            <DropdownMenuItem onClick={() => moveObject(obj, 'front')}>Trazer para frente</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => moveObject(obj, 'up')}>Trazer para cima</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => moveObject(obj, 'down')}>Enviar para baixo</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => moveObject(obj, 'back')}>Enviar para trás</DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => setEditingObjectId(`${artboard.id}-${objIdx}`)}>Renomear</DropdownMenuItem>
+                                            <DropdownMenuItem className="text-red-600" onClick={() => deleteObject(obj)}>Excluir</DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
                           </div>
-                          
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600" onClick={(e) => { e.stopPropagation(); handleDuplicateArtboard(artboard.id); }} title="Duplicar">
-                              <Copy className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-600" onClick={(e) => { e.stopPropagation(); handleDeleteArtboard(artboard.id); }} title="Excluir">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </TabsContent>
 
@@ -843,6 +1436,15 @@ function SupportContent() {
                       <Button variant="outline" className="h-28 flex-col gap-3 relative overflow-hidden group border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl"><Sparkles className="w-8 h-8 text-blue-500" /><span className="text-xs font-semibold text-slate-700">Remover Fundo</span><Lock className="w-3.5 h-3.5 absolute top-2 right-2 text-slate-300" /></Button>
                       <Button variant="outline" className="h-28 flex-col gap-3 relative overflow-hidden group border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl"><ImageIcon className="w-8 h-8 text-blue-500" /><span className="text-xs font-semibold text-slate-700">Gerador IA</span><Lock className="w-3.5 h-3.5 absolute top-2 right-2 text-slate-300" /></Button>
                     </div>
+                    <Separator className="my-4" />
+                    <h3 className="font-bold text-sm mb-4 text-slate-800">Ações Rápidas</h3>
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-12 justify-start gap-3 border-red-100 text-red-600 hover:bg-red-50 hover:border-red-200 rounded-xl"
+                      onClick={() => showConfirm("Limpar Prancheta", "Deseja remover todos os elementos da prancheta atual?", clearCanvas)}
+                    >
+                      <Trash2 className="w-4 h-4" /> Limpar Prancheta Atual
+                    </Button>
                   </TabsContent>
                 </div>
               </Tabs>
@@ -1379,6 +1981,33 @@ function SupportContent() {
             </aside>
           </div>
         </div>
+
+        <AlertDialog open={confirmDialog.isOpen} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, isOpen: open }))}>
+          <AlertDialogContent className="rounded-2xl max-w-[400px]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-bold">{confirmDialog.title}</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
+                {confirmDialog.description}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 mt-4">
+              <AlertDialogCancel className="rounded-xl font-semibold border-slate-200">Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                }}
+                className={cn(
+                  "rounded-xl font-semibold px-6",
+                  confirmDialog.variant === 'destructive' ? "bg-red-600 hover:bg-red-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+                )}
+              >
+                Confirmar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </main>
     </div>
   );

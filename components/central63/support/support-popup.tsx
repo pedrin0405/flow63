@@ -18,7 +18,14 @@ const ATENDENTES = [
 
 export function SuportePopup() {
   const { toast } = useToast()
+  const [mounted, setMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // ... rest of state ...
   const [mensagem, setMensagem] = useState("")
   const [mensagens, setMensagens] = useState<any[]>([])
   const [chamadoId, setChamadoId] = useState<string | null>(null)
@@ -212,7 +219,11 @@ export function SuportePopup() {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("A imagem deve ter no máximo 5MB")
+        toast({
+          title: "Arquivo muito grande",
+          description: "A imagem deve ter no máximo 5MB",
+          variant: "destructive"
+        })
         return
       }
       setSelectedFile(file)
@@ -235,7 +246,11 @@ export function SuportePopup() {
     }
 
     if (isIdentifying && (!userData.nome || !userData.email || !atendenteSelecionado)) {
-      alert("Por favor, preencha o seu nome, e-mail e selecione um atendente.");
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha o seu nome, e-mail e selecione um atendente.",
+        variant: "destructive"
+      })
       return;
     }
 
@@ -317,6 +332,8 @@ export function SuportePopup() {
       setIsLoading(false);
     }
   }
+
+  if (!mounted) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
