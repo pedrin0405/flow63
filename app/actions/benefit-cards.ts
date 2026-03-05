@@ -249,3 +249,26 @@ export async function getCardBenefitsIds(cardId: string) {
     return { success: false, error: err.message }
   }
 }
+
+export async function updateCardSettings(cardId: string, settings: {
+  card_image_url?: string,
+  card_image_pos_x?: number,
+  card_image_pos_y?: number,
+  card_image_zoom?: number,
+  card_image_opacity?: number,
+  card_display_name?: string
+}) {
+  try {
+    const supabase = await getSupabase()
+    const { error } = await supabase
+      .from('benefit_cards')
+      .update({ ...settings, updated_at: new Date().toISOString() })
+      .eq('id', cardId)
+
+    if (error) throw error
+    revalidatePath('/brokers/my-card')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
