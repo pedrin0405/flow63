@@ -7,7 +7,7 @@ import {
   Settings2, LayoutGrid, ListChecks, Info, 
   AlertCircle, ChevronRight, UserPlus, Download, FileSpreadsheet,
   MoveHorizontal, MoveVertical, Maximize, Eye, Camera, Loader2, UploadCloud,
-  Calendar, ShieldCheck, User, Layers, Sparkles, Type, X
+  Calendar, ShieldCheck, User, Layers, Sparkles, Type, X, Image as ImageIcon, Percent
 } from "lucide-react"
 import { Sidebar } from "@/components/central63/sidebar"
 import { useToast } from "@/hooks/use-toast"
@@ -48,6 +48,23 @@ import {
 } from "@/app/actions/benefit-cards"
 import * as XLSX from 'xlsx'
 import { Slider } from "@/components/ui/slider"
+
+// Função para destacar valores no texto (Ex: 10%, OFF, VIP)
+const HighlightValue = ({ text }: { text: string }) => {
+  if (!text) return null;
+  const parts = text.split(/(\d+%|OFF|VIP|GRÁTIS|DESCONTO)/gi);
+  return (
+    <>
+      {parts.map((part, i) => 
+        /(\d+%|OFF|VIP|GRÁTIS|DESCONTO)/i.test(part) ? (
+          <span key={i} className="text-[#e91c74] font-black">{part}</span>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+};
 
 export default function BenefitCardsAdminPage() {
   const { toast } = useToast()
@@ -123,15 +140,6 @@ export default function BenefitCardsAdminPage() {
     XLSX.utils.book_append_sheet(wb, ws, "Cartões")
     XLSX.writeFile(wb, `Cartoes_Beneficios_${new Date().toISOString().split('T')[0]}.xlsx`)
     toast({ title: "Sucesso", description: "Relatório exportado com sucesso." })
-  }
-
-  const handleStatusColor = (status: string) => {
-    switch (status) {
-      case 'ativo': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-      case 'inativo': return 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-      case 'expirado': return 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-      default: return 'bg-slate-500/10 text-slate-500 border-slate-500/20'
-    }
   }
 
   return (
@@ -260,19 +268,17 @@ export default function BenefitCardsAdminPage() {
                 {isLoading ? (
                   <div className="flex justify-center items-center py-24"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" /></div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {cards.map((card) => (
                       <div key={card.id} className="space-y-3">
                         {/* Visual do Cartão (Versão Mini Premium) */}
                         <div className="relative group perspective-1000 w-full">
                           <div 
-                            className="relative w-full aspect-[1.586/1] rounded-[1.5rem] bg-[#1c1c1e] p-4 sm:p-5 shadow-xl overflow-hidden border border-white/5 text-white transition-all duration-500 hover:rotate-y-3"
+                            className="relative w-full aspect-[1.586/1] rounded-[1.5rem] bg-[#1c1c1e] p-4 sm:p-5 shadow-xl overflow-hidden border border-white/5 text-white transform transition-all duration-500 hover:rotate-y-3"
                           >
-                            {/* Background Effects */}
                             <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-[#e91c74]/15 via-white/[0.03] to-transparent opacity-80 pointer-events-none" />
                             <div className="absolute -top-16 -right-16 w-48 h-48 bg-[#e91c74]/20 rounded-full blur-[60px] animate-pulse duration-[4s] pointer-events-none" />
                             
-                            {/* Foto personalizada */}
                             {card.card_image_url && (
                               <div className="absolute inset-0 z-0 select-none pointer-events-none">
                                 <img 
@@ -290,7 +296,6 @@ export default function BenefitCardsAdminPage() {
                               </div>
                             )}
                             
-                            {/* Header do Cartão */}
                             <div className="flex justify-between items-start relative z-10">
                               <div className="flex items-center gap-2">
                                 <div className="w-6 h-6 sm:w-7 sm:h-7 bg-white/5 backdrop-blur-xl rounded-lg flex items-center justify-center border border-white/10 shadow-inner">
@@ -320,10 +325,9 @@ export default function BenefitCardsAdminPage() {
                               </Badge>
                             </div>
 
-                            {/* Dados do Usuário */}
                             <div className="mt-6 sm:mt-8 relative z-10">
                               <p className="text-[7px] sm:text-[8px] opacity-30 uppercase tracking-[0.4em] font-black mb-0.5">Membro</p>
-                              <h2 className="text-sm sm:text-lg font-bold tracking-tight uppercase truncate text-white/90 drop-shadow-sm">{card.card_display_name || card.profiles?.full_name}</h2>
+                              <h2 className="text-sm sm:text-lg font-bold tracking-tight uppercase truncate text-white/90 drop-shadow-sm max-w-[75%]">{card.card_display_name || card.profiles?.full_name}</h2>
                               
                               <div className="flex gap-4 sm:gap-6 mt-3 sm:mt-4">
                                 <div>
@@ -337,7 +341,6 @@ export default function BenefitCardsAdminPage() {
                               </div>
                             </div>
 
-                            {/* QR Code Mini */}
                             <div className="absolute bottom-4 right-4 w-10 h-10 sm:w-12 sm:h-12 bg-white p-1 rounded-lg shadow-2xl flex items-center justify-center overflow-hidden border border-white/20">
                               <img 
                                 src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${card.id}&margin=0`} 
@@ -348,7 +351,6 @@ export default function BenefitCardsAdminPage() {
                           </div>
                         </div>
 
-                        {/* Ações Administrativas Compactas */}
                         <div className="flex gap-1.5 px-1">
                           <Button 
                             variant="outline" 
@@ -369,12 +371,6 @@ export default function BenefitCardsAdminPage() {
                         </div>
                       </div>
                     ))}
-                    {cards.length === 0 && (
-                      <div className="col-span-full py-24 text-center opacity-40">
-                        <CreditCard className="w-16 h-16 mx-auto mb-4" />
-                        <p className="font-bold">Nenhum cartão emitido nesta categoria.</p>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -398,8 +394,12 @@ export default function BenefitCardsAdminPage() {
                             {benefit.ativo ? "Disponível" : "Suspenso"}
                           </Badge>
                         </div>
-                        <h3 className="font-black text-lg leading-tight mb-2 uppercase tracking-tight">{benefit.nome}</h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-6 h-10">{benefit.descricao}</p>
+                        <h3 className="font-black text-lg leading-tight mb-2 uppercase tracking-tight">
+                          <HighlightValue text={benefit.nome} />
+                        </h3>
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-6 h-10">
+                          <HighlightValue text={benefit.descricao} />
+                        </p>
                         
                         <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                           <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nível Mín: {benefit.nivel_minimo}</span>
@@ -454,7 +454,6 @@ export default function BenefitCardsAdminPage() {
   )
 }
 
-// Modal de Cartão Individual - DESIGN APPLE VIDRO COM PROFUNDIDADE
 function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -564,7 +563,6 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border border-white/20 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] bg-white/80 backdrop-blur-3xl">
         <div className="flex flex-col h-[85vh]">
-          {/* Header Vidro com Sombra */}
           <div className="bg-white/40 px-8 py-5 border-b border-white/20 flex items-center justify-between shadow-sm z-10">
             <DialogHeader>
               <DialogTitle className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3">
@@ -581,11 +579,7 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
 
           <div className="flex-1 overflow-y-auto">
             <div className="grid grid-cols-1 lg:grid-cols-12 h-full">
-              
-              {/* Coluna Esquerda: Preview e Configs */}
               <div className="lg:col-span-5 p-8 space-y-8 border-r border-white/20 bg-white/20 shadow-inner">
-                
-                {/* PREVIEW CARD - MAIOR PROFUNDIDADE */}
                 <div className="space-y-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e91c74] px-1 flex items-center gap-2">
                     <Eye size={12} /> Live Preview
@@ -611,24 +605,29 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                       <Badge className="bg-white/10 backdrop-blur-md text-[8px] px-2.5 py-1 rounded-full font-bold border-white/10 shadow-sm">{formData.status.toUpperCase()}</Badge>
                     </div>
 
-                    <div className="mt-10 relative z-10">
-                      <p className="text-[8px] opacity-30 uppercase tracking-[0.4em] font-black mb-1">Membro do Club</p>
-                      <h2 className="text-xl font-bold tracking-tight uppercase truncate drop-shadow-lg">{formData.card_display_name || selectedUserName}</h2>
-                      <div className="flex gap-6 mt-4">
-                        <div>
-                          <p className="text-[8px] opacity-30 uppercase tracking-[0.2em] font-black mb-1">Nível</p>
-                          <p className="font-bold text-xs drop-shadow-md">Nível {formData.nivel_beneficio}</p>
+                    <div className="mt-10 relative z-10 flex justify-between items-end">
+                      <div>
+                        <p className="text-[8px] opacity-30 uppercase tracking-[0.4em] font-black mb-1">Membro do Club</p>
+                        <h2 className="text-xl font-bold tracking-tight uppercase truncate drop-shadow-lg max-w-[180px]">{formData.card_display_name || selectedUserName}</h2>
+                        <div className="flex gap-6 mt-4">
+                          <div>
+                            <p className="text-[8px] opacity-30 uppercase tracking-[0.2em] font-black mb-1">Nível</p>
+                            <p className="font-bold text-xs drop-shadow-md">Nível {formData.nivel_beneficio}</p>
+                          </div>
+                          <div>
+                            <p className="text-[8px] opacity-30 uppercase tracking-[0.2em] font-black mb-1">Validade</p>
+                            <p className="font-bold text-xs drop-shadow-md">{formData.data_validade ? new Date(formData.data_validade).toLocaleDateString('pt-BR') : '--/--/----'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[8px] opacity-30 uppercase tracking-[0.2em] font-black mb-1">Validade</p>
-                          <p className="font-bold text-xs drop-shadow-md">{formData.data_validade ? new Date(formData.data_validade).toLocaleDateString('pt-BR') : '--/--/----'}</p>
-                        </div>
+                      </div>
+                      
+                      <div className="w-12 h-12 bg-white p-1 rounded-lg opacity-80 border border-white/20">
+                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=PREVIEW&margin=0`} alt="" className="w-full h-full grayscale" />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* FORMULÁRIO ESTILO VIDRO COM SOMBRAS */}
                 <div className="space-y-5">
                   <div className="bg-white/40 p-5 rounded-[2rem] border border-white/40 shadow-lg space-y-4">
                     <div className="space-y-1.5">
@@ -649,12 +648,7 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                       <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
                         <Type size={10} className="text-[#e91c74]" /> Nome Impresso
                       </label>
-                      <Input 
-                        placeholder="Nome personalizado" 
-                        className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner text-xs font-bold focus:ring-2 focus:ring-[#e91c74]/20 transition-all"
-                        value={formData.card_display_name}
-                        onChange={(e) => setFormData(p => ({ ...p, card_display_name: e.target.value }))}
-                      />
+                      <Input placeholder="Personalizado" className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner text-xs font-bold" value={formData.card_display_name} onChange={(e) => setFormData(p => ({ ...p, card_display_name: e.target.value }))} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -676,15 +670,22 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
                         <Calendar size={10} className="text-[#e91c74]" /> Data de Validade
                       </label>
-                      <Input type="date" className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner font-bold text-xs" value={formData.data_validade} onChange={(e) => setFormData(p => ({ ...p, data_validade: e.target.value }))} />
+                      <Input type="date" className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner font-bold text-xs focus:ring-2 focus:ring-[#e91c74]/20 transition-all" value={formData.data_validade} onChange={(e) => setFormData(p => ({ ...p, data_validade: e.target.value }))} />
+                      <div className="flex gap-2 mt-3">
+                        {[{ label: '3 Meses', months: 3 }, { label: '6 Meses', months: 6 }, { label: '1 Ano', months: 12 }].map((opt) => (
+                          <button key={opt.label} type="button" onClick={() => { const d = new Date(); d.setMonth(d.getMonth() + opt.months); setFormData(p => ({ ...p, data_validade: d.toISOString().split('T')[0] })) }}
+                            className="flex-1 py-2 rounded-xl bg-white/30 backdrop-blur-md border border-white/40 text-[9px] font-bold uppercase tracking-tight hover:bg-[#e91c74] hover:text-white hover:border-[#e91c74]/20 hover:shadow-lg hover:shadow-[#e91c74]/20 transition-all active:scale-95 text-slate-600">
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  {/* UPLOAD ÁREA COM SOMBRA */}
                   <label className="flex items-center gap-4 p-4 rounded-[1.5rem] bg-white/40 border border-white/40 cursor-pointer hover:bg-white/60 hover:border-[#e91c74]/30 hover:shadow-md transition-all shadow-sm group">
                     <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-[#e91c74] shadow-md group-hover:scale-110 transition-transform">
                       {uploading ? <Loader2 className="animate-spin" size={20} /> : <Camera size={20} />}
@@ -698,7 +699,6 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                 </div>
               </div>
 
-              {/* Coluna Direita: Benefícios Manuais */}
               <div className="lg:col-span-7 p-8 flex flex-col h-full bg-white/40 shadow-inner">
                 <div className="flex items-center justify-between mb-6 px-2">
                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e91c74] flex items-center gap-2">
@@ -709,21 +709,20 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                   </Badge>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-4">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-8 pb-12">
                     {benefits.filter(b => b.ativo).map(b => {
                       const isSelected = formData.benefitIds.includes(b.id);
                       return (
-                        <div 
-                          key={b.id} 
-                          onClick={() => toggleBenefit(b.id)}
-                          className={`flex items-center gap-4 p-4 rounded-[1.5rem] transition-all cursor-pointer border ${isSelected ? 'bg-[#e91c74]/10 border-[#e91c74]/30 shadow-xl shadow-[#e91c74]/10 scale-[1.02]' : 'bg-white/40 border-white/40 hover:bg-white/60 hover:border-slate-300 hover:shadow-md'}`}
-                        >
-                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-md ${isSelected ? 'bg-[#e91c74] text-white scale-110 shadow-[#e91c74]/40' : 'bg-white text-slate-400'}`}>
+                        <div key={b.id} onClick={() => toggleBenefit(b.id)}
+                          className={`flex items-center gap-4 p-4 rounded-[1.5rem] transition-all duration-300 cursor-pointer border ${isSelected ? 'bg-[#e91c74]/10 border-[#e91c74]/30 shadow-[0_15px_35px_-5px_rgba(233,28,116,0.25)] scale-[1.03] z-10 relative' : 'bg-white/40 border-white/40 hover:bg-white/60 hover:border-slate-300 hover:shadow-lg'}`}>
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-md ${isSelected ? 'bg-[#e91c74] text-white shadow-[#e91c74]/40' : 'bg-white text-slate-400'}`}>
                             {b.image_url ? <img src={b.image_url} alt="" className="w-full h-full object-cover rounded-2xl" /> : <Star size={18} />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-[11px] font-black leading-tight truncate uppercase ${isSelected ? 'text-[#e91c74]' : 'text-slate-700'}`}>{b.nome}</p>
+                            <p className={`text-[11px] font-black leading-tight truncate uppercase ${isSelected ? 'text-[#e91c74]' : 'text-slate-700'}`}>
+                              <HighlightValue text={b.nome} />
+                            </p>
                             <p className="text-[9px] font-bold opacity-40 mt-0.5">Nível {b.nivel_minimo}+</p>
                           </div>
                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shadow-inner ${isSelected ? 'bg-[#e91c74] border-[#e91c74]' : 'border-slate-300 bg-white'}`}>
@@ -735,10 +734,9 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                   </div>
                 </div>
 
-                {/* Footer Flutuante Vidro com Sombras Fortes */}
                 <div className="pt-8 flex gap-4 mt-auto">
                   <Button variant="ghost" className="flex-1 rounded-2xl h-14 font-black uppercase tracking-widest text-[10px] text-slate-400 hover:text-slate-900 hover:bg-white/40 hover:shadow-sm transition-all" onClick={onClose}>Descartar</Button>
-                  <Button className="flex-[2.5] rounded-2xl h-14 font-black uppercase tracking-widest text-[10px] bg-[#e91c74] hover:bg-[#e91c74]/90 text-white shadow-[0_10px_25px_rgba(233,28,116,0.4)] hover:shadow-[0_15px_30px_rgba(233,28,116,0.5)] gap-3 transition-all transform active:scale-95" onClick={handleSave} disabled={loading || uploading}>
+                  <Button className="flex-[2.5] rounded-2xl h-14 font-black uppercase tracking-widest text-[10px] bg-[#e91c74] hover:bg-[#d11a68] shadow-[0_10px_25px_rgba(233,28,116,0.4)] hover:shadow-[0_15px_30px_rgba(233,28,116,0.5)] gap-3 transition-all transform active:scale-95 text-white" onClick={handleSave} disabled={loading || uploading}>
                     {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <ShieldCheck size={20} />}
                     {card ? "Salvar Alterações" : "Emitir Cartão Digital"}
                   </Button>
@@ -752,18 +750,11 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
   )
 }
 
-// Modal de Gestão do Catálogo
 function BenefitCatalogModal({ isOpen, benefit, onClose, onSave }: any) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [formData, setFormData] = useState({
-    nome: "",
-    descricao: "",
-    nivel_minimo: 1,
-    ativo: true,
-    image_url: ""
-  })
+  const [formData, setFormData] = useState({ nome: "", descricao: "", nivel_minimo: 1, ativo: true, image_url: "" })
 
   useEffect(() => {
     if (isOpen) {
@@ -780,25 +771,14 @@ function BenefitCatalogModal({ isOpen, benefit, onClose, onSave }: any) {
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     setUploading(true)
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `benefit-${Math.random().toString(36).substring(2)}.${fileExt}`
-      const filePath = `benefits/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('user-uploads')
-        .upload(filePath, file)
-
+      const filePath = `benefits/benefit-${Math.random().toString(36).substring(2)}.${file.name.split('.').pop()}`
+      const { error: uploadError } = await supabase.storage.from('user-uploads').upload(filePath, file)
       if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('user-uploads')
-        .getPublicUrl(filePath)
-
+      const { data: { publicUrl } } = supabase.storage.from('user-uploads').getPublicUrl(filePath)
       setFormData(prev => ({ ...prev, image_url: publicUrl }))
-      toast({ title: "Sucesso", description: "Ícone do benefício carregado." })
+      toast({ title: "Sucesso", description: "Ícone carregado." })
     } catch (error: any) {
       toast({ title: "Erro no upload", description: error.message, variant: "destructive" })
     } finally {
@@ -810,12 +790,8 @@ function BenefitCatalogModal({ isOpen, benefit, onClose, onSave }: any) {
     if (!formData.nome) return
     setLoading(true)
     const res = await saveBenefit({ ...formData, id: benefit?.id })
-    if (res.success) {
-      toast({ title: "Sucesso", description: "Benefício salvo no catálogo." })
-      onSave()
-    } else {
-      toast({ title: "Erro", description: res.error, variant: "destructive" })
-    }
+    if (res.success) { toast({ title: "Sucesso", description: "Benefício salvo." }); onSave() }
+    else { toast({ title: "Erro", description: res.error, variant: "destructive" }) }
     setLoading(false)
   }
 
@@ -823,71 +799,33 @@ function BenefitCatalogModal({ isOpen, benefit, onClose, onSave }: any) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md rounded-[2.5rem] p-0 overflow-hidden border border-white/20 shadow-2xl bg-white/80 backdrop-blur-3xl">
         <div className="p-8 space-y-6">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase italic tracking-tight">
-              {benefit ? 'Editar Benefício' : 'Novo Benefício no Catálogo'}
-            </DialogTitle>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle className="text-2xl font-black uppercase italic tracking-tight">{benefit ? 'Editar Benefício' : 'Novo Benefício'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            {/* Upload do Ícone */}
             <div className="flex flex-col items-center justify-center py-4">
               <label className="relative group cursor-pointer">
                 <input type="file" className="hidden" accept="image/*" onChange={handleUploadImage} disabled={uploading} />
                 <div className="w-24 h-24 rounded-3xl bg-white/40 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden group-hover:border-primary/50 group-hover:bg-primary/5 transition-all shadow-inner">
-                  {formData.image_url ? (
-                    <img src={formData.image_url} alt="Ícone" className="w-full h-full object-cover shadow-sm" />
-                  ) : uploading ? (
-                    <Loader2 className="animate-spin text-primary w-8 h-8" />
-                  ) : (
-                    <div className="text-center">
-                      <ImageIcon className="text-slate-400 w-8 h-8 mx-auto" />
-                      <span className="text-[8px] font-black uppercase text-slate-400 mt-1 block">Upload</span>
-                    </div>
-                  )}
+                  {formData.image_url ? <img src={formData.image_url} alt="Ícone" className="w-full h-full object-cover shadow-sm" /> : uploading ? <Loader2 className="animate-spin text-primary w-8 h-8" /> : <div className="text-center"><ImageIcon className="text-slate-400 w-8 h-8 mx-auto" /><span className="text-[8px] font-black uppercase text-slate-400 mt-1 block">Upload</span></div>}
                 </div>
-                {formData.image_url && !uploading && (
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-3xl transition-opacity">
-                    <Edit2 className="text-white w-6 h-6" />
-                  </div>
-                )}
+                {formData.image_url && !uploading && <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-3xl transition-opacity"><Edit2 className="text-white w-6 h-6" /></div>}
               </label>
-              <p className="text-[10px] text-muted-foreground mt-2 font-bold uppercase tracking-widest">Ícone do Benefício</p>
             </div>
-
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Nome do Benefício</label>
-              <Input placeholder="Ex: Estacionamento VIP" className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold shadow-inner" value={formData.nome} onChange={(e) => setFormData(p => ({ ...p, nome: e.target.value }))} />
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Nome</label>
+              <Input placeholder="Ex: 10% OFF" className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold shadow-inner" value={formData.nome} onChange={(e) => setFormData(p => ({ ...p, nome: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Descrição</label>
-              <Input placeholder="Descreva o que este benefício oferece..." className="rounded-2xl h-12 bg-white/60 border-white/40 text-xs shadow-inner" value={formData.descricao} onChange={(e) => setFormData(p => ({ ...p, descricao: e.target.value }))} />
+              <Input placeholder="Ex: Ganhe 10% de desconto..." className="rounded-2xl h-12 bg-white/60 border-white/40 text-xs shadow-inner" value={formData.descricao} onChange={(e) => setFormData(p => ({ ...p, descricao: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Nível Mínimo</label>
-                <Input type="number" className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold shadow-inner" value={formData.nivel_minimo} onChange={(e) => setFormData(p => ({ ...p, nivel_minimo: parseInt(e.target.value) }))} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Status</label>
-                <Select value={formData.ativo ? "true" : "false"} onValueChange={(val) => setFormData(p => ({ ...p, ativo: val === "true" }))}>
-                  <SelectTrigger className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold text-[10px] uppercase shadow-inner">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="z-[150] shadow-2xl">
-                    <SelectItem value="true" className="text-emerald-600 font-bold uppercase text-[10px]">ATIVO</SelectItem>
-                    <SelectItem value="false" className="text-rose-600 font-bold uppercase text-[10px]">SUSPENSO</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Nível Mínimo</label><Input type="number" className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold shadow-inner" value={formData.nivel_minimo} onChange={(e) => setFormData(p => ({ ...p, nivel_minimo: parseInt(e.target.value) }))} /></div>
+              <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Status</label><Select value={formData.ativo ? "true" : "false"} onValueChange={(val) => setFormData(p => ({ ...p, ativo: val === "true" }))}><SelectTrigger className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold text-[10px] uppercase shadow-inner"><SelectValue /></SelectTrigger><SelectContent className="z-[150] shadow-2xl"><SelectItem value="true" className="text-emerald-600 font-bold uppercase text-[10px]">ATIVO</SelectItem><SelectItem value="false" className="text-rose-600 font-bold uppercase text-[10px]">SUSPENSO</SelectItem></SelectContent></Select></div>
             </div>
           </div>
-
           <DialogFooter className="pt-4 flex gap-3">
             <Button variant="ghost" className="flex-1 rounded-2xl h-14 font-black uppercase tracking-widest text-xs opacity-50 hover:opacity-100 transition-all" onClick={onClose}>Cancelar</Button>
-            <Button className="flex-[2] rounded-2xl h-14 font-black uppercase tracking-widest text-xs bg-[#e91c74] shadow-[0_10px_20px_rgba(233,28,116,0.3)] hover:shadow-[0_15px_25px_rgba(233,28,116,0.4)] text-white transition-all" onClick={handleSave} disabled={loading || uploading}>
-              {loading ? "Salvando..." : "Salvar no Catálogo"}
-            </Button>
+            <Button className="flex-[2] rounded-2xl h-14 font-black uppercase tracking-widest text-xs bg-[#e91c74] hover:bg-[#d11a68] shadow-[0_10px_20px_rgba(233,28,116,0.3)] hover:shadow-[0_15px_25px_rgba(233,28,116,0.4)] text-white transition-all" onClick={handleSave} disabled={loading || uploading}>{loading ? "Salvando..." : "Salvar"}</Button>
           </DialogFooter>
         </div>
       </DialogContent>

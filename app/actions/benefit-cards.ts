@@ -151,7 +151,7 @@ export async function saveBenefitCard(card: any, benefitIds?: string[]) {
       // Deleta vínculos antigos
       await supabase.from('card_benefits').delete().eq('card_id', savedCard.id)
 
-      // Insere novos vínculos se houver
+      // Insere novos vínculos si houver
       if (finalBenefitIds.length > 0) {
         const { error: relError } = await supabase
           .from('card_benefits')

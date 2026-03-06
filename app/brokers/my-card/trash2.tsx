@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, Suspense, useRef, useCallback } from "react"
-import { useTheme } from "next-themes"
 import { CreditCard, Menu, Download, ShieldCheck, Calendar, Star, Info, Plus, FileText, Camera, Loader2, Trash2, Settings2, Maximize, Eye, MoveHorizontal, MoveVertical, Edit2, UploadCloud, User, Percent, Sparkles, Zap, ChevronRight, X, QrCode } from "lucide-react"
 import { Sidebar } from "@/components/central63/sidebar"
 import { useToast } from "@/hooks/use-toast"
@@ -23,13 +22,14 @@ import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
-// ─── Styles Light Premium (Com suporte a Temas de Cartão) ───────────────
-const glassStyles = `
+// ─── Styles Light Premium (Com Profundidade Aprimorada) ───────────────
+const lightGlassStyles = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,700&display=swap');
 
   :root {
     --glass-white: rgba(255, 255, 255, 0.85);
     --glass-border: rgba(255, 255, 255, 1);
+    /* Sombra dos painéis aumentada para maior destaque no fundo claro */
     --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.08), 0 6px 16px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1);
     --pink: #e91c74;
     --pink-glow: rgba(233, 28, 116, 0.35);
@@ -40,33 +40,11 @@ const glassStyles = `
                linear-gradient(160deg, #fdfdfd 0%, #f5f5f7 100%);
     --text-main: #111827;
     --text-muted: #6b7280;
-    --card-bg: #ffffff;
-    --border-subtle: rgba(0, 0, 0, 0.05);
-    --btn-ghost-bg: rgba(255, 255, 255, 0.9);
-    --btn-ghost-border: rgba(0, 0, 0, 0.08);
-    --btn-ghost-hover: #ffffff;
-  }
-
-  .dark {
-    --glass-white: rgba(24, 24, 27, 0.8);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    --bg-base: #09090b;
-    --bg-mesh: radial-gradient(ellipse 80% 80% at 10% -10%, rgba(233, 28, 116, 0.15) 0%, transparent 60%),
-               radial-gradient(ellipse 60% 60% at 90% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 55%),
-               linear-gradient(160deg, #09090b 0%, #18181b 100%);
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --card-bg: #18181b;
-    --border-subtle: rgba(255, 255, 255, 0.1);
-    --btn-ghost-bg: rgba(255, 255, 255, 0.05);
-    --btn-ghost-border: rgba(255, 255, 255, 0.1);
-    --btn-ghost-hover: rgba(255, 255, 255, 0.1);
   }
 
   .glass-font { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
 
-  /* ── Painel de vidro (Adaptativo) ── */
+  /* ── Painel de vidro (Branco Fosco) ── */
   .glass-panel {
     background: var(--glass-white);
     backdrop-filter: blur(32px) saturate(200%);
@@ -75,35 +53,26 @@ const glassStyles = `
     box-shadow: var(--glass-shadow);
   }
 
-  /* ── Cartão fisico Base ── */
+  /* ── Cartão fisico (Silver/Opal Light com sombra profunda) ── */
   .physical-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fb 40%, #e2e5eb 100%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+      0 40px 80px rgba(0, 0, 0, 0.15),
+      0 15px 35px rgba(0, 0, 0, 0.10),
+      inset 0 2px 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
     transform-style: preserve-3d;
-    transition: transform 0.8s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.8s ease, background 0.5s ease;
+    transition: transform 0.8s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.8s ease;
+    color: var(--text-main);
   }
   .physical-card:hover {
     transform: perspective(900px) rotateY(4deg) rotateX(2deg) scale(1.015);
-  }
-
-  /* Tema Escuro do Cartão */
-  .physical-card.theme-dark {
-    background: linear-gradient(135deg, #09090b 0%, #1a0812 40%, #100617 100%);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.25), 0 15px 35px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
-    color: #ffffff;
-  }
-  .physical-card.theme-dark:hover {
-    box-shadow: 0 50px 100px rgba(0, 0, 0, 0.35), 0 20px 40px rgba(0, 0, 0, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
-  }
-
-  /* Tema Claro do Cartão */
-  .physical-card.theme-light {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fb 40%, #e2e5eb 100%);
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.15), 0 15px 35px rgba(0, 0, 0, 0.10), inset 0 2px 0 rgba(255, 255, 255, 1), inset 0 -1px 0 rgba(0, 0, 0, 0.05);
-    color: #111827;
-  }
-  .physical-card.theme-light:hover {
-    box-shadow: 0 50px 100px rgba(0, 0, 0, 0.22), 0 20px 40px rgba(0, 0, 0, 0.14), inset 0 2px 0 rgba(255, 255, 255, 1), inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    box-shadow:
+      0 50px 100px rgba(0, 0, 0, 0.22),
+      0 20px 40px rgba(0, 0, 0, 0.14),
+      inset 0 2px 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
   }
 
   /* ── Luz especular animada no cartão ── */
@@ -115,6 +84,7 @@ const glassStyles = `
   }
   .specular-sweep {
     position: absolute; inset: 0; z-index: 20; pointer-events: none;
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.8) 50%, transparent 80%);
     animation: specular-sweep 5s ease-in-out infinite;
   }
 
@@ -144,7 +114,7 @@ const glassStyles = `
   }
 
   /* ── Botão primário (Rosa) ── */
-  .btn-primary { 
+  .btn-primary {
     background: var(--pink);
     color: #fff;
     border: none;
@@ -158,47 +128,18 @@ const glassStyles = `
   }
   .btn-primary:active { transform: scale(0.98); }
 
-  /* ── Botões de Ação que acompanham o Cartão ── */
-  .btn-card-dark {
-    background: linear-gradient(135deg, #09090b 0%, #1a0812 40%, #100617 100%);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    transition: transform 0.2s, box-shadow 0.3s, filter 0.3s;
-  }
-  .btn-card-dark:hover {
-    box-shadow: 0 12px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
-    filter: brightness(1.15);
-  }
-  .btn-card-dark:active { transform: scale(0.98); }
-
-  .btn-card-light {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fb 40%, #e2e5eb 100%);
-    color: #111827;
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08), inset 0 2px 0 rgba(255, 255, 255, 1);
-    transition: transform 0.2s, box-shadow 0.3s, filter 0.3s;
-  }
-  .btn-card-light:hover {
-    box-shadow: 0 12px 32px rgba(0,0,0,0.12), inset 0 2px 0 rgba(255, 255, 255, 1);
-    transform: translateY(-2px);
-    filter: brightness(1.02);
-  }
-  .btn-card-light:active { transform: scale(0.98); }
-
-  /* ── Botão ghost (Adaptativo) ── */
+  /* ── Botão ghost (Outline Claro com sombra visível) ── */
   .btn-ghost {
-    background: var(--btn-ghost-bg);
+    background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(12px);
-    border: 1px solid var(--btn-ghost-border);
+    border: 1px solid rgba(0, 0, 0, 0.08);
     color: var(--text-main);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0,0,0,0.04);
     transition: background 0.3s, transform 0.2s, border-color 0.3s, color 0.3s, box-shadow 0.3s;
   }
   .btn-ghost:hover {
-    background: var(--btn-ghost-hover);
-    border-color: var(--btn-ghost-border);
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.15);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0,0,0,0.06);
     transform: translateY(-2px);
   }
@@ -224,12 +165,11 @@ const glassStyles = `
 
   /* ── Customização dropdown ── */
   .customize-panel {
-    background: var(--glass-white) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(40px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
-    border: 1px solid var(--glass-border) !important;
-    box-shadow: var(--glass-shadow) !important;
-    color: var(--text-main) !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.08) !important;
   }
 `
 
@@ -253,7 +193,6 @@ const HighlightValue = ({ text }: { text: string }) => {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function MyBenefitCardPage() {
   const { toast } = useToast()
-  const { resolvedTheme } = useTheme()
   const cardRef = useRef<HTMLDivElement>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("my-card")
@@ -270,24 +209,6 @@ export default function MyBenefitCardPage() {
   const [imageOpacity, setImageOpacity] = useState(0.5)
   const [cardName, setCardName] = useState("")
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
-
-  // Estado do Tema do Cartão
-  const [cardTheme, setCardTheme] = useState<'dark' | 'light'>('dark')
-
-  // Efeito para sincronizar com o tema global
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('central63_card_theme')
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      setCardTheme(savedTheme as 'light' | 'dark')
-    } else if (resolvedTheme === 'dark' || resolvedTheme === 'light') {
-      setCardTheme(resolvedTheme)
-    }
-  }, [resolvedTheme])
-
-  const handleThemeChange = (theme: 'dark' | 'light') => {
-    setCardTheme(theme)
-    localStorage.setItem('central63_card_theme', theme)
-  }
 
   const loadData = async () => {
     setIsLoading(true)
@@ -373,9 +294,7 @@ export default function MyBenefitCardPage() {
     setIsExporting(true)
     toast({ title: "Processando", description: "Gerando seu Ticket PDF..." })
     try {
-      // O fundo do PDF se adapta ao tema selecionado para evitar bordas feias
-      const pdfBg = cardTheme === 'dark' ? '#0a0a0a' : '#ffffff'
-      const dataUrl = await toPng(cardRef.current, { cacheBust: true, pixelRatio: 3, style: { borderRadius: '0', background: pdfBg } })
+      const dataUrl = await toPng(cardRef.current, { cacheBust: true, pixelRatio: 3, style: { borderRadius: '0', background: '#ffffff' } })
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 54] })
       pdf.addImage(dataUrl, 'PNG', 0, 0, 85.6, 54)
       pdf.save(`ticket-central63-${user?.full_name?.split(' ')[0] || 'membro'}.pdf`)
@@ -389,31 +308,28 @@ export default function MyBenefitCardPage() {
   }
 
   if (isLoading && !card) return <Loading />
-if (isLoading && !card) return <Loading />
 
-const isAppDark = resolvedTheme === 'dark';
-const isCardDark = cardTheme === 'dark';
+  return (
+    <Suspense fallback={<Loading />}>
+      {/* Estilos injetados no head para a versão light */}
+      <style>{lightGlassStyles}</style>
 
-return (
-  <Suspense fallback={<Loading />}>
-    <style>{glassStyles}</style>
-
-    <div
-      className={`glass-font flex h-screen overflow-hidden transition-colors duration-500 ${isAppDark ? 'dark' : ''}`}
-      style={{ background: 'var(--bg-mesh)', backgroundColor: 'var(--bg-base)', color: 'var(--text-main)' }}
-    >
+      <div
+        className="glass-font flex h-screen overflow-hidden text-[#111827]"
+        style={{ background: 'var(--bg-mesh)', backgroundColor: 'var(--bg-base)' }}
+      >
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={setActiveTab} />
 
         <main className="flex-1 flex flex-col h-full overflow-hidden">
 
-          {/* ── Header Glass ── */}
+          {/* ── Header Glass (Light) ── */}
           <header
-            className="glass-panel z-20 flex items-center justify-between px-5 sm:px-8 py-4 transition-all duration-500"
+            className="glass-panel z-20 flex items-center justify-between px-5 sm:px-8 py-4"
             style={{ borderRadius: 0, borderLeft: 'none', borderTop: 'none', borderRight: 'none' }}
           >
             <div className="flex items-center gap-3 sm:gap-4">
               <button
-                className="lg:hidden p-2 rounded-xl transition-all hover:bg-black/5 dark:hover:bg-white/5"
+                className="lg:hidden p-2 rounded-xl transition-all hover:bg-black/5"
                 onClick={() => setSidebarOpen(true)}
               >
                 <Menu size={18} />
@@ -421,28 +337,26 @@ return (
 
               {/* Logo pill */}
               <div
-                className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl transition-all duration-500"
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-white"
                 style={{
-                  background: 'var(--card-bg)',
-                  border: '1px solid var(--border-subtle)',
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.06)'
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  boxShadow: '0 6px 16px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.03)'
                 }}
               >
                 <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-500"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center bg-white"
                   style={{
-                    background: 'var(--card-bg)',
-                    border: '1px solid var(--border-subtle)',
+                    border: '1px solid rgba(0,0,0,0.05)',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                   }}
                 >
                   <CreditCard size={15} color="#e91c74" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-main)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.02em', color: '#111827' }}>
                     Club Casa63+
                   </div>
-                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: '#9ca3af', textTransform: 'uppercase' }}>
                     Member Portal
                   </div>
                 </div>
@@ -451,10 +365,9 @@ return (
 
             {/* Status chip */}
             <div
-              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl transition-all duration-500"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white"
               style={{
-                background: 'var(--card-bg)',
-                border: '1px solid var(--border-subtle)',
+                border: '1px solid rgba(0,0,0,0.05)',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
               }}
             >
@@ -462,7 +375,7 @@ return (
                 className="status-dot block w-1.5 h-1.5 rounded-full"
                 style={{ background: '#e91c74', boxShadow: '0 0 6px rgba(233,28,116,0.6)' }}
               />
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#4b5563' }}>
                 Sistema Ativo
               </span>
             </div>
@@ -480,50 +393,38 @@ return (
                   {/* ─── LEFT: Card + Actions ─── */}
                   <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-0">
 
-                    {/* Ambient glow behind card (Dinâmico) */}
+                    {/* Ambient glow behind card */}
                     <div className="relative">
                       <div
-                        className="absolute -inset-8 rounded-[4rem] blur-3xl pointer-events-none transition-all duration-700"
-                        style={{ background: isCardDark ? 'radial-gradient(ellipse at 70% 30%, rgba(233,28,116,0.3) 0%, transparent 60%), radial-gradient(ellipse at 30% 80%, rgba(139, 92, 246, 0.25) 0%, transparent 60%)' : 'radial-gradient(ellipse at 60% 40%, rgba(233,28,116,0.15) 0%, transparent 60%)' }}
+                        className="absolute -inset-8 rounded-[4rem] blur-3xl pointer-events-none"
+                        style={{ background: 'radial-gradient(ellipse at 60% 40%, rgba(233,28,116,0.15) 0%, transparent 60%)' }}
                       />
 
-                      {/* Physical card com Tema Dinâmico */}
+                      {/* Physical card (Silver/Opal) */}
                       <div
                         ref={cardRef}
-                        className={`physical-card group/card relative w-full overflow-hidden ${isCardDark ? 'theme-dark' : 'theme-light'}`}
+                        className="physical-card relative w-full overflow-hidden"
                         style={{ aspectRatio: '1.586/1', borderRadius: '2.2rem' }}
                       >
-                        {/* Metal brushed texture */}
+                        {/* Metal brushed texture suave */}
                         <div
                           className="absolute inset-0 pointer-events-none"
                           style={{
-                            background: isCardDark ? 'repeating-linear-gradient(83deg, transparent, transparent 2px, rgba(255,255,255,0.015) 2px, rgba(255,255,255,0.015) 3px)' : 'repeating-linear-gradient(83deg, transparent, transparent 2px, rgba(0,0,0,0.015) 2px, rgba(0,0,0,0.015) 3px)',
+                            background: 'repeating-linear-gradient(83deg, transparent, transparent 2px, rgba(0,0,0,0.015) 2px, rgba(0,0,0,0.015) 3px)',
                             zIndex: 1
-                          }}
-                        />
-
-                        {/* Color gradient layer interno (Dinâmico) */}
-                        <div
-                          className="absolute inset-0 pointer-events-none transition-opacity duration-700"
-                          style={{
-                            background: isCardDark ? 'radial-gradient(ellipse at 80% 0%, rgba(233,28,116,0.3) 0%, transparent 55%), radial-gradient(ellipse at 20% 100%, rgba(139,92,246,0.2) 0%, transparent 50%)' : 'none',
-                            zIndex: 2
                           }}
                         />
 
                         {/* Top highlight edge */}
                         <div
                           className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-                          style={{ background: isCardDark ? 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3) 30%, rgba(255,255,255,0.1) 70%, transparent)' : 'linear-gradient(90deg, transparent, rgba(255,255,255,1) 30%, rgba(255,255,255,0.8) 70%, transparent)', zIndex: 3 }}
+                          style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,1) 30%, rgba(255,255,255,0.8) 70%, transparent)', zIndex: 3 }}
                         />
 
                         {/* Specular sweep */}
-                        <div 
-                          className="specular-sweep" 
-                          style={{ background: isCardDark ? 'linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.12) 50%, transparent 80%)' : 'linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.8) 50%, transparent 80%)' }} 
-                        />
+                        <div className="specular-sweep" />
 
-                        {/* User photo overlay (Dinâmico) */}
+                        {/* User photo overlay (Claro) */}
                         {card.card_image_url && (
                           <div className="absolute inset-0 z-0 pointer-events-none select-none">
                             <img
@@ -538,11 +439,11 @@ return (
                                 width: '100%', height: '100%',
                                 objectFit: 'cover',
                                 filter: 'grayscale(100%)',
-                                mixBlendMode: isCardDark ? 'overlay' : 'multiply'
+                                mixBlendMode: 'multiply'
                               }}
                             />
-                            {/* Gradiente cobrindo a imagem */}
-                            <div className="absolute inset-0" style={{ background: isCardDark ? 'linear-gradient(100deg, rgba(10,10,12,0.95) 0%, rgba(26,8,18,0.6) 60%, transparent 100%)' : 'linear-gradient(100deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.6) 60%, transparent 100%)' }} />
+                            {/* Gradiente branco cobrindo a imagem para garantir legibilidade */}
+                            <div className="absolute inset-0" style={{ background: 'linear-gradient(100deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.6) 60%, transparent 100%)' }} />
                           </div>
                         )}
 
@@ -558,12 +459,11 @@ return (
                               <div
                                 style={{
                                   width: 44, height: 44,
-                                  background: isCardDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.9)',
-                                  border: isCardDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.05)',
+                                  background: 'rgba(255,255,255,0.9)',
+                                  border: '1px solid rgba(0,0,0,0.05)',
                                   borderRadius: 14,
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  boxShadow: isCardDark ? '0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.08)',
-                                  transition: 'all 0.5s'
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                                 }}
                               >
                                 <div style={{
@@ -578,7 +478,7 @@ return (
                               </div>
                               <div>
                                 <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.03em', fontStyle: 'italic', textTransform: 'uppercase', lineHeight: 1 }}>Club Casa63+</div>
-                                <div style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase', opacity: isCardDark ? 0.6 : 0.5, marginTop: 3 }}>Exclusivo</div>
+                                <div style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase', opacity: 0.5, marginTop: 3 }}>Exclusivo</div>
                               </div>
                             </div>
 
@@ -589,68 +489,34 @@ return (
                                   style={{
                                     padding: '6px 14px',
                                     borderRadius: 99,
-                                    background: isCardDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.5)',
-                                    border: isCardDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.08)',
-                                    color: isCardDark ? '#ffffff' : '#111827',
+                                    background: 'rgba(255,255,255,0.5)',
+                                    border: '1px solid rgba(0,0,0,0.08)',
+                                    color: '#111827',
                                     fontSize: 9, fontWeight: 800, letterSpacing: '0.14em',
                                     textTransform: 'uppercase',
                                     display: 'flex', alignItems: 'center', gap: 6,
                                     cursor: 'pointer', transition: 'all 0.25s',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                                    minWidth: '85px',
-                                    justifyContent: 'center'
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
                                   }}
-                                  onMouseEnter={e => { e.currentTarget.style.background = '#e91c74'; e.currentTarget.style.borderColor = '#e91c74'; e.currentTarget.style.color = '#fff'; }}
-                                  onMouseLeave={e => { 
-                                    e.currentTarget.style.background = isCardDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.5)'; 
-                                    e.currentTarget.style.borderColor = isCardDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)'; 
-                                    e.currentTarget.style.color = isCardDark ? '#ffffff' : '#111827';
-                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = '#e91c74'; e.currentTarget.style.color = '#fff'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.5)'; e.currentTarget.style.color = '#111827'; }}
                                 >
-                                  {/* Renderiza "VÁLIDO" estado normal. Ao passar o mouse no card, oculta. */}
-                                  <span className="flex items-center gap-1.5 group-hover/card:hidden">
-                                    <span style={{ width: 5, height: 5, borderRadius: 99, background: '#e91c74', display: 'inline-block' }} />
-                                    VÁLIDO
-                                  </span>
-                                  {/* Renderiza "EDITAR" apenas ao passar o mouse em qualquer parte do cartão escuro. */}
-                                  <span className="hidden items-center gap-1.5 group-hover/card:flex">
-                                    <Edit2 size={10} />
-                                    EDITAR
-                                  </span>
+                                  <span
+                                    style={{ width: 5, height: 5, borderRadius: 99, background: '#e91c74', display: 'inline-block' }}
+                                  />
+                                  VÁLIDO
                                 </button>
                               </DropdownMenuTrigger>
 
                               <DropdownMenuContent
                                 side="right" sideOffset={60} align="center"
-                                className="customize-panel w-72 rounded-[2.2rem] p-6 z-50"
+                                className="customize-panel w-72 rounded-[2.2rem] p-6 z-50 text-[#111827]"
                                 style={{ border: 'none' }}
                               >
                                 <div className="space-y-5">
-                                  <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', opacity: 0.5, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 10 }}>
+                                  <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', opacity: 0.5, borderBottom: '1px solid rgba(0,0,0,0.07)', paddingBottom: 10 }}>
                                     Customização
                                   </p>
-
-                                  {/* Seletor de Temas Adicionado */}
-                                  <div className="space-y-2">
-                                    <label style={{ fontSize: 10, fontWeight: 700, opacity: 0.6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <Sparkles size={11} /> Estilo do Cartão
-                                    </label>
-                                    <div className="flex gap-2">
-                                      <button 
-                                        onClick={() => handleThemeChange('light')}
-                                        className={`flex-1 h-10 rounded-[12px] font-bold text-xs border transition-all ${!isCardDark ? 'border-[#e91c74] bg-[#e91c74]/10 text-[#e91c74]' : 'border-current opacity-50 bg-current/5 hover:opacity-100'}`}
-                                      >
-                                        Claro
-                                      </button>
-                                      <button 
-                                        onClick={() => handleThemeChange('dark')}
-                                        className={`flex-1 h-10 rounded-[12px] font-bold text-xs border transition-all ${isCardDark ? 'border-[#e91c74] bg-[#e91c74]/10 text-[#e91c74]' : 'border-current opacity-50 bg-current/5 hover:opacity-100'}`}
-                                      >
-                                        Escuro
-                                      </button>
-                                    </div>
-                                  </div>
-
                                   <div className="space-y-2">
                                     <label style={{ fontSize: 10, fontWeight: 700, opacity: 0.6, display: 'flex', alignItems: 'center', gap: 6 }}>
                                       <User size={11} /> Nome Impresso
@@ -661,9 +527,9 @@ return (
                                       placeholder="Nome no cartão"
                                       style={{
                                         height: 44, borderRadius: 14,
-                                        background: 'rgba(120,120,120,0.05)',
-                                        border: '1px solid var(--border-subtle)',
-                                        fontWeight: 600, fontSize: 13, color: 'inherit'
+                                        background: 'rgba(0,0,0,0.03)',
+                                        border: '1px solid rgba(0,0,0,0.08)',
+                                        fontWeight: 600, fontSize: 13, color: '#111827'
                                       }}
                                     />
                                   </div>
@@ -677,26 +543,14 @@ return (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, opacity: 0.6 }}>
                                           <span>{label}</span><span>{display}</span>
                                         </div>
-                                        <Slider
-                                          value={value}
-                                          min={min}
-                                          max={max}
-                                          step={step}
-                                          onValueChange={onChange}
-                                          className="
-                                              [&_[role=slider]]:bg-current 
-                                              [&_[role=slider]]:border-none 
-                                              [&_[data-radix-slider-range]]:bg-current 
-                                              [&_[data-radix-slider-track]]:bg-current/10
-                                            "
-                                        />
+                                        <Slider value={value} min={min} max={max} step={step} onValueChange={onChange} className="[&_[role=slider]]:bg-[#e91c74] [&_[role=slider]]:border-none" />
                                       </div>
                                     ))}
                                   </div>
                                   <div className="space-y-2 pt-1">
                                     <button
                                       className="btn-ghost w-full rounded-2xl font-bold uppercase text-xs gap-2 flex items-center justify-center"
-                                      style={{ height: 44, letterSpacing: '0.1em', border: '1px dashed var(--border-subtle)' }}
+                                      style={{ height: 44, letterSpacing: '0.1em', border: '1px dashed rgba(0,0,0,0.2)' }}
                                       onClick={() => document.getElementById('card-photo-upload')?.click()}
                                     >
                                       <Camera size={14} /> Trocar Foto
@@ -720,7 +574,7 @@ return (
                           <div className="flex items-end justify-between" style={{ pointerEvents: 'none' }}>
                             <div className="space-y-4">
                               <div>
-                                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.4em', textTransform: 'uppercase', opacity: isCardDark ? 0.5 : 0.45, marginBottom: 5 }}>Membro do Club</div>
+                                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.4em', textTransform: 'uppercase', opacity: 0.45, marginBottom: 5 }}>Membro do Club</div>
                                 <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', textTransform: 'uppercase', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {cardName}
                                 </div>
@@ -731,8 +585,8 @@ return (
                                   { label: 'Validade', value: new Date(card.data_validade).toLocaleDateString('pt-BR') }
                                 ].map(({ label, value }) => (
                                   <div key={label}>
-                                    <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', opacity: isCardDark ? 0.5 : 0.45, marginBottom: 3 }}>{label}</div>
-                                    <div style={{ fontSize: 12, fontWeight: 800, opacity: 1 }}>{value}</div>
+                                    <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.45, marginBottom: 3 }}>{label}</div>
+                                    <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.9 }}>{value}</div>
                                   </div>
                                 ))}
                               </div>
@@ -745,8 +599,8 @@ return (
                                 background: 'white',
                                 borderRadius: 16,
                                 padding: 6,
-                                boxShadow: isCardDark ? '0 12px 32px rgba(0,0,0,0.2)' : '0 8px 24px rgba(0,0,0,0.08)',
-                                border: '1px solid rgba(255,255,255,0.1)',
+                                boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+                                border: '1px solid rgba(0,0,0,0.05)',
                                 overflow: 'hidden'
                               }}
                             >
@@ -757,10 +611,10 @@ return (
                       </div>
                     </div>
 
-                    {/* Action buttons dinâmicos com o tema */}
+                    {/* Action buttons */}
                     <div className="flex gap-3">
                       <button
-                        className={`${isCardDark ? 'btn-card-dark' : 'btn-card-light'} flex-[2] flex items-center justify-center gap-2.5 rounded-2xl font-black uppercase`}
+                        className="btn-primary flex-[2] flex items-center justify-center gap-2.5 rounded-2xl font-black uppercase"
                         style={{ height: 52, fontSize: 10, letterSpacing: '0.12em' }}
                         onClick={handleDownloadPDF}
                         disabled={isExporting}
@@ -777,6 +631,26 @@ return (
                       </button>
                     </div>
 
+                    {/* Info strip */}
+                    <div
+                      className="glass-panel rounded-[1.6rem] flex items-center gap-4"
+                      style={{ padding: '14px 18px' }}
+                    >
+                      <div
+                        style={{
+                          width: 36, height: 36, borderRadius: 12,
+                          background: 'rgba(233,28,116,0.1)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        <ShieldCheck size={16} color="#e91c74" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#111827', letterSpacing: '-0.01em' }}>Cartão verificado e ativo</div>
+                        <div style={{ fontSize: 10, fontWeight: 500, color: '#6b7280', marginTop: 2 }}>Suas vantagens estão liberadas automaticamente.</div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* ─── RIGHT: Benefits ─── */}
@@ -799,8 +673,8 @@ return (
                           <Zap size={18} fill="#e91c74" color="#e91c74" />
                         </div>
                         <div>
-                          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-main)' }}>Vantagens Ativas</div>
-                          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: 2 }}>Curadoria Club Casa63+</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em', color: '#111827' }}>Vantagens Ativas</div>
+                          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#6b7280', marginTop: 2 }}>Curadoria Club Casa63+</div>
                         </div>
                       </div>
                       <div
@@ -920,107 +794,87 @@ return (
         </main>
       </div>
 
-      {/* ── Validation Modal (Light Premium Refined) ── */}
+      {/* ── Validation Modal (Light) ── */}
       <Dialog open={isValidateModalOpen} onOpenChange={setIsValidateModalOpen}>
         <DialogContent
           style={{
-            width: '92vw', maxWidth: 380,
-            borderRadius: '2.5rem',
+            width: '92vw', maxWidth: 420,
+            borderRadius: '3rem',
             padding: 0, overflow: 'hidden',
             background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(40px) saturate(200%)',
-            WebkitBackdropFilter: 'blur(40px) saturate(200%)',
+            backdropFilter: 'blur(40px)',
             border: '1px solid rgba(255, 255, 255, 1)',
-            boxShadow: '0 40px 80px rgba(0,0,0,0.1), 0 10px 30px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,1)'
+            boxShadow: '0 40px 100px rgba(0,0,0,0.15), 0 12px 40px rgba(0,0,0,0.1)'
           }}
         >
-          {/* Luzes ambiente de fundo do modal */}
-          <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-[#e91c74]/10 to-transparent pointer-events-none" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-500/10 rounded-full blur-[60px] pointer-events-none" />
+          <div style={{ padding: '44px 36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, textAlign: 'center' }}>
 
-          <div style={{ padding: '40px 32px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, textAlign: 'center', position: 'relative', zIndex: 10 }}>
-
-            {/* Header Compacto */}
-            <div className="flex flex-col items-center gap-3">
-              <div
-                style={{
-                  width: 52, height: 52, borderRadius: 16,
-                  background: 'linear-gradient(135deg, #e91c74, #ff4d94)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 8px 24px rgba(233,28,116,0.3)'
-                }}
-              >
-                <QrCode size={24} color="white" />
-              </div>
-              <div className="space-y-1 mt-1">
-                <DialogTitle style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: '#111827', lineHeight: 1 }}>Passe de Acesso</DialogTitle>
-                <DialogDescription style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>Apresente para liberação</DialogDescription>
-              </div>
-            </div>
-
-            {/* QR container flutuante com Aura */}
-            <div className="relative group mt-2">
-              <div className="absolute -inset-2 bg-gradient-to-r from-[#e91c74]/20 to-purple-500/20 rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-              <div
-                style={{
-                  position: 'relative',
-                  background: '#ffffff',
-                  padding: 16, borderRadius: '2rem',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)',
-                  border: '1px solid rgba(0,0,0,0.04)',
-                  transform: 'translateZ(0)',
-                  transition: 'transform 0.4s cubic-bezier(0.23,1,0.32,1)'
-                }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.02) translateY(-4px)')}
-                onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1) translateY(0)')}
-              >
-                {/* Efeito sutil de scanline/borda interna */}
-                <div className="absolute inset-0 border-2 border-[#e91c74]/5 rounded-[2rem] pointer-events-none" />
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${card?.id}&margin=0`}
-                  alt="QR Code"
-                  style={{ width: 180, height: 180, display: 'block', borderRadius: '1rem' }}
-                />
-              </div>
-            </div>
-
-            {/* Member info - Ticket Style Horizontal */}
+            {/* Icon */}
             <div
               style={{
-                width: '100%',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '16px 20px', borderRadius: '1.2rem',
-                background: 'rgba(255,255,255,0.7)',
-                border: '1px solid rgba(255,255,255,1)',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.8)',
-                textAlign: 'left'
+                width: 72, height: 72, borderRadius: 24,
+                background: 'linear-gradient(135deg, #e91c74, #ff4d94)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 16px 40px rgba(233,28,116,0.3)',
+                animation: 'status-pulse 2.5s ease-in-out infinite'
               }}
             >
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 2 }}>Membro VIP</div>
-                <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', color: '#111827', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cardName}</div>
-              </div>
+              <QrCode size={30} color="white" />
+            </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                <div style={{ padding: '4px 10px', borderRadius: 99, background: 'rgba(233,28,116,0.1)', color: '#e91c74', fontSize: 10, fontWeight: 800, letterSpacing: '0.05em' }}>
-                  Nível {card?.nivel_beneficio}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span className="status-dot block w-1.5 h-1.5 rounded-full" style={{ background: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.5)' }} />
-                  <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.1em' }}>Ativo</span>
-                </div>
+            <DialogHeader style={{ gap: 6 }}>
+              <DialogTitle style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', fontStyle: 'italic', textTransform: 'uppercase', color: '#111827' }}>
+                Validação Club
+              </DialogTitle>
+              <DialogDescription style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>
+                Apresente este código para resgate.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* QR container */}
+            <div
+              style={{
+                background: 'white',
+                padding: 16, borderRadius: '2.2rem',
+                boxShadow: '0 16px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)',
+                border: '8px solid rgba(243,244,246,0.8)',
+                transition: 'transform 0.4s cubic-bezier(0.23,1,0.32,1)'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.03)')}
+              onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+            >
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${card?.id}&margin=10`}
+                alt="QR"
+                style={{ width: 200, height: 200, display: 'block' }}
+              />
+            </div>
+
+            {/* Member info */}
+            <div
+              style={{
+                width: '100%', padding: '20px 24px', borderRadius: '1.8rem',
+                background: '#f9fafb',
+                border: '1px solid rgba(0,0,0,0.05)',
+                boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.02)'
+              }}
+            >
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 6 }}>Membro VIP</div>
+              <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1, color: '#111827' }}>{cardName}</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+                <span style={{ width: 7, height: 7, borderRadius: 99, background: '#e91c74', display: 'inline-block', animation: 'status-pulse 2s ease-in-out infinite' }} />
+                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#e91c74' }}>Level {card?.nivel_beneficio} • Ativo</span>
               </div>
             </div>
 
-            {/* Botão de Fechar Dinâmico */}
+            {/* Close button */}
             <button
-              className={`${isCardDark ? 'btn-card-dark' : 'btn-card-light'} w-full rounded-2xl font-black uppercase mt-1`}
+              className="btn-primary w-full rounded-2xl font-black uppercase"
               style={{ height: 52, fontSize: 10, letterSpacing: '0.14em' }}
               onClick={() => setIsValidateModalOpen(false)}
             >
-              Fechar
+              Fechar Validador
             </button>
-
           </div>
         </DialogContent>
       </Dialog>

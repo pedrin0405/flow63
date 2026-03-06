@@ -242,7 +242,16 @@ export function ProfileTab({ profile, setProfile, onRefresh }: ProfileTabProps) 
                       <Sun className={cn("h-3.5 w-3.5 transition-colors", resolvedTheme === 'light' ? "text-orange-500" : "text-muted-foreground/40")} />
                       <Switch 
                         checked={resolvedTheme === 'dark'} 
-                        onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} 
+                        onCheckedChange={async (checked) => {
+                          const newTheme = checked ? 'dark' : 'light'
+                          setTheme(newTheme)
+                          // Persiste no banco de dados
+                          try {
+                            await supabase.from('profiles').update({ app_theme: newTheme }).eq('id', profile.id)
+                          } catch (e) {
+                            console.error("Erro ao salvar tema:", e)
+                          }
+                        }} 
                         className="scale-75 data-[state=checked]:bg-primary"
                       />
                       <Moon className={cn("h-3.5 w-3.5 transition-colors", resolvedTheme === 'dark' ? "text-primary" : "text-muted-foreground/40")} />
