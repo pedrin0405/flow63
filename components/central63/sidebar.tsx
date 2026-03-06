@@ -121,7 +121,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
   const canAccessChat = userData?.role === 'Marketing' || userData?.role === 'Gestor' || userData?.role === 'Diretor' || userData?.role === 'Admin';
   
   // Variáveis auxiliares para facilitar o entendimento e manutenção das permissões
-  const isHighLevelUser = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Secretaria' || userData?.role === 'Admin';
+  const isHighLevelUser = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Secretária' || userData?.role === 'Admin';
   const isManagerOrAbove = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Admin';
 
   // Atualiza o título da aba com a contagem de mensagens não lidas
