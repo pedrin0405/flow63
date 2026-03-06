@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 2. Verificar o usuário
+  // 2. Verificar a sessão
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -41,13 +41,60 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/forgot-password')
   const isPublicFormRoute = path.startsWith('/forms/') && path !== '/forms'
 
-  // Proteção usando a sessão (mais rápido que getUser)
+  // 3. Proteção básica de rotas não logadas
   if (!session && !isAuthRoute && !isPublicFormRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (session && path === '/login') {
-    return NextResponse.redirect(new URL('/', request.url))
+  // 4. Lógica de Redirecionamento por Role (Apenas se logado)
+  if (session) {
+    // Busca a Role (perfil) do usuário no banco
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+
+    const role = profile?.role
+    // Verifica se o usuário pertence à alta gestão/admin
+    const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretaria', 'Admin'].includes(role)
+
+    // Se o usuário acessar /login estando logado
+    if (path === '/login') {
+      if (isHighLevelUser) {
+        return NextResponse.redirect(new URL('/', request.url)) // Vai pra Home (Dashboard)
+      } else {
+        return NextResponse.redirect(new URL('/brokers/my-card', request.url)) // Vai pro Cartão
+      }
+    }
+
+    // Se for Corretor e tentar acessar a Home (Dashboard)
+    if (path === '/' && !isHighLevelUser) {
+      return NextResponse.redirect(new URL('/brokers/my-card', request.url))
+    }
+
+    // Bloqueio de segurança extra: Se for Corretor, não deixa acessar via URL direta outras páginas
+    const restrictedRoutes = [
+      '/services', 
+      '/homes', 
+      '/units', 
+      '/brokers',
+      '/admin', 
+      '/indicators', 
+      '/forms', 
+      '/spreadsheets', 
+      '/custom-dashboard', 
+      '/chat-support', 
+      '/support'
+    ]
+
+    // Se a rota acessada começar com alguma das restritas e não for HighLevelUser
+    if (!isHighLevelUser && restrictedRoutes.some(route => path.startsWith(route))) {
+      // Exceção do isPublicFormRoute já foi tratada acima para não logados, mas aqui garantimos pros logados
+      if (!isPublicFormRoute) {
+        return NextResponse.redirect(new URL('/brokers/my-card', request.url))
+      }
+    }
   }
 
   return response
