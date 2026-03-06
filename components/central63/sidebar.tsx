@@ -23,7 +23,8 @@ import {
   CreditCard,
   type LucideIcon, 
   House,
-  Palette
+  Palette,
+  Wallet
 } from "lucide-react"
 import {
   Tooltip,
@@ -116,8 +117,12 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
   const router = useRouter()
   const pathname = usePathname()
 
-  // Lógica de permissão para o Chat de Suporte
+  // Lógica de permissão
   const canAccessChat = userData?.role === 'Marketing' || userData?.role === 'Gestor' || userData?.role === 'Diretor' || userData?.role === 'Admin';
+  
+  // Variáveis auxiliares para facilitar o entendimento e manutenção das permissões
+  const isHighLevelUser = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Secretaria' || userData?.role === 'Admin';
+  const isManagerOrAbove = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Admin';
 
   // Atualiza o título da aba com a contagem de mensagens não lidas
   useEffect(() => {
@@ -261,6 +266,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
 
   const isActive = (key: string, route?: string) => {
     if (route && pathname === route) return true
+    // Se o usuário não tem role alta, a home dele será "/brokers/my-card", então a lógica de isActive na "/" para ele muda.
     if (pathname === "/" && activeTab === key) return true
     return false
   }
@@ -313,79 +319,99 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
           </div>
 
           <nav className="flex-1 py-6 space-y-1 overflow-y-auto overflow-x-hidden px-3">
+            
+            {/* Bloco: Menu Principal (Apenas para perfis mais altos) */}
+            {isHighLevelUser && (
+              <>
+                {!isCollapsed && (
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 px-4 whitespace-nowrap">
+                    Menu Principal
+                  </div>
+                )}
+                <SidebarItem 
+                  icon={LayoutDashboard}
+                  label="Home" 
+                  active={isActive("dashboard") && pathname === "/"} 
+                  onClick={() => handleNavigation("dashboard")}
+                  badge={atendimentosCount}
+                  collapsed={isCollapsed}
+                />
+                
+                <SidebarItem 
+                  icon={Users} 
+                  label="Atendimentos" 
+                  active={isActive("atendimentos", "/services")} 
+                  onClick={() => handleNavigation("atendimentos", "/services")} 
+                  collapsed={isCollapsed}
+                />
+                
+                <SidebarItem 
+                  icon={Building2} 
+                  label="Imóveis" 
+                  active={isActive("imoveis", "/homes")} 
+                  onClick={() => handleNavigation("imoveis", "/homes")} 
+                  collapsed={isCollapsed}
+                />
+                
+                <SidebarItem 
+                  icon={UserCog} 
+                  label="Corretores" 
+                  active={isActive("corretores", "/brokers")} 
+                  onClick={() => handleNavigation("corretores", "/brokers")}
+                  collapsed={isCollapsed}
+                />
+                
+                <SidebarItem 
+                  icon={House} 
+                  label="Unidades" 
+                  active={isActive("unidades", "/units")} 
+                  onClick={() => handleNavigation("unidades", "/units")}
+                  collapsed={isCollapsed}
+                />
+              </>
+            )}
+
+            {/* Bloco: Club Casa63+ (Todos veem o título, mas as opções dependem da role) */}
             {!isCollapsed && (
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 px-4 whitespace-nowrap">
-                Menu Principal
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
+                Club Casa63+
               </div>
             )}
-            
-            <SidebarItem 
-              icon={LayoutDashboard}
-              label="Home" 
-              active={isActive("dashboard") && pathname === "/"} 
-              onClick={() => handleNavigation("dashboard")}
-              badge={atendimentosCount}
-              collapsed={isCollapsed}
-            />
+            {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
-            <SidebarItem 
-              icon={Users} 
-              label="Atendimentos" 
-              active={isActive("atendimentos", "/services")} 
-              onClick={() => handleNavigation("atendimentos", "/services")} 
-              collapsed={isCollapsed}
-            />
-
-            <SidebarItem 
-              icon={Building2} 
-              label="Imóveis" 
-              active={isActive("imoveis", "/homes")} 
-              onClick={() => handleNavigation("imoveis", "/homes")} 
-              collapsed={isCollapsed}
-            />
-            <SidebarItem 
-              icon={UserCog} 
-              label="Corretores" 
-              active={isActive("corretores", "/brokers")} 
-              onClick={() => handleNavigation("corretores", "/brokers")}
-              collapsed={isCollapsed}
-            />
-            
-            <SidebarItem 
-              icon={House} 
-              label="Unidades" 
-              active={isActive("unidades", "/units")} 
-              onClick={() => handleNavigation("unidades", "/units")}
-              collapsed={isCollapsed}
-            />
-
-            {(userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Admin') && (
+            {isManagerOrAbove && (
               <SidebarItem 
-                icon={CreditCard} 
+                icon={Wallet} 
                 label="Gestão de Cartões" 
                 active={isActive("benefit-cards-admin", "/admin/benefit-cards")} 
                 onClick={() => handleNavigation("benefit-cards-admin", "/admin/benefit-cards")}
                 collapsed={isCollapsed}
               />
-            )}
+            )}  
 
-            {userData?.role === 'Corretor' && (
-              <SidebarItem 
-                icon={CreditCard} 
-                label="Meu Cartão" 
-                active={isActive("my-benefit-card", "/brokers/my-card")} 
-                onClick={() => handleNavigation("my-benefit-card", "/brokers/my-card")}
-                collapsed={isCollapsed}
-              />
-            )}
+            {/* Item liberado para todos (Corretores e Alta gestão) */}
+            <SidebarItem 
+              icon={CreditCard} 
+              label="Meu Cartão" 
+              active={isActive("my-benefit-card", "/brokers/my-card")} 
+              onClick={() => handleNavigation("my-benefit-card", "/brokers/my-card")}
+              collapsed={isCollapsed}
+            />
 
-            {!isCollapsed && (
+            {/* Bloco: Documentos & Métricas (Título só aparece se houver itens liberados, ou seja, se for Gestão. Se for corretor, o Flow Design sobe sem título ou usa o título base) */}
+            {!isCollapsed && isHighLevelUser && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
                 Documentos & Métricas
               </div>
             )}
+            {!isCollapsed && !isHighLevelUser && (
+               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
+                Ferramentas
+              </div>
+            )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
+            {/* Liberado para todos */}
             <SidebarItem 
               icon={Palette} 
               label="Flow Design" 
@@ -394,38 +420,44 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               collapsed={isCollapsed}
             />
 
-            <SidebarItem 
-              icon={ChartPie} 
-              label="Indicadores" 
-              active={isActive("indicadores", "/indicators")} 
-              onClick={() => handleNavigation("indicadores", "/indicators")}
-              collapsed={isCollapsed}
-            />
+            {/* Itens restritos */}
+            {isHighLevelUser && (
+              <>
+                <SidebarItem 
+                  icon={ChartPie} 
+                  label="Indicadores" 
+                  active={isActive("indicadores", "/indicators")} 
+                  onClick={() => handleNavigation("indicadores", "/indicators")}
+                  collapsed={isCollapsed}
+                />
 
-            <SidebarItem 
-              icon={Library} 
-              label="Formulários" 
-              active={isActive("formularios", "/forms")} 
-              onClick={() => handleNavigation("formularios", "/forms")}
-              collapsed={isCollapsed}
-            />
+                <SidebarItem 
+                  icon={Library} 
+                  label="Formulários" 
+                  active={isActive("formularios", "/forms")} 
+                  onClick={() => handleNavigation("formularios", "/forms")}
+                  collapsed={isCollapsed}
+                />
 
-            <SidebarItem 
-              icon={FileSpreadsheet} 
-              label="Planilhas" 
-              active={isActive("planilhas", "/spreadsheets")} 
-              onClick={() => handleNavigation("planilhas", "/spreadsheets")}
-              collapsed={isCollapsed}
-            />
+                <SidebarItem 
+                  icon={FileSpreadsheet} 
+                  label="Planilhas" 
+                  active={isActive("planilhas", "/spreadsheets")} 
+                  onClick={() => handleNavigation("planilhas", "/spreadsheets")}
+                  collapsed={isCollapsed}
+                />
 
-            <SidebarItem 
-              icon={ChartSpline} 
-              label="Dashboard" 
-              active={isActive("dashboard-customizavel", "/custom-dashboard")} 
-              onClick={() => handleNavigation("dashboard-customizavel", "/custom-dashboard")}
-              collapsed={isCollapsed}
-            />
+                <SidebarItem 
+                  icon={ChartSpline} 
+                  label="Dashboard" 
+                  active={isActive("dashboard-customizavel", "/custom-dashboard")} 
+                  onClick={() => handleNavigation("dashboard-customizavel", "/custom-dashboard")}
+                  collapsed={isCollapsed}
+                />
+              </>
+            )}
 
+            {/* Bloco: Sistema */}
             {!isCollapsed && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
                 Sistema
@@ -433,7 +465,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
-            {/* RENDERIZAÇÃO CONDICIONAL: Apenas para marketing ou gestão */}
             {canAccessChat && (
               <SidebarItem 
                 icon={MessageCircle} 
@@ -445,6 +476,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               />
             )}
 
+            {/* Liberado para todos */}
             <SidebarItem 
               icon={Settings} 
               label="Configurações" 
@@ -453,13 +485,17 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               collapsed={isCollapsed}
             />
 
-            <SidebarItem 
-              icon={HelpCircle} 
-              label="Suporte" 
-              active={isActive("support", "/support")} 
-              onClick={() => handleNavigation("support", "/support")}
-              collapsed={isCollapsed}
-            />
+            {/* Restrito */}
+            {isHighLevelUser && (
+              <SidebarItem 
+                icon={HelpCircle} 
+                label="Suporte" 
+                active={isActive("support", "/support")} 
+                onClick={() => handleNavigation("support", "/support")}
+                collapsed={isCollapsed}
+              />
+            )}
+
           </nav>
 
           <div className="p-3 border-t border-border mt-auto">
