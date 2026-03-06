@@ -33,6 +33,7 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
   const [clientName, setClientName] = useState("")
   const [brokerName, setBrokerName] = useState("")
   const [secretaryName, setSecretaryName] = useState("")
+  const [category, setCategory] = useState<"venda" | "locacao">("venda")
   const [allBrokers, setAllBrokers] = useState<any[]>([])
   const [filter, setFilter] = useState<"todos" | "pmw" | "arg">("todos")
   const [isLoading, setIsLoading] = useState(false)
@@ -88,9 +89,11 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!clientName || !brokerName || !secretaryName) return
-    onSubmit({ clientName, brokerName, secretaryName })
+    //selectedTerm 0 indica que ambos/todos são incluídos automaticamente
+    onSubmit({ clientName, brokerName, secretaryName, category, selectedTerm: 0 })
     setClientName("")
     setBrokerName("")
+    setCategory("venda")
     onClose()
   }
 
@@ -182,6 +185,29 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
                 </div>
               </div>
 
+              {/* NOVA SEÇÃO: MODALIDADE */}
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase text-muted-foreground">Modalidade</Label>
+                <div className="flex bg-accent/30 p-1 rounded-xl gap-1 border border-accent-foreground/5">
+                  <button
+                    type="button"
+                    onClick={() => setCategory("venda")}
+                    className={`flex-1 text-[11px] py-2.5 rounded-lg font-black transition-all ${category === "venda" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-accent/50"}`}
+                  >
+                    VENDA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategory("locacao")}
+                    className={`flex-1 text-[11px] py-2.5 rounded-lg font-black transition-all ${category === "locacao" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-accent/50"}`}
+                  >
+                    LOCAÇÃO
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground font-medium px-1">
+                  * Os termos contratuais serão incluídos automaticamente conforme a modalidade.
+                </p>
+              </div>
 
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground">Responsável (Secretária)</Label>

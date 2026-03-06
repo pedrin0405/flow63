@@ -22,7 +22,29 @@ export default function PublicFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isValidId, setIsValidId] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
+  const [categoria, setCategoria] = useState<string>("venda")
   
+  // Forçar modo claro apenas nesta página
+  useEffect(() => {
+    const html = document.documentElement;
+    const hadDark = html.classList.contains('dark');
+    
+    if (hadDark) {
+      html.classList.remove('dark');
+    }
+    
+    // Adiciona uma classe light para garantir variáveis do :root
+    html.classList.add('light');
+
+    return () => {
+      // Restaura o estado anterior ao sair
+      html.classList.remove('light');
+      if (hadDark) {
+        html.classList.add('dark');
+      }
+    };
+  }, []);
+
   // Estado do Formulário atualizado com telefone e email
   const [formData, setFormData] = useState({
     nome: "",
@@ -42,7 +64,7 @@ export default function PublicFormPage() {
       
       const { data, error } = await supabase
         .from('reg_forms')
-        .select('cliente_nome, status')
+        .select('cliente_nome, status, categoria')
         .eq('id', formId)
         .single()
 
@@ -52,6 +74,7 @@ export default function PublicFormPage() {
       }
 
       setIsValidId(true)
+      setCategoria(data.categoria || "venda")
       
       if (data.status === 'completed') {
         setIsCompleted(true)
@@ -113,9 +136,16 @@ export default function PublicFormPage() {
           termo_1: formData.termo_1,
           termo_2: formData.termo_2,
           data_assinatura: formData.data_assinatura
+          // Removido categoria daqui pois a coluna pode não existir na tabela 'forms'
         }])
 
       if (error) throw error
+
+      // Atualiza o status na tabela reg_forms
+      await supabase
+        .from('reg_forms')
+        .update({ status: 'completed' })
+        .eq('id', formId)
 
       setIsCompleted(true)
       toast({
@@ -189,6 +219,11 @@ export default function PublicFormPage() {
     )
   }
 
+  const isLocacao = categoria === 'locacao';
+  const honorariosText = isLocacao 
+    ? "O (a) CONTRATANTE pagará para CONTRATADA pelos serviços profissionais prestados de intermediação imobiliária o percentual de 50% do primeiro aluguel. Os Demais alugueis cobramos uma taxa de 10% em cima do valor para a Administração do imovel."
+    : "Dos HONORÁRIOS - O (a) CONTRATANTE pagará para a CONTRATADA pelos serviços profissionais prestados de intermediação imobiliária o percentual de 5% do total da transação.";
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-8 px-4 flex justify-center">
       <Card className="max-w-2xl w-full border-none shadow-xl rounded-[2rem] overflow-hidden flex flex-col">
@@ -198,7 +233,7 @@ export default function PublicFormPage() {
               <FileText className="text-primary" size={24} />
             </div>
             <span className="font-bold text-xs uppercase tracking-widest text-primary/70 bg-primary/10 px-3 py-1 rounded-lg">
-              Ficha de Cadastro
+              Ficha de Cadastro - {isLocacao ? "Locação" : "Venda"}
             </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground">
@@ -364,8 +399,7 @@ export default function PublicFormPage() {
                   className="mt-1"
                 />
                 <Label htmlFor="termo_1" className="text-sm font-medium leading-relaxed cursor-pointer">
-                  Dos HONORÁRIOS - O (a) CONTRATANTE pagará para a CONTRATADA pelos serviços profissionais prestados de
-                  intermediação imobiliária o percentual de 5% do total da transação.
+                  {honorariosText}
                 </Label>
               </div>
 

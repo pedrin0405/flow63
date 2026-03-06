@@ -115,14 +115,14 @@ const generatePDF = async (form: any) => {
   let currentY = 20;
 
   // 1. Adicionar Logo (public/logo-horizontal.png)
-      try {
-        // Next.js serve arquivos da pasta public na raiz /
-        doc.addImage('/logo-horizontal.png', 'PNG', 75, currentY, 60, 30)
-        currentY += 45
-      } catch (e) {
-        console.warn("Logo não encontrada no caminho /logo-horizontal.png")
-        currentY += 10
-      }
+  try {
+    // Next.js serve arquivos da pasta public na raiz /
+    doc.addImage('/logo-horizontal.png', 'PNG', 75, currentY, 60, 30)
+    currentY += 45
+  } catch (e) {
+    console.warn("Logo não encontrada no caminho /logo-horizontal.png")
+    currentY += 10
+  }
 
   // Cabeçalho Principal (Negrito)
   doc.setFont("helvetica", "bold");
@@ -186,21 +186,60 @@ const generatePDF = async (form: any) => {
     
     currentY = cursorY + 12;
   };
-  console.log(detailData)
 
-  // --- TERMO 1 (Dos Honorários) ---
-  // A porcentagem de 5% agora é fixa (Normal), o variável é o final (ex: CIENTE)
+  const isLocacao = detailData?.categoria === 'locacao' || form.categoria === 'locacao';
+
+  // --- INTRODUÇÃO UNIFICADA ---
+  doc.setFont("helvetica", "normal");
+  const introText = `A promover e intermediar, ${detailData?.tipo?.toUpperCase() || "(COM/SEM) EXCLUSIVIDADE"}, a ${isLocacao ? 'Locação' : 'Venda'} do imóvel de minha propriedade acima descrito, na conformidade das cláusulas e condições seguintes:`;
+  
+  let cursorX = margin;
+  let cursorY = currentY;
+  const words = introText.split(" ");
+  words.forEach(word => {
+    const w = word + " ";
+    const width = doc.getTextWidth(w);
+    if (cursorX + width > margin + 170) {
+      cursorX = margin;
+      cursorY += 6;
+    }
+    doc.text(w, cursorX, cursorY);
+    cursorX += width;
+  });
+  currentY = cursorY + 12;
+
+  // --- CLÁUSULAS ESTRUTURAIS IGUAIS ---
+
+  // 1. HONORÁRIOS (Texto depende da modalidade)
+  const honorariosText = isLocacao 
+    ? "O (a) CONTRATANTE pagará para CONTRATADA pelos serviços profissionais prestados de intermediação imobiliária o percentual de 50% do primeiro aluguel incluindo( Vistoria de entrada e saida do inquilino, Divulgaçoes nos sites, contrato, cobranças, possuimos assistencia juridica e manutençoes no imovel ). Os Demais alugueis cobramos uma taxa de 10% em cima do valor para a Administração do imovel: "
+    : "O (a) CONTRATANTE pagará para a CONTRATADA pelos serviços profissionais prestados de intermediação imobiliária o percentual de 5% do total da transação. Devendo tal comissão ser paga no ato da assinatura do contrato de promessa de compra e venda ou da assinatura da escritura definitiva no respectivo cartório de registro de imóveis, o que acontecer primeiro: ";
+
   drawMixedParagraph(
-    "Dos HONORÁRIOS - ",
-    "O (a) CONTRATANTE  pagará para a CONTRATADA  pelos serviços profissionais prestados de intermediação imobiliária o percentual de 5% do total da transação. Devendo tal comissão ser paga no ato da assinatura do contrato de promessa de compra e venda ou da assinatura da escritura definitiva no respectivo cartório de registro de imóveis, o que acontecer primeiro: ",
-    detailData?.termo_1 === true ? "CIENTE." : "NÃO INFORMADO."
+    "DOS HONORÁRIOS - ",
+    honorariosText,
+    "CIENTE."
   );
 
-  // --- TERMO 2 (Da Publicidade) ---
+  // 2. VIGÊNCIA
   drawMixedParagraph(
-    "Da publicidade e das ferramentas para a realização de objeto - ",
-    "É reservado para a contratada, como forma de promover a divulgação do imóvel objeto desta AUTORIZAÇÃO DE INTERMEDIAÇÃO IMOBILIÁRIA, o direito de, as suas expensas, utilizar-se das ferramentas e técnicas permitidas em lei, entre elas: a colocação de placas; veiculação de anúncios, inclusive com a utilização de fotografias, na internet e demais meios de comunicação; promover, com o prévio consentimento do CONTRATANTE, visitas ao imóvel para mostrá-lo as pessoas interessadas: ",
-    detailData?.termo_2 === true ? "CIENTE." : "NÃO INFORMADO."
+    "DA VIGÊNCIA DA AUTORIZAÇÃO - ",
+    `A presente AUTORIZAÇÃO DE INTERMEDIAÇÃO IMOBILIÁRIA tem o prazo de ${detailData?.prazo || "120"} dias, contados a partir da data de sua assinatura. Ainda, o presente contrato poderá ser prorrogado, mediante conveniência das partes, mediante termo aditivo por escrito, onde as cláusulas que serão modificadas deverão ser objeto do referido instrumento, mantendo-se as demais inalteradas: `,
+    "CIENTE."
+  );
+
+  // 3. PUBLICIDADE
+  drawMixedParagraph(
+    "DA PUBLICIDADE E DAS FERRAMENTAS PARA A REALIZAÇÃO DE OBJETO - ",
+    "É reservado para com a CONTRATADA, como forma de promover a divulgação do imóvel objeto desta AUTORIZAÇÃO DE INTERMEDIAÇÃO IMOBILIÁRIA, o direito de, às suas expensas, utilizar-se das ferramentas e técnicas permitidas em lei, entre elas: a colocação de placas; veiculação de anúncios, inclusive com a utilização de fotografias, na internet e demais meios de comunicação; promover, com o prévio consentimento do CONTRATANTE, visitas ao imóvel para mostrá-lo às pessoas interessadas: ",
+    "CIENTE."
+  );
+
+  // 4. RESCISÃO
+  drawMixedParagraph(
+    "DA RESCISÃO DO CONTRATO - ",
+    "Em caso de rescisão ou arrependimento deste Instrumento por parte do CONTRATANTE e já tendo a CONTRATADA feito oferecimento de imóvel ou gasto com anúncios, fica o CONTRATANTE sujeito ao pagamento dos honorários a que a CONTRATADA faria jus: ",
+    "CIENTE."
   );
 
   // DATA
@@ -215,7 +254,7 @@ const generatePDF = async (form: any) => {
   // Rodapé Institucional
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("CASA 63 IMOBILIÁRIA L TDA- CNPJ 29.541.965/0001-73-CRECI 3638", 105, 285, { align: "center" });
+  doc.text("CASA 63 IMOBILIÁRIA LTDA - CNPJ 29.541.965/0001-73 - CRECI 3638", 105, 285, { align: "center" });
 
   doc.save(`Autorização - ${form.cliente_nome}.pdf`);
   setLoading(false);
@@ -289,6 +328,8 @@ const generatePDF = async (form: any) => {
           cliente_nome: newFormData.clientName,
           corretor_nome: newFormData.brokerName,
           secretaria: newFormData.secretaryName,
+          categoria: newFormData.category,
+          termo_escolhido: newFormData.selectedTerm,
           status: "pending"
         }])
 
