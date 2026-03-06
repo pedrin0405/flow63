@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { 
   Building2, Users, DollarSign, 
-  MapPin, Trophy, Menu, LayoutDashboard, CheckCircle2
+  MapPin, Trophy, Menu, LayoutDashboard, CheckCircle2, Bell
 } from "lucide-react"
 import { Sidebar } from "@/components/central63/sidebar"
 import { StatCard } from "@/components/central63/services/stat-card"
@@ -19,7 +19,6 @@ import Loading from "./loading"
 // Componente Customizado para o Tooltip do Gráfico
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (active && payload && payload.length) {
-    // payload[0].payload contém os dados completos do dia (day, quantidade, pmw, aux, total)
     const { pmw, aux, total } = payload[0].payload as any;
     
     return (
@@ -67,11 +66,29 @@ export default function DashboardPage() {
   const [neighborhoodDensity, setNeighborhoodDensity] = useState<any[]>([])
   const [brokerRanking, setBrokerRanking] = useState<any[]>([])
   const [recentActivities, setRecentActivities] = useState<any[]>([])
+  const [globalNotification, setGlobalNotification] = useState<string | null>(null)
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(val)
 
-  
+  const fetchNotification = async () => {
+    try {
+      const { data } = await supabase
+        .from('company_settings')
+        .select('url_site, api_config')
+        .eq('instance_name', 'GLOBAL_BROADCAST')
+        .order('id', { ascending: false })
+        .limit(1)
+      
+      if (data && data.length > 0 && data[0].url_site && data[0].api_config?.active !== false) {
+        setGlobalNotification(data[0].url_site)
+      } else {
+        setGlobalNotification(null)
+      }
+    } catch (err) {
+      console.error("Erro ao carregar notificação:", err)
+    }
+  }
 
   // Função auxiliar para converter datas no formato "DD/MM/YYYY HH:mm" ou ISO
   const parseDate = (dateStr: string | null) => {
@@ -93,9 +110,7 @@ export default function DashboardPage() {
   // Função auxiliar para remover tags HTML da descrição
   const stripHtml = (html: string | null) => {
     if (!html) return ""
-    // Remove tags HTML
     let text = html.replace(/<[^>]*>?/gm, ' ')
-    // Decodifica entidades HTML básicas se necessário ou remove espaços extras
     text = text.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
     return text
   }
@@ -103,8 +118,6 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setIsLoading(true)
     try {
-      // Busca paralela em todas as tabelas (PMW e AUX)
-      // Adicionado 'created_at' em todas as consultas para cálculo de tendências
       const [
         resImovelPmw, resImovelAux, 
         resLeadsPmw, resLeadsAux, 
@@ -113,50 +126,34 @@ export default function DashboardPage() {
       ] = await Promise.all([
         supabase.from('imovel_pmw').select('bairro, created_at'),
         supabase.from('imovel_aux').select('bairro, created_at'),
-        
-        // Leads: buscando codigo (para join) e datahoraultimaalteracao
         supabase.from('atendimento_pmw').select('codigo, situacao, corretor, datahoraultimaalteracao, created_at'),
         supabase.from('atendimento_aux').select('codigo, situacao, corretor, datahoraultimaalteracao, created_at'),
-        
-        // Vendas: buscando valor_venda, id_origem (referencia ao codigo do atendimento) e tabela_origem
         supabase.from('vendas').select('valor_venda, id_origem, tabela_origem, created_at'),
-        
-        // Interações: buscando tudo para ordenar no front
         supabase.from('interacao_pmw').select('*').limit(50), 
         supabase.from('interacao_aux').select('*').limit(50)
       ])
 
-      // --- Consolidação dos Dados ---
-      
+      await fetchNotification()
+
       const allProperties = [...(resImovelPmw.data || []), ...(resImovelAux.data || [])]
-      
-      // Combinando leads e marcando a origem
       const allLeads = [
         ...(resLeadsPmw.data || []).map(l => ({ ...l, source: 'PMW' })),
         ...(resLeadsAux.data || []).map(l => ({ ...l, source: 'AUX' }))
       ]
-      
-      // Adicionando tag de origem nas interações
       const allInteractions = [
         ...(resInteracoesPmw.data || []).map(i => ({ ...i, sourceTag: 'PMW' })), 
         ...(resInteracoesAux.data || []).map(i => ({ ...i, sourceTag: 'AUX' }))
       ]
-      
       const allSales = resVendas.data || []
 
-      // --- Cálculo de Estatísticas e Tendências ---
-      
-      // Datas para comparação (Mês Atual vs Mês Anterior)
       const now = new Date()
       const currentMonth = now.getMonth()
       const currentYear = now.getFullYear()
-      
       const prevDate = new Date()
       prevDate.setMonth(prevDate.getMonth() - 1)
       const prevMonth = prevDate.getMonth()
       const prevYear = prevDate.getFullYear()
 
-      // Helpers de filtro
       const filterByMonth = (data: any[], dateField: string, month: number, year: number) => {
         return data.filter(item => {
           const d = parseDate(item[dateField])
@@ -164,36 +161,25 @@ export default function DashboardPage() {
         })
       }
 
-      // 1. VGV Trend
       const salesCurr = filterByMonth(allSales, 'created_at', currentMonth, currentYear)
       const salesPrev = filterByMonth(allSales, 'created_at', prevMonth, prevYear)
       const vgvCurrSum = salesCurr.reduce((acc, curr) => acc + (Number(curr.valor_venda) || 0), 0)
       const vgvPrevSum = salesPrev.reduce((acc, curr) => acc + (Number(curr.valor_venda) || 0), 0)
-
-      // 2. Leads Trend (Novos Leads criados)
       const leadsCurr = filterByMonth(allLeads, 'created_at', currentMonth, currentYear)
       const leadsPrev = filterByMonth(allLeads, 'created_at', prevMonth, prevYear)
-
-      // 3. Properties Trend (Novos Imóveis)
       const propsCurr = filterByMonth(allProperties, 'created_at', currentMonth, currentYear)
       const propsPrev = filterByMonth(allProperties, 'created_at', prevMonth, prevYear)
-
-      // 4. Sales Count Trend
       const salesCountCurr = salesCurr.length
       const salesCountPrev = salesPrev.length
 
-      // Função de cálculo percentual
       const calcTrend = (curr: number, prev: number) => {
         if (prev === 0) return curr > 0 ? "+100%" : "0%"
         const diff = ((curr - prev) / prev) * 100
         return `${diff > 0 ? "+" : ""}${diff.toFixed(0)}%`
       }
 
-      // Totais Gerais
       const vgvTotal = allSales.reduce((acc, curr) => acc + (Number(curr.valor_venda) || 0), 0)
-      const activeLeads = allLeads.filter(l => 
-        l.situacao !== "Descartado" && l.situacao !== "Negócio realizado"
-      ).length
+      const activeLeads = allLeads.filter(l => l.situacao !== "Descartado" && l.situacao !== "Negócio realizado").length
 
       setStats({
         totalImoveis: allProperties.length,
@@ -208,22 +194,18 @@ export default function DashboardPage() {
         }
       })
 
-      // 2. Tendência de Leads (Últimos 14 dias - Gráfico)
       const last14Days = Array.from({ length: 14 }, (_, i) => {
         const d = new Date()
         d.setDate(d.getDate() - (13 - i))
         return d.toISOString().split('T')[0]
       })
 
-      // Agrupamento por data e origem
       const leadsByDate = allLeads.reduce((acc: Record<string, { total: number, pmw: number, aux: number }>, curr) => {
         const dateObj = parseDate(curr.datahoraultimaalteracao)
         if (dateObj) {
           const dateStr = dateObj.toISOString().split('T')[0]
-          
           if (last14Days.includes(dateStr)) {
             if (!acc[dateStr]) acc[dateStr] = { total: 0, pmw: 0, aux: 0 }
-            
             acc[dateStr].total += 1
             if (curr.source === 'PMW') acc[dateStr].pmw += 1
             if (curr.source === 'AUX') acc[dateStr].aux += 1
@@ -236,45 +218,37 @@ export default function DashboardPage() {
         const dayStats = leadsByDate[date] || { total: 0, pmw: 0, aux: 0 }
         return {
           day: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-          quantidade: dayStats.total, // Usado para o gráfico
+          quantidade: dayStats.total,
           pmw: dayStats.pmw,
           aux: dayStats.aux,
           total: dayStats.total
         }
       })
-      
       setLeadTrendData(trend)
 
-      // 3. Densidade por Bairro
       const neighborhoodMap: Record<string, number> = {}
-      
       allProperties.forEach(p => { 
         if (p.bairro) {
            const normBairro = p.bairro.trim().charAt(0).toUpperCase() + p.bairro.trim().slice(1).toLowerCase();
            neighborhoodMap[normBairro] = (neighborhoodMap[normBairro] || 0) + 1 
         }
       })
-      
       const densityData = Object.entries(neighborhoodMap)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value)
         .slice(0, 6)
       setNeighborhoodDensity(densityData)
 
-      // 4. Ranking de Corretores (Relacionando Vendas com Atendimentos)
       const pmwBrokersMap = new Map(resLeadsPmw.data?.map(l => [l.codigo, l.corretor]) || [])
       const auxBrokersMap = new Map(resLeadsAux.data?.map(l => [l.codigo, l.corretor]) || [])
-      
       const brokerSalesMap: Record<string, { name: string, value: number, source: string }> = {}
 
       allSales.forEach((sale: any) => {
         const valor = Number(sale.valor_venda) || 0
         const codigoAtendimento = sale.id_origem
         const origem = sale.tabela_origem?.toLowerCase() || ''
-        
         let corretorNome = null
         let tagOrigem = ''
-
         if (origem.includes('pmw')) {
           corretorNome = pmwBrokersMap.get(codigoAtendimento)
           tagOrigem = 'PMW'
@@ -283,41 +257,20 @@ export default function DashboardPage() {
           tagOrigem = 'AUX'
         } else {
           const fromPmw = pmwBrokersMap.get(codigoAtendimento)
-          if (fromPmw) {
-            corretorNome = fromPmw
-            tagOrigem = 'PMW'
-          } else {
-            const fromAux = auxBrokersMap.get(codigoAtendimento)
-            if (fromAux) {
-              corretorNome = fromAux
-              tagOrigem = 'AUX'
-            }
-          }
+          if (fromPmw) { corretorNome = fromPmw; tagOrigem = 'PMW' }
+          else { corretorNome = auxBrokersMap.get(codigoAtendimento); tagOrigem = 'AUX' }
         }
-
         if (corretorNome) {
           const nomeLimpo = corretorNome.trim();
           const uniqueKey = `${tagOrigem}-${nomeLimpo}`;
-
-          if (!brokerSalesMap[uniqueKey]) {
-            brokerSalesMap[uniqueKey] = { name: nomeLimpo, value: 0, source: tagOrigem }
-          }
+          if (!brokerSalesMap[uniqueKey]) brokerSalesMap[uniqueKey] = { name: nomeLimpo, value: 0, source: tagOrigem }
           brokerSalesMap[uniqueKey].value += valor;
         }
       })
-      
-      setBrokerRanking(
-        Object.values(brokerSalesMap)
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 5)
-      )
+      setBrokerRanking(Object.values(brokerSalesMap).sort((a, b) => b.value - a.value).slice(0, 5))
 
-      // 5. Atividades Recentes
       const sortedActivities = allInteractions
-        .map(int => ({
-          ...int,
-          parsedDate: parseDate(int.datahora)
-        }))
+        .map(int => ({ ...int, parsedDate: parseDate(int.datahora) }))
         .filter(int => int.parsedDate !== null)
         .sort((a, b) => (b.parsedDate!.getTime() - a.parsedDate!.getTime()))
         .slice(0, 5)
@@ -326,20 +279,23 @@ export default function DashboardPage() {
         id: int.id,
         user: int.usuario || "Sistema",
         source: int.sourceTag,
-        description: stripHtml(int.descricao) || "Interação registrada", // Usando a função stripHtml aqui
-        time: int.parsedDate 
-          ? int.parsedDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-          : '--:--'
+        description: stripHtml(int.descricao) || "Interação registrada",
+        time: int.parsedDate ? int.parsedDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'
       })))
-
-    } catch (error) { 
-      console.error("Erro ao carregar dados do dashboard:", error) 
-    } finally { 
-      setIsLoading(false) 
-    }
+    } catch (error) { console.error("Erro ao carregar dados do dashboard:", error) }
+    finally { setIsLoading(false) }
   }
 
-  useEffect(() => { fetchDashboardData() }, [])
+  useEffect(() => { 
+    fetchDashboardData() 
+    const channel = supabase
+      .channel('dashboard_notification_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_settings' }, () => {
+        fetchNotification()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   if (isLoading) return <Loading />
 
@@ -349,20 +305,12 @@ export default function DashboardPage() {
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)} 
         activeTab={activeTab} 
-        onTabChange={(tab: string) => {
-          setActiveTab(tab);
-          setSidebarOpen(false);
-        }} 
+        onTabChange={(tab: string) => { setActiveTab(tab); setSidebarOpen(false); }} 
       />
-      
       <main className="flex-1 flex flex-col h-full overflow-y-auto">
         <header className="sticky top-0 z-20 w-full bg-card/80 backdrop-blur-md border-b border-border px-4 lg:px-8 py-4 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
-            <button 
-              className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors" 
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Abrir menu"
-            >
+            <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors" onClick={() => setSidebarOpen(true)}>
               <Menu size={20} />
             </button>
             <LayoutDashboard className="text-primary hidden sm:block" />
@@ -379,7 +327,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            
             <Card className="xl:col-span-2">
               <CardHeader className="pb-2">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -394,101 +341,56 @@ export default function DashboardPage() {
                   <AreaChart data={leadTrendData} margin={{ left: 10, right: 10, top: 10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                    <XAxis 
-                      dataKey="day" 
-                      tick={{fontSize: 12}} 
-                      tickLine={false} 
-                      axisLine={false}
-                      minTickGap={30}
-                    />
-                    {/* Tooltip Customizado */}
+                    <XAxis dataKey="day" tick={{fontSize: 12}} tickLine={false} axisLine={false} minTickGap={30} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Area 
-                      type="monotone" 
-                      dataKey="quantidade" 
-                      name="Leads"
-                      stroke="#3b82f6" 
-                      strokeWidth={2}
-                      fillOpacity={1} 
-                      fill="url(#colorLeads)" 
-                    />
+                    <Area type="monotone" dataKey="quantidade" name="Leads" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorLeads)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card className="h-full flex flex-col">
-              <CardHeader>
+            <Card className="h-full flex flex-col overflow-hidden relative group">
+              <CardHeader className="pb-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-b border-primary/5">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Trophy size={18} className="text-amber-500"/> Top Corretores
+                  <Bell size={18} className={globalNotification ? "text-red-500 animate-bounce" : "text-slate-400"}/> Comunicados
                 </CardTitle>
-                <CardDescription>Por volume de vendas (VGV)</CardDescription>
+                <CardDescription>Informativos gerais do sistema</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-5 flex-1 overflow-y-auto">
-                {brokerRanking.length > 0 ? (
-                  brokerRanking.map((broker, i) => (
-                    <div key={broker.name + i} className="flex items-center justify-between border-b border-border/50 pb-2 last:border-0 last:pb-0">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className={`
-                          flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-                          ${i === 0 ? 'bg-amber-100 text-amber-700' : 
-                            i === 1 ? 'bg-slate-200 text-slate-700' : 
-                            i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-secondary text-muted-foreground'}
-                        `}>
-                          {i + 1}
-                        </div>
-                        <div className="flex items-center min-w-0">
-                          {/* Tag de Origem Estilizada */}
-                          {broker.source && (
-                            <span className={`
-                              text-[9px] font-bold px-1.5 py-0.5 rounded mr-2 border shadow-sm
-                              ${broker.source === 'PMW' 
-                                ? 'bg-blue-100 text-blue-700 border-blue-200' 
-                                : 'bg-orange-100 text-orange-700 border-orange-200'}
-                            `}>
-                              {broker.source}
-                            </span>
-                          )}
-                          <span className="text-sm font-medium truncate" title={broker.name}>
-                            {broker.name}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-bold text-primary whitespace-nowrap ml-2">{formatCurrency(broker.value)}</span>
+              <CardContent className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                {globalNotification ? (
+                  <div className="space-y-4 animate-in fade-in zoom-in duration-500">
+                    <div className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-3xl border border-slate-100 dark:border-zinc-800 shadow-inner">
+                      <p className="text-sm font-medium leading-relaxed text-slate-700 dark:text-slate-300">{globalNotification}</p>
                     </div>
-                  ))
+                    <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />Importante
+                    </span>
+                  </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
-                    <Trophy className="opacity-20 mb-2" size={32} />
-                    Nenhuma venda registrada
+                  <div className="space-y-3 opacity-40">
+                    <div className="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center mx-auto"><Bell size={24} className="text-slate-400" /></div>
+                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Sem notificações no momento</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </div>
 
-            <Card className="order-last xl:order-none flex flex-col">
-              <CardHeader>
-                <CardTitle className="text-lg">Atividades Recentes</CardTitle>
-              </CardHeader>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <Card className="flex flex-col">
+              <CardHeader><CardTitle className="text-lg">Atividades Recentes</CardTitle></CardHeader>
               <CardContent className="space-y-4 flex-1 overflow-y-auto max-h-[300px]">
                 {recentActivities.length > 0 ? (
                   recentActivities.map((act) => (
                     <div key={act.id} className="border-l-4 border-primary/20 pl-3 py-1 hover:bg-accent/50 transition-colors rounded-r-md">
                       <div className="flex justify-between items-start mb-0.5">
                         <div className="flex items-center min-w-0 pr-2">
-                           {/* Tag de Origem Estilizada */}
                            {act.source && (
-                            <span className={`
-                              text-[9px] font-bold px-1.5 py-0.5 rounded mr-2 border flex-shrink-0
-                              ${act.source === 'PMW' 
-                                ? 'bg-blue-100 text-blue-700 border-blue-200' 
-                                : 'bg-orange-100 text-orange-700 border-orange-200'}
-                            `}>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded mr-2 border flex-shrink-0 ${act.source === 'PMW' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
                               {act.source}
                             </span>
                           )}
@@ -499,43 +401,44 @@ export default function DashboardPage() {
                       <p className="text-[11px] text-muted-foreground line-clamp-2">{act.description}</p>
                     </div>
                   ))
-                ) : (
-                  <div className="text-center py-4 text-xs text-muted-foreground">
-                    Nenhuma atividade recente
-                  </div>
-                )}
+                ) : ( <div className="text-center py-4 text-xs text-muted-foreground">Nenhuma atividade recente</div> )}
               </CardContent>
             </Card>
 
-            <Card className="xl:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <MapPin size={18}/> Densidade de Carteira
-                </CardTitle>
-                <CardDescription>Concentração de imóveis por bairro</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px] sm:h-[350px]">
+            <Card className="flex flex-col">
+              <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><MapPin size={18}/> Densidade de Carteira</CardTitle><CardDescription>Imóveis por bairro</CardDescription></CardHeader>
+              <CardContent className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart cx="50%" cy="50%" outerRadius="70%" data={neighborhoodDensity}>
-                    <PolarGrid strokeOpacity={0.2} />
-                    <PolarAngleAxis dataKey="name" fontSize={11} tick={{ fill: 'currentColor', opacity: 0.7 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 'auto']} fontSize={10} strokeOpacity={0} />
-                    <Radar
-                      name="Imóveis"
-                      dataKey="value"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      fill="#3b82f6"
-                      fillOpacity={0.4}
-                    />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    />
+                    <PolarGrid strokeOpacity={0.2} /><PolarAngleAxis dataKey="name" fontSize={10} tick={{ fill: 'currentColor', opacity: 0.7 }} /><PolarRadiusAxis angle={30} domain={[0, 'auto']} fontSize={9} strokeOpacity={0} />
+                    <Radar name="Imóveis" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="#3b82f6" fillOpacity={0.4} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   </RadarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
+            <Card className="flex flex-col">
+              <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Trophy size={18} className="text-amber-500"/> Top Corretores</CardTitle><CardDescription>Volume de vendas (VGV)</CardDescription></CardHeader>
+              <CardContent className="space-y-5 flex-1 overflow-y-auto max-h-[300px]">
+                {brokerRanking.length > 0 ? (
+                  brokerRanking.map((broker, i) => (
+                    <div key={broker.name + i} className="flex items-center justify-between border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-amber-100 text-amber-700' : i === 1 ? 'bg-slate-200 text-slate-700' : i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</div>
+                        <div className="flex items-center min-w-0">
+                          {broker.source && (
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded mr-2 border shadow-sm ${broker.source === 'PMW' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>{broker.source}</span>
+                          )}
+                          <span className="text-sm font-medium truncate" title={broker.name}>{broker.name}</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-bold text-primary whitespace-nowrap ml-2">{formatCurrency(broker.value)}</span>
+                    </div>
+                  ))
+                ) : ( <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm py-10"><Trophy className="opacity-20 mb-2" size={32} />Sem vendas registradas</div> )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

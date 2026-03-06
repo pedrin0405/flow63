@@ -52,6 +52,7 @@ import { supabase } from "@/lib/supabase"
 import { NewFormModal } from "@/components/central63/forms/new-form-modal"
 import { FormPreviewModal } from "@/components/central63/forms/form-preview-modal"
 import { Sidebar } from "@/components/central63/sidebar"
+import { NotificationBell } from "@/components/central63/notification-bell"
 import { useToast } from "@/hooks/use-toast"
 
 import { jsPDF } from "jspdf";
@@ -378,6 +379,7 @@ const generatePDF = async (form: any) => {
               <p className="text-primary hidden sm:block" >| Autorização de Divulgação</p>
               {/* <p className="text-muted-foreground text-sm"> | Gerencie o fluxo de cadastros e atendimentos.</p> */}
             </div>
+            <NotificationBell />
           </header>
 
 
@@ -531,8 +533,11 @@ const generatePDF = async (form: any) => {
                                     <Badge variant="secondary" className="font-mono text-[10px] px-1.5 h-5 bg-white/80 backdrop-blur border border-slate-200 text-slate-500 rounded-md shadow-sm">
                                       {form.id}
                                     </Badge>
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isCompleted ? 'text-blue-600' : 'text-amber-600'}`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${isCompleted ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                                    <Badge variant="outline" className={`text-[10px] font-bold uppercase border-slate-200 ${form.categoria === 'locacao' ? 'text-purple-600 bg-purple-50/50' : 'text-blue-600 bg-blue-50/50'}`}>
+                                      {form.categoria === 'locacao' ? 'Locação' : 'Venda'}
+                                    </Badge>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isCompleted ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                                       {isCompleted ? 'Concluído' : 'Pendente'}
                                     </span>
                                   </div>

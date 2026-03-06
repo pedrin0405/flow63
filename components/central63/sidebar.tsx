@@ -295,8 +295,11 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
         </button>
 
         <div className="h-full flex flex-col overflow-hidden">
-          <div className={cn("flex items-center transition-all duration-300", isCollapsed ? "p-4 justify-center" : "p-6 gap-4")}>
-            <div className="relative flex-shrink-0">
+          <div 
+            onClick={() => handleNavigation("dashboard")}
+            className={cn("flex items-center transition-all duration-300 cursor-pointer group/logo", isCollapsed ? "p-4 justify-center" : "p-6 gap-4")}
+          >
+            <div className="relative flex-shrink-0 transition-transform group-hover/logo:scale-105 active:scale-95">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-primary to-primary/60 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
                 <Image 
                   src="/icon.svg" 
@@ -313,7 +316,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             <div className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", 
               isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100 block"
             )}>
-              <h1 className="font-bold text-xl text-foreground tracking-tight">Central63</h1>
+              <h1 className="font-bold text-xl text-foreground tracking-tight group-hover/logo:text-primary transition-colors">Central63</h1>
               <p className="text-xs text-muted-foreground">Gestão Imobiliária</p>
             </div>
           </div>

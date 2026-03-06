@@ -86,6 +86,9 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                     <Badge variant="outline" className="font-mono text-[10px] bg-white/50 backdrop-blur border-slate-300 text-slate-600 px-1.5 py-0 h-5">
                       ID: {formId}
                     </Badge>
+                    <Badge variant="outline" className={`text-[10px] font-bold uppercase h-5 px-1.5 ${basicInfo?.categoria === 'locacao' ? 'text-purple-600 border-purple-200 bg-purple-50' : 'text-blue-600 border-blue-200 bg-blue-50'}`}>
+                      {basicInfo?.categoria === 'locacao' ? 'Locação' : 'Venda'}
+                    </Badge>
                     {isCompleted ? (
                       <Badge className="bg-blue-500 hover:bg-emerald-600 text-[10px] h-5 px-1.5 border-0">Concluído</Badge>
                     ) : (

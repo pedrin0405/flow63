@@ -12,6 +12,7 @@ import { Sidebar } from "@/components/central63/sidebar"
 import { ProfileTab } from "@/components/central63/settings/profile-tab"
 import { TeamTab } from "@/components/central63/settings/team-tab"
 import { IntegrationsTab } from "@/components/central63/settings/integrations-tab"
+import { BroadcastTab } from "@/components/central63/settings/broadcast-tab"
 
 export default function ConfiguracoesPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -45,7 +46,8 @@ export default function ConfiguracoesPage() {
       }
 
       setUsers(usersRes.data || [])
-      setIntegrations(configRes.data || [])
+      // Filtra para não exibir o broadcast nas integrações comuns
+      setIntegrations(configRes.data?.filter(i => i.instance_name !== 'GLOBAL_BROADCAST') || [])
 
     } catch (error: any) {
       toast.error("Erro ao carregar dados")
@@ -56,7 +58,8 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const isAdmin = profile.role === 'Diretor' || profile.role === 'Gestor'
+  const canManageSystem = profile.role === 'Diretor' || profile.role === 'Gestor' || profile.role === 'Admin'
+  const canManageBroadcast = canManageSystem || profile.role === 'Marketing'
 
   if (loading && !profile.id) return (
     <div className="flex h-screen items-center justify-center bg-background">
@@ -86,11 +89,14 @@ export default function ConfiguracoesPage() {
           <Tabs defaultValue="perfil" className="space-y-6">
             <TabsList className="bg-muted p-1">
               <TabsTrigger value="perfil">Meu Perfil</TabsTrigger>
-              {isAdmin && (
+              {canManageSystem && (
                 <>
                   <TabsTrigger value="equipe">Equipe</TabsTrigger>
                   <TabsTrigger value="integracoes">Integrações</TabsTrigger>
                 </>
+              )}
+              {canManageBroadcast && (
+                <TabsTrigger value="comunicados">Comunicados</TabsTrigger>
               )}
             </TabsList>
 
@@ -102,22 +108,28 @@ export default function ConfiguracoesPage() {
               />
             </TabsContent>
 
-            {isAdmin && (
-              <TabsContent value="equipe">
-                <TeamTab 
-                  users={users} 
-                  currentUserId={profile.id} 
-                  onRefresh={fetchData} 
-                />
-              </TabsContent>
+            {canManageSystem && (
+              <>
+                <TabsContent value="equipe">
+                  <TeamTab 
+                    users={users} 
+                    currentUserId={profile.id} 
+                    onRefresh={fetchData} 
+                  />
+                </TabsContent>
+
+                <TabsContent value="integracoes">
+                  <IntegrationsTab 
+                    integrations={integrations} 
+                    onRefresh={fetchData} 
+                  />
+                </TabsContent>
+              </>
             )}
 
-            {isAdmin && (
-              <TabsContent value="integracoes">
-                <IntegrationsTab 
-                  integrations={integrations} 
-                  onRefresh={fetchData} 
-                />
+            {canManageBroadcast && (
+              <TabsContent value="comunicados">
+                <BroadcastTab />
               </TabsContent>
             )}
           </Tabs>
