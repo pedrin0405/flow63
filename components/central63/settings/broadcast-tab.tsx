@@ -6,41 +6,34 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { toast } from "sonner"
-import { Bell, Send, Trash2, Loader2, Megaphone } from "lucide-react"
+import { Bell, Send, Trash2, Loader2, Megaphone, Edit2, Plus, X } from "lucide-react"
 
-export function BroadcastTab({ onRefresh }: { onRefresh?: () => void }) {
+export function BroadcastTab() {
   const [message, setMessage] = useState("")
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [currentBroadcast, setCurrentBroadcast] = useState<any>(null)
+  const [broadcasts, setBroadcasts] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const fetchBroadcast = async () => {
+  const fetchBroadcasts = async () => {
+    setIsLoading(true)
     try {
-      // Busca todos para garantir que pegamos o mais recente e limpamos lixo
       const { data } = await supabase
         .from('company_settings')
         .select('*')
         .eq('instance_name', 'GLOBAL_BROADCAST')
         .order('id', { ascending: false })
       
-      if (data && data.length > 0) {
-        setCurrentBroadcast(data[0])
-        setMessage(data[0].url_site || "")
-        
-        // Limpeza opcional: se houver duplicatas por erro anterior, removemos
-        if (data.length > 1) {
-            const extraIds = data.slice(1).map(i => i.id)
-            await supabase.from('company_settings').delete().in('id', extraIds)
-        }
-      } else {
-        setCurrentBroadcast(null)
-      }
+      setBroadcasts(data || [])
     } catch (err) {
-      console.error("Erro ao buscar broadcast:", err)
+      console.error("Erro ao buscar comunicados:", err)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchBroadcast()
+    fetchBroadcasts()
   }, [])
 
   const handleSave = async () => {
@@ -51,22 +44,15 @@ export function BroadcastTab({ onRefresh }: { onRefresh?: () => void }) {
       const now = new Date().toISOString()
       const apiConfig = { active: true, updatedAt: now }
       
-      // Busca ID existente para fazer update em vez de insert duplicado
-      const { data: existing } = await supabase
-        .from('company_settings')
-        .select('id')
-        .eq('instance_name', 'GLOBAL_BROADCAST')
-        .limit(1)
-
       let error
-      if (existing && existing.length > 0) {
+      if (editingId) {
         const res = await supabase
           .from('company_settings')
           .update({ 
             url_site: message,
             api_config: apiConfig
           })
-          .eq('id', existing[0].id)
+          .eq('id', editingId)
         error = res.error
       } else {
         const res = await supabase
@@ -81,100 +67,140 @@ export function BroadcastTab({ onRefresh }: { onRefresh?: () => void }) {
 
       if (error) throw error
       
-      toast.success("Comunicado disparado com sucesso!")
-      await fetchBroadcast()
-      onRefresh?.()
+      toast.success(editingId ? "Comunicado atualizado!" : "Comunicado disparado!")
+      setMessage("")
+      setEditingId(null)
+      await fetchBroadcasts()
     } catch (error: any) {
-      console.error(error)
-      toast.error("Erro ao disparar: " + (error.message || "Erro de conexão"))
+      toast.error("Erro ao salvar: " + (error.message || "Erro de conexão"))
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm("Deseja remover o comunicado atual?")) return
+  const handleDelete = async (id: string) => {
+    if (!confirm("Deseja excluir este comunicado?")) return
 
-    setIsSaving(true)
     try {
       const { error } = await supabase
         .from('company_settings')
         .delete()
-        .eq('instance_name', 'GLOBAL_BROADCAST')
+        .eq('id', id)
 
       if (error) throw error
       
-      setMessage("")
-      setCurrentBroadcast(null)
-      toast.success("Comunicado removido com sucesso")
-      onRefresh?.()
+      toast.success("Comunicado removido")
+      fetchBroadcasts()
     } catch (error: any) {
-      console.error(error)
-      toast.error("Erro ao remover: " + (error.message || "Erro desconhecido"))
-    } finally {
-      setIsSaving(false)
+      toast.error("Erro ao remover")
     }
   }
 
+  const startEdit = (broadcast: any) => {
+    setEditingId(broadcast.id)
+    setMessage(broadcast.url_site)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+      {/* Formulário de Criação/Edição */}
       <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white dark:bg-zinc-950">
         <CardHeader className="p-10 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-b border-primary/5">
           <div className="flex items-center gap-6">
-            <div className="h-16 w-16 rounded-3xl bg-primary flex items-center justify-center text-white shadow-2xl shadow-primary/30 rotate-3 group-hover:rotate-0 transition-transform">
+            <div className="h-16 w-16 rounded-3xl bg-primary flex items-center justify-center text-white shadow-2xl shadow-primary/30 rotate-3 transition-transform">
               <Megaphone size={32} />
             </div>
             <div>
-              <CardTitle className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">Broadcast</CardTitle>
+              <CardTitle className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+                {editingId ? "Editar Comunicado" : "Novo Broadcast"}
+              </CardTitle>
               <CardDescription className="text-xs font-black uppercase tracking-[0.2em] text-primary/60 mt-1">
-                Comunicação Global Interna
+                {editingId ? "Modificando mensagem existente" : "Comunicação Global Interna"}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-10 space-y-8">
+        <CardContent className="p-10 space-y-6">
           <div className="space-y-3">
             <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-400">Mensagem do Comunicado</label>
             <Textarea 
-              placeholder="Digite aqui o aviso que todos os usuários verão..."
-              className="min-h-[180px] rounded-[2rem] p-8 bg-slate-50 dark:bg-zinc-900 border-slate-100 dark:border-zinc-800 focus:ring-primary/20 text-base font-bold leading-relaxed resize-none shadow-inner"
+              placeholder="Digite aqui o aviso..."
+              className="min-h-[150px] rounded-[2rem] p-8 bg-slate-50 dark:bg-zinc-900 border-slate-100 dark:border-zinc-800 focus:ring-primary/20 text-base font-bold leading-relaxed resize-none shadow-inner"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
           </div>
-
-          <div className="bg-blue-50/50 dark:bg-blue-900/10 p-6 rounded-3xl border border-blue-100/50 dark:border-blue-900/30 flex items-start gap-4">
-            <div className="h-10 w-10 rounded-2xl bg-white dark:bg-zinc-800 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
-                <Bell size={20} />
-            </div>
-            <div className="space-y-1 pt-1">
-                <p className="text-sm font-bold text-blue-900 dark:text-blue-300">Como funciona?</p>
-                <p className="text-xs text-blue-700/70 dark:text-blue-400/70 leading-relaxed font-medium">
-                    Ao disparar, a mensagem aparecerá no card de comunicados da página inicial para todos os usuários logados.
-                </p>
-            </div>
-          </div>
         </CardContent>
-        <CardFooter className="p-10 pt-0 bg-transparent flex flex-col sm:flex-row gap-4 justify-between items-center">
+        <CardFooter className="p-10 pt-0 bg-transparent flex justify-between items-center">
+          {editingId && (
+            <Button 
+              variant="ghost" 
+              className="rounded-2xl h-12 px-6 font-black uppercase text-[10px] tracking-[0.2em]"
+              onClick={() => { setEditingId(null); setMessage(""); }}
+            >
+              Cancelar Edição
+            </Button>
+          )}
           <Button 
-            variant="ghost" 
-            className="rounded-2xl h-12 px-6 font-black uppercase text-[10px] tracking-[0.2em] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
-            onClick={handleDelete}
-            disabled={!currentBroadcast?.url_site || isSaving}
-          >
-            <Trash2 size={16} className="mr-2" />
-            Remover Ativo
-          </Button>
-          <Button 
-            className="rounded-2xl h-14 px-12 font-black uppercase text-xs tracking-[0.15em] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all w-full sm:w-auto"
+            className="rounded-2xl h-14 px-12 font-black uppercase text-xs tracking-[0.15em] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all ml-auto"
             onClick={handleSave}
             disabled={isSaving}
           >
-            {isSaving ? <Loader2 size={18} className="animate-spin mr-2" /> : <Send size={18} className="mr-2" />}
-            Disparar Mensagem
+            {isSaving ? <Loader2 size={18} className="animate-spin mr-2" /> : editingId ? <Edit2 size={18} className="mr-2" /> : <Send size={18} className="mr-2" />}
+            {editingId ? "Salvar Alterações" : "Disparar Mensagem"}
           </Button>
         </CardFooter>
       </Card>
+
+      {/* Lista de Comunicados Ativos */}
+      <div className="space-y-4">
+        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 ml-6">Comunicados Ativos ({broadcasts.length})</h3>
+        
+        {isLoading ? (
+          <div className="flex justify-center p-12">
+            <Loader2 className="animate-spin text-primary opacity-20" size={40} />
+          </div>
+        ) : broadcasts.length > 0 ? (
+          <div className="grid gap-4">
+            {broadcasts.map((b) => (
+              <div key={b.id} className="group bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 p-6 rounded-[2rem] shadow-sm hover:shadow-xl transition-all flex items-center justify-between gap-6">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-relaxed truncate">
+                    {b.url_site}
+                  </p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2 block">
+                    Enviado em: {new Date(b.updated_at || b.created_at).toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button 
+                    variant="secondary" 
+                    size="icon" 
+                    className="h-10 w-10 rounded-xl bg-slate-50 dark:bg-zinc-800 border-none hover:bg-primary hover:text-white transition-all"
+                    onClick={() => startEdit(b)}
+                  >
+                    <Edit2 size={16} />
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="icon" 
+                    className="h-10 w-10 rounded-xl bg-slate-50 dark:bg-zinc-800 border-none hover:bg-red-500 hover:text-white transition-all"
+                    onClick={() => handleDelete(b.id)}
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center p-12 bg-slate-50/50 dark:bg-zinc-900/50 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-zinc-800">
+            <Bell className="mx-auto text-slate-300 mb-4" size={40} />
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Nenhum comunicado ativo</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

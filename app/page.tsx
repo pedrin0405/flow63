@@ -15,7 +15,6 @@ import {
   AreaChart, Area, XAxis, CartesianGrid, TooltipProps
 } from 'recharts'
 import Loading from "./loading"
-import { useRouter } from 'next/navigation'
 
 // Componente Customizado para o Tooltip do Gráfico
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
@@ -49,31 +48,6 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("dashboard")
-  const router = useRouter()
-
-  // TRAVA DUPLA CLIENT-SIDE
-  useEffect(() => {
-    const checkAccess = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
-
-        const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(profile?.role)
-        
-        // Se NÃO for da gestão, chuta de volta pro cartão
-        if (!isHighLevelUser) {
-          router.replace('/brokers/my-card')
-        }
-      }
-    }
-    
-    checkAccess()
-  }, [router])
   
   const [stats, setStats] = useState({
     totalImoveis: 0,
@@ -92,43 +66,34 @@ export default function DashboardPage() {
   const [neighborhoodDensity, setNeighborhoodDensity] = useState<any[]>([])
   const [brokerRanking, setBrokerRanking] = useState<any[]>([])
   const [recentActivities, setRecentActivities] = useState<any[]>([])
-  const [globalNotification, setGlobalNotification] = useState<string | null>(null)
+  const [notifications, setNotifications] = useState<any[]>([])
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(val)
 
-  const fetchNotification = async () => {
+  const fetchNotifications = async () => {
     try {
       const { data } = await supabase
         .from('company_settings')
-        .select('url_site, api_config')
+        .select('*')
         .eq('instance_name', 'GLOBAL_BROADCAST')
         .order('id', { ascending: false })
-        .limit(1)
       
-      if (data && data.length > 0 && data[0].url_site && data[0].api_config?.active !== false) {
-        setGlobalNotification(data[0].url_site)
-      } else {
-        setGlobalNotification(null)
-      }
+      setNotifications(data || [])
     } catch (err) {
-      console.error("Erro ao carregar notificação:", err)
+      console.error("Erro ao carregar notificações:", err)
     }
   }
 
   // Função auxiliar para converter datas no formato "DD/MM/YYYY HH:mm" ou ISO
   const parseDate = (dateStr: string | null) => {
     if (!dateStr) return null
-    
-    // Tenta formato DD/MM/YYYY
     if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
       const [datePart, timePart] = dateStr.split(' ')
       const [day, month, year] = datePart.split('/').map(Number)
       const [hour, minute] = timePart ? timePart.split(':').map(Number) : [0, 0]
       return new Date(year, month - 1, day, hour, minute)
     }
-
-    // Tenta formato ISO padrão
     const parsed = new Date(dateStr)
     return isNaN(parsed.getTime()) ? null : parsed
   }
@@ -159,7 +124,7 @@ export default function DashboardPage() {
         supabase.from('interacao_aux').select('*').limit(50)
       ])
 
-      await fetchNotification()
+      await fetchNotifications()
 
       const allProperties = [...(resImovelPmw.data || []), ...(resImovelAux.data || [])]
       const allLeads = [
@@ -317,7 +282,7 @@ export default function DashboardPage() {
     const channel = supabase
       .channel('dashboard_notification_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'company_settings' }, () => {
-        fetchNotification()
+        fetchNotifications()
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -382,22 +347,33 @@ export default function DashboardPage() {
             <Card className="h-full flex flex-col overflow-hidden relative group">
               <CardHeader className="pb-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-b border-primary/5">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Bell size={18} className={globalNotification ? "text-red-500 animate-bounce" : "text-slate-400"}/> Comunicados
+                  <Bell size={18} className={notifications.length > 0 ? "text-red-500 animate-bounce" : "text-slate-400"}/> Comunicados
                 </CardTitle>
                 <CardDescription>Informativos gerais do sistema</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                {globalNotification ? (
-                  <div className="space-y-4 animate-in fade-in zoom-in duration-500">
-                    <div className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-3xl border border-slate-100 dark:border-zinc-800 shadow-inner">
-                      <p className="text-sm font-medium leading-relaxed text-slate-700 dark:text-slate-300">{globalNotification}</p>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />Importante
-                    </span>
+              <CardContent className="flex-1 flex flex-col p-6 overflow-y-auto max-h-[400px]">
+                {notifications.length > 0 ? (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                    {notifications.map((notif) => (
+                      <div key={notif.id} className="relative p-4 bg-slate-50 dark:bg-zinc-900 rounded-3xl border border-slate-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all group/item">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 shrink-0">
+                            <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                          </div>
+                          <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-relaxed">
+                            {notif.url_site}
+                          </p>
+                        </div>
+                        <div className="mt-2 ml-5">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                            {new Date(notif.updated_at || notif.created_at).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="space-y-3 opacity-40">
+                  <div className="flex-1 flex flex-col items-center justify-center space-y-3 opacity-40">
                     <div className="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center mx-auto"><Bell size={24} className="text-slate-400" /></div>
                     <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Sem notificações no momento</p>
                   </div>
