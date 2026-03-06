@@ -139,7 +139,7 @@ const generatePDF = async (form: any) => {
     const labelWidth = doc.getTextWidth(label);
     doc.setFont("helvetica", "normal");
     doc.text(value || "", margin + labelWidth + 2, currentY);
-    currentY += 10;
+    currentY += 8; // Reduzido de 10 para 8
   };
 
   // --- PREENCHIMENTO DOS CAMPOS ---
@@ -150,11 +150,11 @@ const generatePDF = async (form: any) => {
   currentY += 7;
   doc.setFont("helvetica", "normal");
   doc.text(detailData?.endereco || "_________________________________________________", margin, currentY);
-  currentY += 10;
+  currentY += 9; // Reduzido de 10 para 9
 
   drawField("QUAL TIPO DE INTERMEDIAÇÃO?: ", detailData?.tipo || "SEM EXCLUSIVIDADE");
   drawField("AUTORIZAÇÃO COM PRAZO DE VIGÊNCIA DE: ", detailData?.prazo || "NÃO INFORMADO");
-  currentY += 5;
+  currentY += 4; // Reduzido de 5 para 4
 
   // Função para desenhar parágrafos (Texto Fixo Normal + Variável em Negrito no final)
   const drawMixedParagraph = (title: string, fixedText: string, variableText: string) => {
@@ -174,7 +174,7 @@ const generatePDF = async (form: any) => {
         const width = doc.getTextWidth(w);
         if (cursorX + width > margin + maxWidth) {
           cursorX = margin;
-          cursorY += 6;
+          cursorY += 5.5; // Reduzido de 6 para 5.5
         }
         doc.text(w, cursorX, cursorY);
         cursorX += width;
@@ -184,7 +184,7 @@ const generatePDF = async (form: any) => {
     drawPart(fixedText, false); // Texto estático em Normal
     drawPart(variableText, true);  // Valor variável em Negrito
     
-    currentY = cursorY + 12;
+    currentY = cursorY + 10; // Reduzido de 12 para 10
   };
 
   const isLocacao = detailData?.categoria === 'locacao' || form.categoria === 'locacao';
@@ -251,10 +251,12 @@ const generatePDF = async (form: any) => {
   : "";
   drawField("DATA DA AUTORIZAÇÃO: ", dataStr);
 
-  // Rodapé Institucional
-  doc.setFontSize(10);
+  // Rodapé Institucional - Posicionado no limite inferior para evitar sobreposição
+  doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
-  doc.text("CASA 63 IMOBILIÁRIA LTDA - CNPJ 29.541.965/0001-73 - CRECI 3638", 105, 285, { align: "center" });
+  doc.setTextColor(160, 160, 160);
+  // Mais espaçamento horizontal interno e posição fixa no rodapé (293mm)
+  doc.text("CASA 63 IMOBILIÁRIA LTDA     -     CNPJ 29.541.965/0001-73     -     CRECI 3638", 105, 293, { align: "center" });
 
   doc.save(`Autorização - ${form.cliente_nome}.pdf`);
   setLoading(false);
@@ -466,7 +468,7 @@ const generatePDF = async (form: any) => {
                     variant="ghost" 
                     size="icon" 
                     onClick={() => setViewMode('grid')}
-                    className={`h-9 w-9 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-gray-100 text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                    className={`h-9 w-9 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-slate-100 dark:bg-zinc-800 text-foreground shadow-sm' : 'text-muted-foreground'}`}
                   >
                     <LayoutGrid size={18} />
                   </Button>
@@ -474,7 +476,7 @@ const generatePDF = async (form: any) => {
                     variant="ghost" 
                     size="icon" 
                     onClick={() => setViewMode('list')}
-                    className={`h-9 w-9 rounded-lg transition-all ${viewMode === 'list' ? 'bg-gray-100 text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                    className={`h-9 w-9 rounded-lg transition-all ${viewMode === 'list' ? 'bg-slate-100 dark:bg-zinc-800 text-foreground shadow-sm' : 'text-muted-foreground'}`}
                   >
                     <ListIcon size={18} />
                   </Button>
