@@ -75,7 +75,7 @@ export async function middleware(request: NextRequest) {
           .single()
 
         const role = profile?.role
-        const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretaria', 'Admin'].includes(role)
+        const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(role)
 
         // Lógica para a página de Login
         if (path === '/login') {
