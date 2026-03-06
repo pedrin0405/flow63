@@ -49,6 +49,7 @@ export const metadata: Metadata = {
   },
 }
 
+// v1.0.1 - Refresh layout chunks
 export default function RootLayout({
   children,
 }: Readonly<{
