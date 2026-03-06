@@ -15,6 +15,10 @@ import {
   AreaChart, Area, XAxis, CartesianGrid, TooltipProps
 } from 'recharts'
 import Loading from "./loading"
+import { redirect } from 'next/navigation'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
 
 // Componente Customizado para o Tooltip do Gráfico
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
@@ -45,10 +49,32 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
   return null;
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("dashboard")
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll() } }
+  )
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (session) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+
+    const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretaria', 'Admin'].includes(profile?.role)
+    
+    // Trava Dupla Server-side
+    if (!isHighLevelUser) {
+      redirect('/brokers/my-card')
+    }
+  }
   
   const [stats, setStats] = useState({
     totalImoveis: 0,
