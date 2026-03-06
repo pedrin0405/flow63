@@ -15,6 +15,7 @@ import {
   AreaChart, Area, XAxis, CartesianGrid, TooltipProps
 } from 'recharts'
 import Loading from "./loading"
+import { useRouter } from 'next/navigation'
 
 // Componente Customizado para o Tooltip do Gráfico
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
@@ -49,6 +50,31 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("dashboard")
+  const router = useRouter()
+
+  // TRAVA DUPLA CLIENT-SIDE
+  useEffect(() => {
+    const checkAccess = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+
+        const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(profile?.role)
+        
+        // Se NÃO for da gestão, chuta de volta pro cartão
+        if (!isHighLevelUser) {
+          router.replace('/brokers/my-card')
+        }
+      }
+    }
+    
+    checkAccess()
+  }, [router])
   
   const [stats, setStats] = useState({
     totalImoveis: 0,
