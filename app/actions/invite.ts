@@ -13,7 +13,7 @@ export async function inviteUserAction(email: string, role: string) {
   // Cria um cliente com privilégios de administrador
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
 
-  const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
     data: { role },
     redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
   })
@@ -28,6 +28,27 @@ export async function inviteUserAction(email: string, role: string) {
 
     // Retorna o erro traduzido em vez de lançar exceção, permitindo que o frontend exiba o popup
     return { success: false, error: errorMessage }
+  }
+
+  // Se o convite foi enviado com sucesso, cria o registro na tabela profiles
+  if (data?.user) {
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert([
+        { 
+          id: data.user.id, 
+          email: email, 
+          role: role,
+          full_name: null, // Marcar como pendente
+          updated_at: new Date().toISOString()
+        }
+      ])
+
+    if (profileError) {
+      console.error('Erro ao criar perfil para usuário convidado:', profileError)
+      // Retornamos sucesso pois o convite auth foi enviado, mas avisamos o erro se necessário
+      // return { success: true, warning: 'Convite enviado, mas houve erro ao criar perfil na base de dados.' }
+    }
   }
 
   return { success: true }
