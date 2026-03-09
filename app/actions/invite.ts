@@ -7,7 +7,14 @@ export async function inviteUserAction(email: string, role: string) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return { success: false, error: 'Configuração do servidor incompleta (SERVICE_ROLE_KEY ausente).' }
+    console.error('SERVER ACTION ERROR: Chaves ausentes.', { 
+      hasUrl: !!supabaseUrl, 
+      hasKey: !!serviceRoleKey 
+    })
+    return { 
+      success: false, 
+      error: `Configuração do servidor incompleta (SERVICE_ROLE_KEY ausente). Verifique o arquivo .env no servidor.` 
+    }
   }
 
   // Cria um cliente com privilégios de administrador
