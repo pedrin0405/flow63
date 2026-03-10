@@ -132,14 +132,14 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
                 </motion.div>
 
                 <h2 className="mt-6 text-[11px] font-black uppercase tracking-[4px] opacity-60" style={{ color: tema.text_color }}>
-                  {data.nome}
+                  {data.headline || "Corretor Imobiliário"}
                 </h2>
                 
                 <h1 className={cn(
                   "mt-3 mb-4 font-black leading-[1.1] tracking-tighter",
                   isPreview ? "text-[22px]" : "text-4xl"
                 )} style={{ color: tema.text_color }}>
-                  {data.headline || "Especialista de Alto Padrão"}
+                  {data.nome} 
                 </h1>
                 
                 <p className={cn(
@@ -155,11 +155,11 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
                     target="_blank"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="mt-8 w-full py-4 rounded-full flex items-center justify-center gap-3 font-black text-[11px] uppercase tracking-[3px] transition-all shadow-[0_0_40px_rgba(0,0,0,0.2)] hover:shadow-[0_0_40px_rgba(0,0,0,0.4)] border border-white/10"
+                    className="mt-8 w-full py-4 rounded-full flex items-center justify-center gap-0 font-black text-[11px] uppercase tracking-[3px] transition-all shadow-[0_0_40px_rgba(0,0,0,0.2)] hover:shadow-[0_0_40px_rgba(0,0,0,0.4)] border border-white/10"
                     style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
                   >
-                    <MessageCircle className="w-5 h-5" />
-                    <span>Contato Imediato</span>
+                    <MessageCircle className="w-15 h-5" />
+                    <span>WhatsApp</span>
                   </motion.a>
                 )}
               </div>
@@ -212,7 +212,7 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
           {data.featured_properties?.enabled && data.featured_properties.items?.length > 0 && (
             <div className={cn(isPreview ? "mt-6" : "mt-8 lg:mt-0")}>
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[11px] font-black uppercase tracking-[4px] opacity-50" style={{ color: tema.text_color }}>Portfolio</h3>
+                <h3 className="text-[11px] font-black uppercase tracking-[4px] opacity-50" style={{ color: tema.text_color }}>Portfólio</h3>
                 <span className="text-[9px] font-black uppercase tracking-widest opacity-40 cursor-pointer hover:opacity-80 transition-opacity">ver tudo</span>
               </div>
               
