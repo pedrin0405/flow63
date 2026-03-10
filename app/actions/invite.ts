@@ -3,17 +3,22 @@
 import { createClient } from '@supabase/supabase-js'
 
 export async function inviteUserAction(email: string, role: string) {
+  // Lista as chaves para depuração no servidor (sem os valores por segurança)
+  const envKeys = Object.keys(process.env).filter(k => k.includes('SUPABASE'))
+  console.log('DEBUG: Variáveis de ambiente Supabase detectadas:', envKeys)
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !serviceRoleKey) {
     console.error('SERVER ACTION ERROR: Chaves ausentes.', { 
       hasUrl: !!supabaseUrl, 
-      hasKey: !!serviceRoleKey 
+      hasKey: !!serviceRoleKey,
+      availableSupabaseKeys: envKeys
     })
     return { 
       success: false, 
-      error: `Configuração do servidor incompleta (SERVICE_ROLE_KEY ausente). Verifique o arquivo .env no servidor.` 
+      error: `Erro de ambiente: SERVICE_ROLE_KEY não encontrada. Chaves disponíveis: ${envKeys.join(', ')}` 
     }
   }
 
