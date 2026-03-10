@@ -338,10 +338,10 @@ export default function CampaignsPage() {
             {/* ABA GERAL */}
             <TabsContent value="dashboard" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Investimento" value={formatCurrency(filteredChannels.reduce((acc, c) => acc + (c.spent || 0), 0))} icon={DollarSign} color="bg-blue-600" />
-                <StatCard title="Resultados" value={filteredChannels.reduce((acc, c) => acc + (c.conversions || 0), 0).toFixed(0)} icon={Target} color="bg-emerald-600" />
-                <StatCard title="Novos Usuários" value={analytics.historyArray.reduce((acc, h) => acc + h.newUsers, 0).toLocaleString()} icon={Users} color="bg-indigo-600" />
-                <StatCard title="ROAS Médio" value={`${((filteredChannels.reduce((acc, c) => acc + (c.roas || 0), 0) / (filteredChannels.length || 1)) || 0).toFixed(1)}x`} icon={BarChart3} color="bg-purple-600" />
+                <StatCard title="Investimento" value={formatCurrency(filteredChannels.reduce((acc, c) => acc + (c.spent || 0), 0))} icon={DollarSign} color="bg-blue-600" trend={""} />
+                <StatCard title="Resultados" value={filteredChannels.reduce((acc, c) => acc + (c.conversions || 0), 0).toFixed(0)} icon={Target} color="bg-emerald-600" trend={""} />
+                <StatCard title="Novos Usuários" value={analytics.historyArray.reduce((acc, h) => acc + h.newUsers, 0).toLocaleString()} icon={Users} color="bg-indigo-600" trend={""} />
+                <StatCard title="ROAS Médio" value={`${((filteredChannels.reduce((acc, c) => acc + (c.roas || 0), 0) / (filteredChannels.length || 1)) || 0).toFixed(1)}x`} icon={BarChart3} color="bg-purple-600" trend={""} />
               </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
