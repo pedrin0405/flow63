@@ -294,7 +294,7 @@ export default function CampaignsPage() {
           <div className="flex items-center gap-3">
             <button className="lg:hidden p-2 text-muted-foreground" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
             <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center"><Megaphone className="text-primary h-5 w-5" /></div>
-            <div><h2 className="text-xl font-black">Intelligence Campaigns</h2><p className="text-[10px] uppercase font-bold opacity-60 tracking-widest">Command Center</p></div>
+            <div><h2 className="text-xl font-black">Camapanhas</h2><p className="text-[10px] uppercase font-bold opacity-60 tracking-widest">Gestão de Dados</p></div>
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden md:flex bg-muted/50 p-1 rounded-xl border border-border/50">
