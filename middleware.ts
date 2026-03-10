@@ -59,7 +59,8 @@ export async function middleware(request: NextRequest) {
       '/spreadsheets', 
       '/custom-dashboard', 
       '/chat-support', 
-      '/support'
+      '/support',
+      '/campaigns'
     ]
 
     const isRestrictedRoute = restrictedRoutes.some(route => path.startsWith(route))

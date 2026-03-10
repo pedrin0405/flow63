@@ -20,11 +20,13 @@ import {
   UserCog,
   FileSpreadsheet,
   Library,
+  Target,
   CreditCard,
   type LucideIcon, 
   House,
   Palette,
-  Wallet
+  Wallet,
+  Megaphone
 } from "lucide-react"
 import {
   Tooltip,
@@ -427,12 +429,21 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             {isHighLevelUser && (
               <>
                 <SidebarItem 
+                  icon={Megaphone} 
+                  label="Camapanhas" 
+                  active={isActive("camapanhas", "/campaigns")} 
+                  onClick={() => handleNavigation("camapanhas", "/campaigns")}
+                  collapsed={isCollapsed}
+                />
+
+                <SidebarItem 
                   icon={ChartPie} 
                   label="Indicadores" 
                   active={isActive("indicadores", "/indicators")} 
                   onClick={() => handleNavigation("indicadores", "/indicators")}
                   collapsed={isCollapsed}
                 />
+                
 
                 <SidebarItem 
                   icon={Library} 
