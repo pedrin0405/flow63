@@ -6,7 +6,8 @@ import {
   Search, Clock, ChevronRight, CheckCheck, Check,
   Paperclip, StickyNote, History, CheckCircle2,
   Settings, Globe, Cpu, Hash, ShieldCheck, 
-  Zap, Loader2, Save, Trash2, MessageCircle, Mail, X
+  Zap, Loader2, Save, Trash2, MessageCircle, Mail, X,
+  Activity, Sparkles
 } from "lucide-react"
 import { Sidebar } from "../../components/central63/sidebar"
 import { supabase } from "../../lib/supabase"
@@ -25,15 +26,16 @@ import {
   SelectValue,
 } from "../../components/ui/select"
 import { useToast } from "../../hooks/use-toast"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Loading from "../loading"
+import { cn } from "@/lib/utils"
 
 const TAG_CONFIG = {
-  novo: { label: 'Novo', color: 'bg-blue-500/10 text-blue-600 border-blue-200' },
-  em_progresso: { label: 'Em Atendimento', color: 'bg-amber-500/10 text-amber-600 border-amber-200' },
-  urgente: { label: 'Prioridade Máxima', color: 'bg-red-500/10 text-red-600 border-red-200' },
-  aguardando: { label: 'Aguardando Cliente', color: 'bg-slate-500/10 text-slate-600 border-slate-200' },
-  concluido: { label: 'Finalizado', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200' },
+  novo: { label: 'Novo', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+  em_progresso: { label: 'Em Atendimento', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+  urgente: { label: 'Prioridade Máxima', color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+  aguardando: { label: 'Aguardando Cliente', color: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
+  concluido: { label: 'Finalizado', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
 }
 
 function SupportContent() {
@@ -65,12 +67,10 @@ function SupportContent() {
     carregarChamados()
   }, [])
 
-  // Auto-scroll sempre que as mensagens mudarem
   useEffect(() => {
     scrollToBottom()
   }, [mensagens])
 
-  // Efeito para selecionar ticket vindo da URL
   useEffect(() => {
     if (ticketIdFromUrl && chamados.length > 0) {
       const ticket = chamados.find(c => c.id === ticketIdFromUrl)
@@ -105,7 +105,6 @@ function SupportContent() {
           filter: `chamado_id=eq.${chamadoSelecionado.id}` 
         }, (payload) => {
           const newMessage = payload.new;
-          // Garante que metadados seja um objeto (Supabase realtime às vezes envia como string)
           if (newMessage.metadados && typeof newMessage.metadados === 'string') {
             try {
               newMessage.metadados = JSON.parse(newMessage.metadados);
@@ -114,7 +113,6 @@ function SupportContent() {
             }
           }
 
-          // Som de alerta para o suporte (Sempre toca se for mensagem do cliente)
           if (!newMessage.eh_admin) {
             marcarComoLidas(chamadoSelecionado.id);
             try {
@@ -150,7 +148,6 @@ function SupportContent() {
   }, [chamadoSelecionado?.id]);
 
   async function marcarComoLidas(id: string) {
-    // Marca mensagens do usuário como lidas pelo suporte
     await supabase
       .from('suporte_mensagens')
       .update({ lida: true })
@@ -210,7 +207,7 @@ function SupportContent() {
 
   async function atualizarStatusKanban(tag: string) {
     if (!chamadoSelecionado) return
-    setChamadoSelecionado(prev => ({ ...prev, tag }));
+    setChamadoSelecionado((prev: any) => ({ ...prev, tag }));
     
     const { error } = await supabase
       .from('suporte_chamados')
@@ -321,7 +318,7 @@ function SupportContent() {
   if (isLoading) return <Loading />
 
   return (
-    <div className="flex h-screen bg-[#F5F5F7] dark:bg-background overflow-hidden font-sans">
+    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden font-sans">
       <Sidebar 
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)} 
@@ -329,74 +326,108 @@ function SupportContent() {
         onTabChange={(tab: string) => { setActiveTab(tab); setSidebarOpen(false); }} 
       />
       
-      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
-        <header className="h-20 shrink-0 flex items-center justify-between px-8 bg-white/70 dark:bg-card/70 border-b border-slate-200/60 z-30 shadow-sm backdrop-blur-xl">
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative animate-in fade-in duration-700">
+        
+        {/* ── BENTO HEADER ── */}
+        <header className="h-20 shrink-0 px-8 flex items-center justify-between z-30">
           <div className="flex items-center gap-5">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
+            <Button variant="ghost" size="icon" className="lg:hidden rounded-xl bg-white/50 dark:bg-white/[0.02] border border-white/20" onClick={() => setSidebarOpen(true)}>
               <Menu size={22} />
             </Button>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 bg-blue-600 rounded-[0.8rem] flex items-center justify-center shadow-md shadow-blue-600/20">
+            
+            <div className="relative flex items-center gap-4 bg-white/60 dark:bg-white/[0.02] backdrop-blur-2xl border border-white/20 dark:border-white/[0.06] px-5 py-2.5 rounded-2xl shadow-sm">
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+              <div className="h-10 w-10 bg-gradient-to-br from-primary/90 to-primary/60 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
                 <MessageCircle className="text-white" size={20} />
               </div>
               <div>
-                <h2 className="text-lg font-bold tracking-tight text-slate-900">Atendimento Hub</h2>
+                <h2 className="text-sm font-black tracking-tight text-foreground uppercase">Atendimento Hub</h2>
                 <div className="flex items-center gap-2 mt-0.5">
-                   <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                   <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Equipe Online</span>
+                   <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                   <span className="text-[9px] text-muted-foreground/60 font-black uppercase tracking-widest">Equipe Online</span>
                 </div>
               </div>
             </div>
           </div>
+
           <div className="flex items-center gap-4">
-             <Badge className="bg-white text-slate-700 rounded-lg h-8 px-4 font-semibold border border-slate-200 shadow-sm">
-               {chamados.filter(c => c.tag !== 'concluido').length} Em Aberto
-             </Badge>
+             <div className="bg-white/60 dark:bg-white/[0.02] backdrop-blur-xl border border-white/20 dark:border-white/[0.06] rounded-xl h-10 px-5 flex items-center gap-3 shadow-sm">
+               <Activity className="h-3.5 w-3.5 text-primary" />
+               <span className="text-[10px] font-black uppercase tracking-[0.15em] text-foreground/70">
+                 {chamados.filter(c => c.tag !== 'concluido').length} Em Aberto
+               </span>
+             </div>
           </div>
         </header>
 
         <div className="flex-1 overflow-hidden p-6 lg:p-8 flex gap-6">
-          <div className="w-[320px] flex flex-col bg-white rounded-[1.5rem] border border-slate-200/60 shadow-lg shadow-slate-200/40 overflow-hidden shrink-0">
-            <div className="p-4 border-b border-slate-100">
+          
+          {/* ── TILE: LISTA DE CHAMADOS (Bento Sidebar) ── */}
+          <div className="w-[340px] flex flex-col relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl shrink-0 transition-all">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+            
+            <div className="p-5 border-b border-black/[0.04] dark:border-white/[0.04]">
               <div className="relative group">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
-                <Input placeholder="Buscar conversas..." className="pl-10 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-blue-500/30 focus:ring-4 focus:ring-blue-500/10 h-10 text-sm transition-all" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40 group-focus-within:text-primary transition-colors" size={14} />
+                <Input 
+                  placeholder="Pesquisar conversas..." 
+                  className="pl-10 h-11 rounded-xl bg-black/[0.02] dark:bg-white/[0.04] border-black/[0.05] dark:border-white/[0.08] focus:bg-white dark:focus:bg-white/[0.06] text-xs font-bold transition-all" 
+                />
               </div>
             </div>
-            <ScrollArea className="flex-1 ">
-              <div className="px-3 py-4 space-y-1.5">
+
+            <ScrollArea className="flex-1">
+              <div className="px-4 py-4 space-y-2">
                 {chamados.map((c) => (
                   <div 
                     key={c.id} 
                     onClick={() => { setChamadoSelecionado(c); carregarMensagens(c); }}
-                    className={`group flex flex-col p-4 rounded-[1rem] cursor-pointer transition-all duration-200 relative ${
+                    className={cn(
+                      "group flex flex-col p-4 rounded-[1.5rem] cursor-pointer transition-all duration-300 relative border",
                       chamadoSelecionado?.id === c.id 
-                      ? 'bg-[#E8F0FE] shadow-md shadow-blue-600/20 ring-1 ring-blue-500/30' 
-                      : 'bg-transparent shadow-md shadow-black-600/20 hover:bg-slate-150'
-                    }`}
+                      ? 'bg-primary/5 border-primary/20 shadow-lg shadow-primary/5 -translate-y-0.5' 
+                      : 'bg-transparent border-transparent hover:bg-black/[0.02] dark:hover:bg-white/[0.02] hover:border-black/[0.05] dark:hover:border-white/[0.05]'
+                    )}
                   >
-                    <div className="flex items-center gap-3 mb-3">
-                      <Avatar className="h-9 w-9 border border-slate-100 shadow-sm">
-                        {c.metadados?.avatar_url ? (
-                          <img src={c.metadados.avatar_url} alt="Foto" className="h-full w-full object-cover rounded-full" />
-                        ) : (
-                          <AvatarFallback>{c.metadados?.nome?.substring(0, 1).toUpperCase() || 'V'}</AvatarFallback>
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className="relative">
+                        <Avatar className="h-11 w-11 rounded-2xl border border-white/40 dark:border-white/[0.08] shadow-sm overflow-hidden">
+                          {c.metadados?.avatar_url ? (
+                            <img src={c.metadados.avatar_url} alt="Foto" className="h-full w-full object-cover" />
+                          ) : (
+                            <AvatarFallback className="text-xs font-black bg-black/[0.05] dark:bg-white/[0.05] text-muted-foreground/40">
+                              {c.metadados?.nome?.substring(0, 2).toUpperCase() || 'V'}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        {chamadoSelecionado?.id === c.id && (
+                          <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary border-2 border-white dark:border-zinc-900 shadow-sm" />
                         )}
-                      </Avatar>
+                      </div>
+                      
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold truncate leading-tight ${chamadoSelecionado?.id === c.id ? 'text-slate-900' : 'text-slate-800'}`}>
-                          {c.metadados?.nome || (c.usuario_id ? `Utilizador #${c.usuario_id.substring(0, 5)}` : `Visitante ${c.id.substring(0, 4)}`)}
-                        </p>
-                        <p className={`text-[11px] truncate font-medium mt-0.5 ${chamadoSelecionado?.id === c.id ? 'text-blue-600/80' : 'text-slate-400'}`}>
-                          {c.metadados?.email || new Date(c.atualizado_em).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        <div className="flex items-center justify-between mb-0.5">
+                          <p className="text-[13px] font-black tracking-tight truncate text-foreground/90">
+                            {c.metadados?.nome || (c.usuario_id ? `Utilizador #${c.usuario_id.substring(0, 5)}` : `Visitante ${c.id.substring(0, 4)}`)}
+                          </p>
+                          <span className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest shrink-0">
+                            {new Date(c.atualizado_em).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
+                        </div>
+                        <p className="text-[10px] truncate font-bold text-muted-foreground/40 uppercase tracking-wider">
+                          {c.metadados?.email || "Nenhum email vinculado"}
                         </p>
                       </div>
                     </div>
+                    
                     <div className="flex items-center justify-between">
-                      <Badge variant="outline" className={`text-[10px] h-5 px-2 border-none rounded-md font-semibold tracking-tight ${TAG_CONFIG[c.tag as keyof typeof TAG_CONFIG]?.color}`}>
+                      <div className={cn(
+                        "text-[9px] h-5 px-2.5 flex items-center rounded-lg font-black uppercase tracking-[0.1em] border",
+                        TAG_CONFIG[c.tag as keyof typeof TAG_CONFIG]?.color
+                      )}>
                         {TAG_CONFIG[c.tag as keyof typeof TAG_CONFIG]?.label || 'Novo'}
-                      </Badge>
-                      <ChevronRight size={14} className={chamadoSelecionado?.id === c.id ? 'text-blue-500' : 'text-slate-300'} />
+                      </div>
+                      <ChevronRight size={14} className={cn("transition-transform duration-300", chamadoSelecionado?.id === c.id ? 'text-primary translate-x-1' : 'text-muted-foreground/20')} />
                     </div>
                   </div>
                 ))}
@@ -404,86 +435,97 @@ function SupportContent() {
             </ScrollArea>
           </div>
 
-          <div className="flex-1 flex flex-col bg-white rounded-[1.5rem] border border-slate-200/60 shadow-lg shadow-slate-200/40 overflow-hidden min-w-0">
+          {/* ── TILE: CHAT INTERFACE (Bento Main) ── */}
+          <div className="flex-1 flex flex-col relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl min-w-0">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+            
             {chamadoSelecionado ? (
               <>
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white/50 backdrop-blur-md z-20">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-10 w-10 ring-1 ring-slate-200 shadow-sm">
+                <div className="px-8 py-5 border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between shrink-0 bg-white/40 dark:bg-white/[0.02] backdrop-blur-xl z-20">
+                  <div className="flex items-center gap-5">
+                    <Avatar className="h-12 w-12 rounded-2xl ring-4 ring-black/[0.02] dark:ring-white/[0.02] shadow-sm border border-white/40 dark:border-white/[0.1]">
                       {chamadoSelecionado.metadados?.avatar_url ? (
                         <img src={chamadoSelecionado.metadados.avatar_url} className="object-cover" />
                       ) : (
-                        <AvatarFallback className="bg-gradient-to-br from-slate-800 to-slate-900 text-white font-bold text-xs">
+                        <AvatarFallback className="bg-primary/10 text-primary font-black text-sm">
                           {chamadoSelecionado.metadados?.nome?.substring(0, 2).toUpperCase() || chamadoSelecionado.id.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       )}
                     </Avatar>
                     <div>
-                      <h3 className="font-semibold text-base text-slate-900">{chamadoSelecionado.metadados?.nome || `Suporte #${chamadoSelecionado.id.substring(0, 8)}`}</h3>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        <span className="text-[11px] text-slate-500 font-medium">Sincronizado</span>
+                      <h3 className="font-black text-base text-foreground tracking-tight">{chamadoSelecionado.metadados?.nome || `Suporte #${chamadoSelecionado.id.substring(0, 8)}`}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                        <span className="text-[10px] text-muted-foreground/40 font-black uppercase tracking-[0.2em]">Sincronizado via Realtime</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <Select value={chamadoSelecionado.tag} onValueChange={atualizarStatusKanban}>
-                      <SelectTrigger className="w-[160px] h-9 rounded-lg text-xs font-semibold bg-slate-50 border border-slate-200 focus:ring-0">
+                      <SelectTrigger className="w-[180px] h-10 rounded-xl text-[10px] font-black uppercase tracking-widest bg-black/[0.02] dark:bg-white/[0.04] border-black/[0.06] dark:border-white/[0.08] focus:ring-0">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl">
+                      <SelectContent className="rounded-2xl border-white/20 dark:border-white/[0.08] bg-white/90 dark:bg-zinc-900/90 backdrop-blur-2xl">
                         {Object.entries(TAG_CONFIG).map(([key, value]) => (
-                          <SelectItem key={key} value={key} className="text-xs font-medium py-2 cursor-pointer">
+                          <SelectItem key={key} value={key} className="text-[10px] font-black uppercase tracking-widest py-3 cursor-pointer">
                             {value.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button variant="ghost" size="icon" onClick={(e) => excluirChamado(e, chamadoSelecionado.id)} className="h-9 w-9 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                    
+                    <button onClick={(e) => excluirChamado(e, chamadoSelecionado.id)} className="h-10 w-10 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all">
                       <Trash2 size={16} />
-                    </Button>
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-hidden bg-[#F5F5F7]/50" ref={chatScrollRef}>
+                <div className="flex-1 min-h-0 overflow-hidden" ref={chatScrollRef}>
                   <ScrollArea className="h-full">
-                    <div className="p-8 flex flex-col gap-4 max-w-4xl mx-auto">
+                    <div className="p-10 flex flex-col gap-5 max-w-4xl mx-auto">
                       {mensagens.map((msg) => (
-                        <div key={msg.id} className={`flex ${msg.eh_admin ? 'justify-end' : 'justify-start'} group animate-in fade-in duration-300`}>
-                          <div className={`max-w-[75%] flex flex-col ${msg.eh_admin ? 'items-end' : 'items-start'}`}>
-                            <div className={`px-5 py-3 rounded-[1.2rem] text-[14px] shadow-sm leading-relaxed ${
+                        <div key={msg.id} className={cn("flex group animate-in slide-in-from-bottom-2 duration-500", msg.eh_admin ? 'justify-end' : 'justify-start')}>
+                          <div className={cn("max-w-[80%] flex flex-col", msg.eh_admin ? 'items-end' : 'items-start')}>
+                            <div className={cn(
+                              "relative px-6 py-4 rounded-[2rem] text-[14px] font-medium leading-relaxed shadow-sm transition-all hover:shadow-md",
                               msg.eh_admin 
-                              ? 'bg-[#007AFF] text-white rounded-br-sm'
-                              : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
-                            }`}>
+                              ? 'bg-primary text-white rounded-br-none shadow-primary/20'
+                              : 'bg-white dark:bg-white/[0.05] border border-black/[0.04] dark:border-white/[0.08] text-foreground rounded-bl-none'
+                            )}>
+                              {msg.eh_admin && <div className="absolute inset-x-0 top-0 h-px rounded-t-[2rem]" />}
+
                               {msg.metadados?.imagem_url && (
-                                <div className="mb-2 overflow-hidden rounded-lg">
+                                <div className="mb-3 overflow-hidden rounded-2xl border border-white/20 shadow-lg">
                                   <img 
                                     src={msg.metadados.imagem_url} 
                                     alt="Anexo" 
-                                    className="max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                    className="max-w-full h-auto cursor-pointer hover:scale-105 transition-transform duration-500"
                                     onClick={() => window.open(msg.metadados.imagem_url, '_blank')}
                                   />
                                 </div>
                               )}
+                              
                               <div className="flex flex-col gap-1">
                                 <span>{msg.conteudo}</span>
-                                {msg.eh_admin && (
-                                  <div className="flex justify-end -mb-1 -mr-1">
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2 px-2">
+                              {!msg.eh_admin && (
+                                <User size={14} className="text-[9px] text-muted-foreground/40 font-black uppercase tracking-widest" />
+                              )}
+                              <span className="text-[9px] text-muted-foreground/40 font-black uppercase tracking-widest">
+                                {new Date(msg.criado_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {msg.eh_admin && (
+                                  <div className="flex justify-end -mb-0 mt-0">
                                     {msg.lida ? (
-                                      <CheckCheck size={14} className="text-blue-200" />
+                                      <CheckCheck size={14} className="text-[9px] text-muted-foreground/40 font-black uppercase tracking-widest" />
                                     ) : (
-                                      <Check size={14} className="text-blue-300/70" />
+                                      <Check size={14} className="text-[9px] text-muted-foreground/40 font-black uppercase tracking-widest" />
                                     )}
                                   </div>
                                 )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-1.5 px-1">
-                              <span className="text-[10px] text-slate-400 font-medium">
-                                {new Date(msg.criado_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
                             </div>
                           </div>
                         </div>
@@ -492,19 +534,23 @@ function SupportContent() {
                   </ScrollArea>
                 </div>
 
-                <div className="p-4 border-t border-slate-100 shrink-0 bg-white">
+                {/* ── CHAT INPUT GLASS ── */}
+                <div className="p-6 border-t border-black/[0.04] dark:border-white/[0.04] shrink-0 bg-white/40 dark:bg-white/[0.01] backdrop-blur-xl">
                   {previewUrl && (
-                    <div className="mb-3 relative inline-block mx-4">
-                      <img src={previewUrl} alt="Preview" className="h-20 w-20 object-cover rounded-xl border-2 border-blue-100 shadow-sm" />
+                    <div className="mb-4 relative inline-block mx-4 animate-in zoom-in duration-300">
+                      <div className="h-24 w-24 rounded-[1.5rem] overflow-hidden border-2 border-primary/20 shadow-xl ring-4 ring-black/[0.02]">
+                        <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
+                      </div>
                       <button 
                         onClick={() => { setSelectedFile(null); setPreviewUrl(null); }}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                        className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1.5 shadow-lg hover:bg-rose-600 transition-colors"
                       >
                         <X size={12} />
                       </button>
                     </div>
                   )}
-                  <div className="flex gap-2 items-center bg-slate-50 p-1.5 rounded-[1.2rem] border border-slate-200/80 focus-within:bg-white focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
+                  
+                  <div className="flex gap-3 items-center bg-black/[0.02] dark:bg-white/[0.03] p-2 rounded-[1.75rem] border border-black/[0.06] dark:border-white/[0.08] focus-within:bg-white dark:focus-within:bg-white/[0.06] focus-within:shadow-xl focus-within:shadow-primary/5 transition-all">
                     <input 
                       type="file" 
                       ref={fileInputRef} 
@@ -516,119 +562,168 @@ function SupportContent() {
                       variant="ghost" 
                       size="icon" 
                       onClick={() => fileInputRef.current?.click()}
-                      className="h-10 w-10 rounded-full text-slate-400 hover:text-slate-600"
+                      className="h-11 w-11 rounded-2xl text-muted-foreground/40 hover:text-primary hover:bg-primary/5"
                     >
-                      <Paperclip size={18} />
+                      <Paperclip size={20} />
                     </Button>
                     <Input 
-                      placeholder="Mensagem..." 
+                      placeholder="Digite sua resposta aqui..." 
                       value={novaResposta}
                       onChange={(e) => setNovaResposta(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && enviarResposta()}
-                      className="border-none bg-transparent focus-visible:ring-0 shadow-none h-10 text-[15px] font-medium placeholder:text-slate-400"
+                      className="border-none bg-transparent focus-visible:ring-0 shadow-none h-11 text-sm font-bold placeholder:text-muted-foreground/30 placeholder:uppercase placeholder:tracking-widest"
                     />
-                    <Button onClick={enviarResposta} disabled={isSending} className="bg-[#007AFF] hover:bg-blue-600 text-white rounded-xl h-10 px-6 shadow-sm">
-                      {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="ml-1" />}
+                    <Button 
+                      onClick={enviarResposta} 
+                      disabled={isSending} 
+                      className="bg-primary hover:bg-primary/90 text-white rounded-2xl h-11 px-6 shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95"
+                    >
+                      {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                     </Button>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-12 bg-slate-50/30 text-slate-400">
-                <MessageSquare size={40} className="mb-4 opacity-20" />
-                <p className="font-medium text-sm">Selecione uma conversa para começar</p>
+              <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-20">
+                <MessageSquare size={60} className="mb-6" />
+                <h3 className="text-xl font-black uppercase tracking-[0.2em] text-foreground">Central de Atendimento</h3>
+                <p className="text-sm font-bold uppercase tracking-widest mt-2">Selecione uma conversa para começar o suporte</p>
               </div>
             )}
           </div>
 
-          <div className="w-[320px] flex flex-col shrink-0 gap-6">
+          {/* ── TILE: DETALHES & NOTAS (Bento Aside) ── */}
+          <div className="w-[340px] flex flex-col shrink-0 gap-6">
             {chamadoSelecionado ? (
-              <div className="bg-white rounded-[1.5rem] border border-slate-200/60 shadow-lg shadow-slate-200/40 flex flex-col overflow-hidden h-full">
+              <div className="relative flex-1 flex flex-col rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl transition-all h-full">
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+                
                 <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
-                  <div className="p-3 border-b border-slate-100 bg-slate-50/50">
-                    <TabsList className="w-full bg-slate-100/80 rounded-lg h-9 p-1">
-                      <TabsTrigger value="info" className="flex-1 rounded-md text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">Detalhes</TabsTrigger>
-                      <TabsTrigger value="notes" className="flex-1 rounded-md text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">Notas</TabsTrigger>
+                  <div className="p-4 border-b border-black/[0.04] dark:border-white/[0.04] bg-black/[0.01] dark:bg-white/[0.01]">
+                    <TabsList className="w-full bg-black/[0.04] dark:bg-white/[0.04] rounded-xl h-11 p-1">
+                      <TabsTrigger value="info" className="flex-1 rounded-lg text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all">Detalhes</TabsTrigger>
+                      <TabsTrigger value="notes" className="flex-1 rounded-lg text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all">Notas</TabsTrigger>
                     </TabsList>
                   </div>
 
                   <TabsContent value="info" className="flex-1 overflow-hidden m-0 relative data-[state=active]:flex flex-col">
-                    <div className="absolute inset-0 overflow-y-auto">
-                      <div className="p-6 space-y-8">
+                    <ScrollArea className="h-full">
+                      <div className="p-8 space-y-10">
                         <div className="flex flex-col items-center text-center">
-                          <Avatar className="h-20 w-20 mb-4 shadow-sm border border-slate-100">
+                          <Avatar className="h-24 w-24 mb-5 shadow-2xl border-4 border-white/40 dark:border-white/[0.05] ring-8 ring-black/[0.02] dark:ring-white/[0.01] rounded-[2rem]">
                             {chamadoSelecionado.metadados?.avatar_url ? (
-                              <img src={chamadoSelecionado.metadados.avatar_url} className="rounded-full object-cover" />
+                              <img src={chamadoSelecionado.metadados.avatar_url} className="object-cover" />
                             ) : (
-                              <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-xl">{chamadoSelecionado.metadados?.nome?.substring(0, 1) || 'V'}</AvatarFallback>
+                              <AvatarFallback className="bg-black/[0.03] dark:bg-white/[0.05] text-muted-foreground/30 font-black text-2xl uppercase">
+                                {chamadoSelecionado.metadados?.nome?.substring(0, 1) || 'V'}
+                              </AvatarFallback>
                             )}
                           </Avatar>
-                          <h4 className="font-semibold text-slate-900 text-[15px]">{chamadoSelecionado.metadados?.nome || 'Informações do Ticket'}</h4>
-                          <span className="text-[11px] font-medium text-blue-600 mt-1">{chamadoSelecionado.metadados?.email || `ID: ${chamadoSelecionado.id.substring(0, 12)}`}</span>
+                          <h4 className="font-black text-lg tracking-tight text-foreground uppercase truncate w-full px-2">
+                            {chamadoSelecionado.metadados?.nome || 'Utilizador Anon'}
+                          </h4>
+                          <div className="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            <Mail size={10} />
+                            <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-[180px]">
+                              {chamadoSelecionado.metadados?.email || "No Email"}
+                            </span>
+                          </div>
                         </div>
-                        <div className="space-y-6">
-                          <div className="space-y-3">
-                            <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Atendimento Selecionado</h5>
-                            <div className="bg-blue-50/50 p-3 rounded-xl flex flex-col gap-1 border border-blue-100/50">
-                              <span className="font-bold text-slate-800 text-sm">{chamadoSelecionado.metadados?.atendente_preferencia || 'Não especificado'}</span>
-                              <span className="text-[11px] text-blue-600 font-semibold">{chamadoSelecionado.metadados?.atendente_cargo || 'Nenhum cargo definido'}</span>
+
+                        <div className="space-y-8">
+                          <div className="space-y-4">
+                            <h5 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.25em] flex items-center gap-3">
+                              <User size={12} className="text-[9px] text-muted-foreground/40 font-black uppercase tracking-widest" />
+                              Perfil Técnico
+                            </h5>
+                            <div className="bg-black/[0.03] dark:bg-white/[0.02] p-5 rounded-2xl border border-black/[0.04] dark:border-white/[0.04]">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 mb-1">Preferência</p>
+                              <p className="font-black text-foreground text-sm tracking-tight">{chamadoSelecionado.metadados?.atendente_preferencia || 'Padrão'}</p>
+                              <div className="h-px bg-black/[0.06] dark:bg-white/[0.06] my-3" />
+                              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 mb-1">Cargo/Setor</p>
+                              <p className="font-black text-primary text-[11px] uppercase tracking-widest">{chamadoSelecionado.metadados?.atendente_cargo || 'Generalista'}</p>
                             </div>
                           </div>
 
-                          <div className="space-y-3">
-                            <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Contato</h5>
-                            <div className="bg-slate-50 p-3 rounded-xl flex justify-between items-center text-sm border border-slate-100">
-                              <span className="font-medium text-slate-500">Email</span>
-                              <span className="font-semibold text-slate-800 text-xs">{chamadoSelecionado.metadados?.email || 'N/A'}</span>
-                            </div>
-                            <div className="bg-slate-50 p-3 rounded-xl flex justify-between items-center text-sm border border-slate-100">
-                              <span className="font-medium text-slate-500">Plataforma</span>
-                              <span className="font-semibold text-slate-800">{chamadoSelecionado.metadados?.plataforma || 'Desconhecida'}</span>
+                          <div className="space-y-4">
+                            <h5 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.25em] flex items-center gap-3">
+                              <Monitor size={12} className="text-primary" />
+                              Sessão & Plataforma
+                            </h5>
+                            <div className="grid grid-cols-1 gap-2">
+                              <div className="flex items-center justify-between p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.01] border border-black/[0.04] dark:border-white/[0.04]">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">Plataforma</span>
+                                <span className="text-[10px] font-black uppercase text-foreground">{chamadoSelecionado.metadados?.plataforma || 'N/A'}</span>
+                              </div>
+                              <div className="flex items-center justify-between p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.01] border border-black/[0.04] dark:border-white/[0.04]">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">Status Sinc</span>
+                                <span className="text-[10px] font-black uppercase text-emerald-500">Live</span>
+                              </div>
                             </div>
                           </div>
-                          <div className="space-y-3">
-                             <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">Atividade</h5>
-                             <div className="pl-3 border-l-[3px] border-slate-200 space-y-4 ml-1">
-                                <div>
-                                   <p className="text-sm font-semibold text-slate-800">Criado em</p>
-                                   <p className="text-xs text-slate-500 mt-0.5">{new Date(chamadoSelecionado.criado_em).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
+
+                          <div className="space-y-4">
+                             <h5 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.25em] flex items-center gap-3">
+                               <History size={12} className="text-primary" />
+                               Linha do Tempo
+                             </h5>
+                             <div className="pl-4 border-l-2 border-primary/20 space-y-6 ml-2 py-1">
+                                <div className="relative">
+                                   <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.8)]" />
+                                   <p className="text-[11px] font-black text-foreground uppercase tracking-widest">Abertura</p>
+                                   <p className="text-[9px] font-bold text-muted-foreground/50 mt-1">
+                                     {new Date(chamadoSelecionado.criado_em).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                   </p>
                                 </div>
-                                <div>
-                                   <p className="text-sm font-semibold text-slate-800">Atualizado</p>
-                                   <p className="text-xs text-slate-500 mt-0.5">{new Date(chamadoSelecionado.atualizado_em).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                                <div className="relative">
+                                   <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-zinc-400 dark:bg-zinc-600 shadow-sm" />
+                                   <p className="text-[11px] font-black text-foreground uppercase tracking-widest">Última Interação</p>
+                                   <p className="text-[9px] font-bold text-muted-foreground/50 mt-1">
+                                     {new Date(chamadoSelecionado.atualizado_em).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                   </p>
                                 </div>
                              </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </ScrollArea>
                   </TabsContent>
 
-                  <TabsContent value="notes" className="flex-1 overflow-hidden m-0 relative data-[state=active]:flex flex-col bg-white">
-                    <div className="absolute inset-0 flex flex-col p-6">
-                      <div className="flex items-center justify-center mb-6 relative">
-                         <span className="text-[11px] font-medium text-slate-400">
-                            {new Date(chamadoSelecionado.atualizado_em).toLocaleString([], { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
-                         </span>
-                         {noteSaved && <CheckCircle2 size={14} className="text-emerald-500 absolute right-0 animate-in fade-in zoom-in duration-300" />}
+                  <TabsContent value="notes" className="flex-1 overflow-hidden m-0 relative data-[state=active]:flex flex-col">
+                    <div className="absolute inset-0 flex flex-col p-8">
+                      <div className="flex items-center justify-between mb-8">
+                         <div className="flex flex-col">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">Notas de Atendimento</span>
+                            <span className="text-[10px] font-bold text-foreground/60">Privado para a equipe</span>
+                         </div>
+                         {noteSaved ? (
+                           <CheckCircle2 size={18} className="text-emerald-500 animate-in zoom-in-50 duration-500" />
+                         ) : (
+                           <StickyNote size={18} className="text-primary/40" />
+                         )}
                       </div>
-                      <div className="flex-1 flex flex-col relative">
+                      
+                      <div className="flex-1 flex flex-col relative bg-black/[0.02] dark:bg-white/[0.02] rounded-[1.5rem] p-6 border border-black/[0.04] dark:border-white/[0.04] shadow-inner">
                         <Textarea 
-                          placeholder="Toque para adicionar notas..." 
-                          className="flex-1 resize-none border-none bg-transparent shadow-none focus-visible:ring-0 p-0 text-[15px] font-normal leading-relaxed text-slate-800 placeholder:text-slate-300"
+                          placeholder="Digite aqui as observações internas sobre este caso..." 
                           value={notaInterna}
                           onChange={(e) => { setNotaInterna(e.target.value); setNoteSaved(false); }}
                         />
                         {isSavingNote && (
-                          <div className="absolute top-2 right-2 bg-white/50 backdrop-blur-sm rounded-full p-1">
-                            <Loader2 size={16} className="animate-spin text-slate-400" />
+                          <div className="absolute top-4 right-4 animate-spin">
+                            <Loader2 size={16} className="text-primary/40" />
                           </div>
                         )}
                       </div>
-                      <div className="pt-4 border-t border-slate-50 mt-auto">
-                        <Button onClick={guardarNota} disabled={isSavingNote} variant="ghost" className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium text-sm">
-                          {isSavingNote ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
-                          {noteSaved ? 'Guardado' : 'Guardar Manualmente'}
+                      
+                      <div className="pt-6 mt-auto">
+                        <Button 
+                          onClick={guardarNota} 
+                          disabled={isSavingNote} 
+                          className="w-full h-12 rounded-xl bg-primary text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+                        >
+                          {isSavingNote ? <Loader2 size={16} className="animate-spin mr-2" /> : <Save size={16} className="mr-2" />}
+                          {noteSaved ? 'Informação Salva' : 'Salvar Alterações'}
                         </Button>
                       </div>
                     </div>
@@ -636,8 +731,9 @@ function SupportContent() {
                 </Tabs>
               </div>
             ) : (
-              <div className="h-full bg-white rounded-[1.5rem] border border-slate-200/60 flex items-center justify-center">
-                 <Settings size={28} className="text-slate-200" />
+              <div className="flex-1 rounded-[2rem] border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl flex flex-col items-center justify-center opacity-20">
+                 <Settings size={32} className="animate-spin-slow" />
+                 <span className="text-[10px] font-black uppercase tracking-widest mt-4 text-foreground/50">Configurações Ativas</span>
               </div>
             )}
           </div>

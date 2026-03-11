@@ -344,108 +344,145 @@ export function SuportePopup() {
     <div className="fixed bottom-6 right-6 z-50">
       <Popover open={isOpen} onOpenChange={(open) => { setIsOpen(open); if(open) scrollToBottom(); }}>
         <PopoverTrigger asChild>
-          <Button size="icon" className="h-14 w-14 rounded-full shadow-lg bg-white hover:bg-slate-50 transition-all border border-slate-200 relative group scale-100 active:scale-95 duration-200">
-            {isOpen ? <X className="h-6 w-6 text-slate-600" /> : <MessageCircle className="h-7 w-7 text-[#007AFF]" />}
+          <Button 
+            size="icon" 
+            className={cn(
+              "h-14 w-14 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] transition-all duration-500 scale-100 active:scale-90 border relative group overflow-hidden",
+              "bg-white/80 dark:bg-white/[0.05] backdrop-blur-xl border-white/40 dark:border-white/[0.1]",
+              isOpen ? "rotate-90" : "rotate-0"
+            )}
+          >
+            {/* Inner glass highlight */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
+            
+            {isOpen ? (
+              <X className="h-6 w-6 text-foreground/70" />
+            ) : (
+              <MessageCircle className="h-7 w-7 text-primary animate-in zoom-in duration-500" />
+            )}
+            
             {!isOpen && unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 bg-[#FF3B30] text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center animate-in zoom-in duration-300">
+              <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-white text-[10px] font-black rounded-full border-2 border-white dark:border-zinc-900 flex items-center justify-center animate-bounce shadow-lg shadow-primary/20">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </Button>
         </PopoverTrigger>
+        
         <PopoverContent 
           side="top" 
           align="end" 
-          sideOffset={16}
-          className="w-[340px] h-[560px] p-0 rounded-[2rem] overflow-hidden border border-slate-200/60 shadow-[0_10px_40px_rgba(0,0,0,0.08)] bg-white/95 backdrop-blur-xl flex flex-col animate-in slide-in-from-bottom-2 duration-300"
+          sideOffset={20}
+          className={cn(
+            "w-[360px] h-[600px] p-0 rounded-[2.5rem] overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 fade-in duration-500",
+            "border border-white/40 dark:border-white/[0.08] bg-white/70 dark:bg-zinc-950/40 backdrop-blur-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)]"
+          )}
         >
-          {/* Header Discreet Style */}
-          <div className="bg-white/50 p-5 border-b border-slate-100 relative shrink-0">
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+          {/* Top glass refraction highlight */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent z-50" />
+
+          {/* ── HEADER GLASS ── */}
+          <div className="bg-white/40 dark:bg-white/[0.02] p-6 border-b border-black/[0.04] dark:border-white/[0.04] relative shrink-0 z-40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
                 {isIdentifying && (
-                  <button onClick={() => setIsIdentifying(false)} className="mr-1 text-slate-400 hover:text-slate-600 transition-colors">
-                    <ChevronLeft size={20} />
+                  <button 
+                    onClick={() => setIsIdentifying(false)} 
+                    className="h-8 w-8 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] flex items-center justify-center text-foreground/40 hover:text-primary transition-all active:scale-90"
+                  >
+                    <ChevronLeft size={18} />
                   </button>
                 )}
                 <div>
-                  <h3 className="font-semibold text-[16px] text-slate-800 tracking-tight leading-none mb-1">Suporte Central63</h3>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-1.5 w-1.5 rounded-full bg-[#34C759]" />
-                    <p className="text-[11px] text-slate-400 font-medium tracking-wide">
-                      {isConcluido ? "Sessão Encerrada" : (isIdentifying ? "Nova Conversa" : "Online agora")}
+                  <h3 className="font-black text-[14px] uppercase tracking-[0.15em] text-foreground leading-none mb-1.5">Hub de Suporte</h3>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
+                    <p className="text-[9px] text-muted-foreground/50 font-black uppercase tracking-widest">
+                      {isConcluido ? "Sessão Encerrada" : (isIdentifying ? "Identificação" : "Time Online")}
                     </p>
                   </div>
                 </div>
               </div>
+              
               {!isIdentifying && !isConcluido && (
                 <button 
                   onClick={novoAtendimento}
-                  className="text-[11px] font-semibold text-[#007AFF] hover:opacity-70 transition-opacity"
+                  className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all active:scale-95 shadow-sm"
                 >
-                  Novo
+                  Reiniciar
                 </button>
               )}
             </div>
           </div>
           
-          <div className="flex-1 relative overflow-hidden bg-slate-50/30">
+          <div className="flex-1 relative overflow-hidden bg-gradient-to-b from-transparent to-black/[0.02] dark:to-white/[0.01]">
             <ScrollArea 
               ref={scrollAreaRef} 
               className={cn(
-                "h-full p-4 transition-all duration-300",
-                isConcluido && "blur-[1px] pointer-events-none grayscale-[0.3]"
+                "h-full p-6 transition-all duration-500",
+                isConcluido && "blur-[2px] pointer-events-none grayscale-[0.5]"
               )}
             >
               {isIdentifying ? (
-                <div className="flex flex-col gap-5 py-4 animate-in fade-in duration-500">
+                <div className="flex flex-col gap-6 py-2 animate-in fade-in slide-in-from-top-2 duration-700">
                   <div className="space-y-4">
-                      <div className="px-1">
-                        <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Identificação</label>
+                      <div className="px-1 flex items-center gap-2">
+                        <User size={10} className="text-primary" />
+                        <label className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em]">Quem é você?</label>
                       </div>
-                      <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm">
-                        <Input 
-                          placeholder="Seu nome" 
-                          className="h-12 border-none rounded-none focus-visible:ring-0 px-4 text-[14px] bg-transparent"
-                          value={userData.nome}
-                          onChange={(e) => setUserData({...userData, nome: e.target.value})}
-                        />
-                        <div className="h-px bg-slate-100 mx-4" />
-                        <Input 
-                          placeholder="Seu e-mail" 
-                          type="email"
-                          className="h-12 border-none rounded-none focus-visible:ring-0 px-4 text-[14px] bg-transparent"
-                          value={userData.email}
-                          onChange={(e) => setUserData({...userData, email: e.target.value})}
-                        />
+                      <div className="space-y-2">
+                        <div className="relative group">
+                           <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 group-focus-within:text-primary transition-all" />
+                           <Input 
+                            placeholder="Introduza o seu nome" 
+                            className="h-12 pl-12 rounded-2xl bg-white/50 dark:bg-white/[0.03] border-black/[0.05] dark:border-white/[0.08] focus:bg-white dark:focus:bg-white/[0.06] text-xs font-bold transition-all"
+                            value={userData.nome}
+                            onChange={(e) => setUserData({...userData, nome: e.target.value})}
+                          />
+                        </div>
+                        <div className="relative group">
+                           <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 group-focus-within:text-primary transition-all" />
+                           <Input 
+                            placeholder="Introduza o seu e-mail" 
+                            type="email"
+                            className="h-12 pl-12 rounded-2xl bg-white/50 dark:bg-white/[0.03] border-black/[0.05] dark:border-white/[0.08] focus:bg-white dark:focus:bg-white/[0.06] text-xs font-bold transition-all"
+                            value={userData.email}
+                            onChange={(e) => setUserData({...userData, email: e.target.value})}
+                          />
+                        </div>
                       </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1">Departamento</label>
-                    <div className="grid grid-cols-1 gap-2">
+                  <div className="space-y-4">
+                    <div className="px-1 flex items-center gap-2">
+                      <MessageCircle size={10} className="text-primary" />
+                      <label className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em]">Falar com...</label>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2.5">
                       {ATENDENTES.map((atendente) => (
                         <div 
                           key={atendente.id}
                           onClick={() => setAtendenteSelecionado(atendente)}
                           className={cn(
-                            "flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all duration-200",
+                            "flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 group cursor-pointer",
                             atendenteSelecionado?.id === atendente.id 
-                            ? 'border-[#007AFF] bg-[#007AFF]/5' 
-                            : 'border-white bg-white hover:border-slate-200 shadow-sm'
+                            ? 'border-primary/40 bg-primary/5 shadow-lg shadow-primary/5 -translate-y-0.5' 
+                            : 'border-black/[0.04] dark:border-white/[0.06] bg-white/40 dark:bg-white/[0.02] hover:bg-white dark:hover:bg-white/[0.04] hover:border-primary/20'
                           )}
                         >
                           <div className={cn(
-                            "h-9 w-9 rounded-full flex items-center justify-center transition-colors",
-                            atendenteSelecionado?.id === atendente.id ? 'bg-[#007AFF]/10' : 'bg-slate-100'
+                            "h-10 w-10 rounded-xl flex items-center justify-center transition-all border shrink-0",
+                            atendenteSelecionado?.id === atendente.id 
+                            ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                            : 'bg-black/[0.03] dark:bg-white/[0.05] text-muted-foreground/40 border-black/[0.05] dark:border-white/[0.05]'
                           )}>
-                             <User size={16} className={atendenteSelecionado?.id === atendente.id ? 'text-[#007AFF]' : 'text-slate-400'} />
+                             <User size={18} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold text-slate-800 truncate">{atendente.nome}</p>
-                            <p className="text-[11px] text-slate-400 font-medium">{atendente.cargo}</p>
+                            <p className="text-[13px] font-black text-foreground tracking-tight truncate">{atendente.nome}</p>
+                            <p className="text-[10px] text-muted-foreground/40 font-black uppercase tracking-widest mt-0.5">{atendente.cargo}</p>
                           </div>
-                          {atendenteSelecionado?.id === atendente.id && <CheckCircle2 size={18} className="text-[#007AFF]" />}
+                          {atendenteSelecionado?.id === atendente.id && <CheckCircle2 size={16} className="text-muted-foreground/30 animate-in zoom-in duration-300" />}
                         </div>
                       ))}
                     </div>
@@ -455,49 +492,62 @@ export function SuportePopup() {
                     type="button" 
                     onClick={(e) => { e.preventDefault(); iniciarEEnviar(); }} 
                     disabled={isLoading}
-                    className="w-full bg-[#007AFF] hover:bg-[#0062CC] text-white h-11 rounded-2xl mt-2 font-semibold text-[14px] shadow-sm transition-all active:scale-[0.98]"
+                    className="w-full bg-primary hover:bg-primary/90 text-white h-12 rounded-[1.25rem] mt-4 font-black uppercase text-[10px] tracking-[0.2em] shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95"
                   >
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Começar atendimento"}
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Iniciar Diálogo"}
                   </Button>
                 </div>
               ) : (
-                <div className="flex flex-col gap-4 py-2">
+                <div className="flex flex-col gap-5 py-2">
                   {mensagens.map((msg) => (
-                    <div key={msg.id} className={cn("flex flex-col gap-1", msg.eh_admin ? 'items-start' : 'items-end')}>
+                    <div key={msg.id} className={cn("flex flex-col gap-1.5 animate-in slide-in-from-bottom-2 duration-500", msg.eh_admin ? 'items-start' : 'items-end')}>
                       {msg.eh_admin && (
-                        <span className="text-[9px] font-medium text-slate-400/80 ml-2.5">
-                          {msg.metadados?.nome_remetente || "Suporte"}
+                        <span className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-[0.2em] ml-0">
+                          {(msg.metadados?.nome_remetente || "Suporte Central63").split(' ')[0]}
                         </span>
                       )}
                       <div className={cn(
-                        "max-w-[85%] p-3.5 rounded-[1.2rem] text-[14px] leading-snug animate-in fade-in duration-300",
+                        "max-w-[85%] p-4 rounded-[1.75rem] text-[14px] font-medium leading-relaxed shadow-sm transition-all hover:shadow-md relative overflow-hidden",
                         msg.eh_admin 
-                        ? 'bg-white text-slate-800 rounded-tl-none border border-slate-200/60 shadow-sm' 
-                        : 'bg-[#007AFF] text-white rounded-tr-none font-normal shadow-sm'
+                        ? 'bg-white dark:bg-white/[0.05] text-foreground rounded-tl-none border border-black/[0.04] dark:border-white/[0.08]' 
+                        : 'bg-primary text-white rounded-tr-none shadow-primary/10'
                       )}>
+                        {/* Internal highlight for bubbles */}
+                        {!msg.eh_admin && <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />}
+                        
                         {msg.metadados && typeof msg.metadados === 'object' && msg.metadados.imagem_url && (
-                          <div className="mb-2.5 overflow-hidden rounded-xl bg-slate-100/50 min-h-[100px] flex items-center justify-center">
+                          <div className="mb-3 overflow-hidden rounded-2xl border border-white/20 shadow-lg bg-black/[0.02]">
                             <img 
                               src={msg.metadados.imagem_url} 
                               alt="Anexo" 
-                              className="max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                              className="max-w-full h-auto cursor-pointer hover:scale-105 transition-transform duration-500"
                               onClick={() => window.open(msg.metadados.imagem_url, '_blank')}
                             />
                           </div>
                         )}
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-2">
                           <span className="break-words">{msg.conteudo}</span>
-                          {!msg.eh_admin && (
-                            <div className="flex justify-end -mb-1 -mr-1">
-                              {msg.lida ? (
-                                <CheckCheck size={13} className="text-blue-100/80" />
-                              ) : (
-                                <Check size={13} className="text-blue-100/50" />
-                              )}
-                            </div>
-                          )}
+                          
                         </div>
+                        
                       </div>
+                      <div className="flex items-center justify-between mt-1">
+                             <span className={cn(
+                                "text-[8px] font-black uppercase tracking-widest",
+                                msg.eh_admin ? "text-muted-foreground/30" : "text-white/40"
+                             )}>
+                               {new Date(msg.criado_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                             </span>
+                             {!msg.eh_admin && (
+                                <div className="flex justify-end">
+                                  {msg.lida ? (
+                                    <CheckCheck size={12} className="text-muted-foreground/30" />
+                                  ) : (
+                                    <Check size={12} className="text-muted-foreground/30" />
+                                  )}
+                                </div>
+                             )}
+                          </div>
                     </div>
                   ))}
                 </div>
@@ -505,19 +555,20 @@ export function SuportePopup() {
             </ScrollArea>
 
             {isConcluido && (
-              <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-white/60 backdrop-blur-[4px] animate-in fade-in duration-500">
-                <div className="w-full p-8 bg-white border border-slate-200/60 rounded-[2rem] text-center shadow-xl animate-in zoom-in duration-500">
-                  <div className="bg-slate-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Check className="text-[#34C759]" size={28} strokeWidth={3} />
+              <div className="absolute inset-0 z-50 flex items-center justify-center p-8 bg-white/60 dark:bg-black/60 backdrop-blur-[6px] animate-in fade-in duration-700">
+                <div className="w-full p-10 bg-white/90 dark:bg-zinc-900/90 border border-white/20 dark:border-white/[0.1] rounded-[2.5rem] text-center shadow-2xl animate-in zoom-in-95 duration-500 relative overflow-hidden">
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+                  
+                  <div className="bg-emerald-500/10 w-16 h-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/10">
+                    <Check className="text-emerald-500" size={32} strokeWidth={3} />
                   </div>
-                  <h4 className="text-slate-800 font-bold text-lg mb-1">Atendimento Finalizado</h4>
-                  <p className="text-[13px] text-slate-500 font-medium leading-relaxed mb-6">
-                    Esperamos ter ajudado! Se precisar, estamos sempre aqui.
+                  <h4 className="text-foreground font-black text-xl uppercase tracking-tight mb-2">Finalizado</h4>
+                  <p className="text-[12px] text-muted-foreground/60 font-bold leading-relaxed mb-8">
+                    Esperamos ter ajudado! Se precisar, estamos sempre aqui no ecossistema Flow63.
                   </p>
                   <Button 
                     onClick={novoAtendimento}
-                    variant="outline"
-                    className="w-full rounded-xl border-slate-200 text-slate-700 font-semibold h-11 gap-2 hover:bg-slate-50 transition-all active:scale-95"
+                    className="w-full rounded-2xl bg-primary text-white font-black uppercase text-[10px] tracking-[0.2em] h-12 gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20"
                   >
                     <RefreshCw size={14} /> Novo Chamado
                   </Button>
@@ -527,44 +578,44 @@ export function SuportePopup() {
           </div>
 
           {!isIdentifying && !isConcluido && (
-            <div className="p-4 bg-white shrink-0">
+            <div className="p-6 bg-white/40 dark:bg-white/[0.01] border-t border-black/[0.04] dark:border-white/[0.04] shrink-0 backdrop-blur-xl">
               {previewUrl && (
-                <div className="mb-3 relative inline-block animate-in zoom-in duration-200">
-                  <img src={previewUrl} alt="Preview" className="h-20 w-20 object-cover rounded-xl border border-slate-200 shadow-md" />
+                <div className="mb-4 relative inline-block animate-in zoom-in duration-300 ml-2">
+                  <img src={previewUrl} alt="Preview" className="h-24 w-24 object-cover rounded-[1.5rem] border-2 border-primary/20 shadow-2xl ring-4 ring-black/[0.02]" />
                   <button 
                     onClick={() => { setSelectedFile(null); setPreviewUrl(null); }}
-                    className="absolute -top-2 -right-2 bg-slate-800 text-white rounded-full p-1.5 shadow-lg hover:bg-black transition-colors"
+                    className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-2 shadow-lg hover:bg-rose-600 transition-all active:scale-90"
                   >
                     <X size={12} />
                   </button>
                 </div>
               )}
-              <div className="flex gap-2.5 items-center">
-                <div className="flex-1 flex gap-2 items-center bg-slate-100/80 p-1.5 rounded-[1.4rem] border border-transparent focus-within:bg-white focus-within:border-slate-200 transition-all">
+              <div className="flex gap-3 items-center">
+                <div className="flex-1 flex gap-1 items-center bg-black/[0.03] dark:bg-white/[0.03] p-1.5 rounded-[1.75rem] border border-black/[0.06] dark:border-white/[0.08] focus-within:bg-white dark:focus-within:bg-white/[0.06] focus-within:shadow-xl focus-within:shadow-primary/5 transition-all">
                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                   <Button 
                     size="icon" 
                     variant="ghost" 
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-full text-slate-400 hover:text-[#007AFF] hover:bg-white transition-colors shrink-0 h-9 w-9"
+                    className="rounded-[1.2rem] text-muted-foreground/40 hover:text-primary hover:bg-primary/5 transition-all shrink-0 h-10 w-10"
                   >
-                    <Paperclip className="h-4.5 w-4.5" />
+                    <Paperclip className="h-5 w-5" />
                   </Button>
                   <Input 
-                    placeholder="Mensagem" 
+                    placeholder="Sua mensagem..." 
                     value={mensagem} 
                     onChange={(e) => setMensagem(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && iniciarEEnviar()}
-                    className="border-none bg-transparent shadow-none focus-visible:ring-0 h-9 px-1 text-[14px] font-medium placeholder:text-slate-400"
+                    className="border-none bg-transparent shadow-none focus-visible:ring-0 h-10 px-1 text-[13px] font-bold placeholder:text-muted-foreground/30 placeholder:uppercase placeholder:tracking-widest"
                   />
                 </div>
                 <Button 
                   size="icon" 
                   onClick={iniciarEEnviar} 
                   disabled={isLoading || (!mensagem.trim() && !selectedFile)} 
-                  className="rounded-full bg-[#007AFF] hover:bg-[#0062CC] h-10 w-10 shrink-0 shadow-sm transition-all active:scale-90"
+                  className="rounded-[1.2rem] bg-primary hover:bg-primary/90 h-11 w-11 shrink-0 shadow-lg shadow-primary/20 transition-all active:scale-90"
                 >
-                  {isLoading ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <Send className="h-4 w-4 text-white" />}
+                  {isLoading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Send className="h-5 w-5 text-white" />}
                 </Button>
               </div>
             </div>
