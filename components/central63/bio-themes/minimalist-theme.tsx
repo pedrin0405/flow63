@@ -13,7 +13,11 @@ import {
   Twitter,
   Link as LinkIcon,
   ArrowUpRight,
-  Maximize2
+  Maximize2,
+  Facebook,
+  Mail,
+  Phone,
+  Music
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BioPropertyDetails } from "../bio-property-details";
@@ -31,8 +35,13 @@ const getSocialIcon = (url: string) => {
   if (lowerUrl.includes("instagram.com")) return <Instagram className="w-5 h-5" />;
   if (lowerUrl.includes("linkedin.com")) return <Linkedin className="w-5 h-5" />;
   if (lowerUrl.includes("twitter.com") || lowerUrl.includes("x.com")) return <Twitter className="w-5 h-5" />;
+  if (lowerUrl.includes("facebook.com") || lowerUrl.includes("fb.com")) return <Facebook className="w-5 h-5" />;
   if (lowerUrl.includes("github.com")) return <Github className="w-5 h-5" />;
-  if (lowerUrl.includes("youtube.com")) return <Youtube className="w-5 h-5" />;
+  if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) return <Youtube className="w-5 h-5" />;
+  if (lowerUrl.includes("tiktok.com")) return <Music className="w-5 h-5" />;
+  if (lowerUrl.includes("wa.me") || lowerUrl.includes("whatsapp.com")) return <MessageCircle className="w-5 h-5" />;
+  if (lowerUrl.startsWith("mailto:")) return <Mail className="w-5 h-5" />;
+  if (lowerUrl.startsWith("tel:")) return <Phone className="w-5 h-5" />;
   return <Globe className="w-5 h-5" />;
 };
 
@@ -64,19 +73,9 @@ const minimalCardStyle = (tema: any) => ({
 export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: ThemeProps) {
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
 
-  const socialDomains = ["instagram.com", "linkedin.com", "twitter.com", "x.com", "github.com", "youtube.com", "facebook.com", "tiktok.com"];
-
-  const socialLinks = visibleLinks?.filter(link => 
-    link.type !== "youtube" && 
-    link.type !== "spotify" && 
-    socialDomains.some(domain => link.url?.toLowerCase().includes(domain))
-  ) || [];
-
-  const regularLinks = visibleLinks?.filter(link => 
-    link.type === "youtube" || 
-    link.type === "spotify" || 
-    !socialDomains.some(domain => link.url?.toLowerCase().includes(domain))
-  ) || [];
+  // Todo link adicionado manualmente agora aparece como um botão
+  const socialLinks = []; 
+  const regularLinks = visibleLinks || [];
 
   const tema = data.tema || { 
     bg_color: "#ffffff", 
@@ -344,7 +343,7 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
                         )}
                         style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
                       >
-                        {link.type === "vcard" ? <UserPlus className="w-5 h-5" /> : <LinkIcon className="w-4 h-4" />}
+                        {link.type === "vcard" ? <UserPlus className="w-5 h-5" /> : getSocialIcon(link.url)}
                       </div>
                       <span 
                         className={cn("font-bold uppercase tracking-[2px] truncate", isPreview ? "text-[11px]" : "text-[12px]")} 

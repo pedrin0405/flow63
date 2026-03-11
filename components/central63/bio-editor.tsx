@@ -356,27 +356,45 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
       return;
     }
     
+    setLoading(true);
     const promise = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Usuário não autenticado");
 
-      const payload = {
-        ...formData,
-        user_id: user.id,
-        updated_at: new Date().toISOString()
-      };
+        // Sanitização de links para garantir que tenham protocolo (http/https)
+        const sanitizedLinks = formData.links.map((link: any) => {
+          if (link.type === "link" && link.url && !link.url.startsWith("http://") && !link.url.startsWith("https://") && !link.url.startsWith("mailto:") && !link.url.startsWith("tel:") && !link.url.startsWith("#")) {
+            return { ...link, url: `https://${link.url}` };
+          }
+          return link;
+        });
 
-      let error;
-      if (id) {
-        ({ error } = await supabase.from("bio_pages").update(payload).eq("id", id));
-      } else {
-        ({ error } = await supabase.from("bio_pages").insert([payload]));
+        const payload = {
+          ...formData,
+          links: sanitizedLinks,
+          user_id: user.id,
+          updated_at: new Date().toISOString()
+        };
+
+        let error;
+        if (id) {
+          ({ error } = await supabase.from("bio_pages").update(payload).eq("id", id));
+        } else {
+          ({ error } = await supabase.from("bio_pages").insert([payload]));
+        }
+
+        if (error) throw error;
+        
+        // Atualiza o estado local com os links sanitizados para o preview refletir a mudança
+        setFormData(prev => ({ ...prev, links: sanitizedLinks }));
+        
+        setShowSuccessModal(true);
+        router.refresh();
+        return "Página publicada!";
+      } finally {
+        setLoading(false);
       }
-
-      if (error) throw error;
-      setShowSuccessModal(true);
-      router.refresh();
-      return "Página publicada!";
     };
 
     toast.promise(promise(), {
@@ -397,11 +415,23 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
   // Lógica de Filtro para o Preview (Sincronizada com o Client)
   const now = new Date();
   const visibleLinks = formData.links.filter((link: any) => {
+    // Se não houver data definida, o link é sempre visível
     if (!link.schedule?.start && !link.schedule?.end) return true;
-    const start = link.schedule.start ? new Date(link.schedule.start) : null;
-    const end = link.schedule.end ? new Date(link.schedule.end) : null;
-    if (start && now < start) return false;
-    if (end && now > end) return false;
+    
+    try {
+      const start = link.schedule.start ? new Date(link.schedule.start) : null;
+      const end = link.schedule.end ? new Date(link.schedule.end) : null;
+      
+      // Validação de datas válidas
+      const isStartValid = start && !isNaN(start.getTime());
+      const isEndValid = end && !isNaN(end.getTime());
+
+      if (isStartValid && now < start) return false;
+      if (isEndValid && now > end) return false;
+    } catch (e) {
+      return true; // Em caso de erro na data, mostra o link por segurança
+    }
+    
     return true;
   });
 
@@ -451,7 +481,7 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
         {/* EDITOR CANVAS */}
         <main className="flex-1 overflow-y-auto p-4 md:p-10 lg:p-16 custom-scrollbar bg-white dark:bg-[#050505]">
           <div className="max-w-xl mx-auto pb-20">
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
               {activeSection === "conteudo" && (
                 <motion.div key="conteudo" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="space-y-12">
                   <section className="space-y-8">

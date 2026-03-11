@@ -18,7 +18,11 @@ import {
   ShieldCheck,
   Zap,
   ChevronRight,
-  BadgeCheck
+  BadgeCheck,
+  Facebook,
+  Mail,
+  Phone,
+  Music
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BioPropertyDetails } from "../bio-property-details";
@@ -33,12 +37,17 @@ interface ThemeProps {
 
 const getSocialIcon = (url: string) => {
   const lowerUrl = url.toLowerCase();
-  if (lowerUrl.includes("instagram.com")) return <Instagram className="w-5 h-5" />;
-  if (lowerUrl.includes("linkedin.com")) return <Linkedin className="w-5 h-5" />;
-  if (lowerUrl.includes("twitter.com") || lowerUrl.includes("x.com")) return <Twitter className="w-5 h-5" />;
-  if (lowerUrl.includes("github.com")) return <Github className="w-5 h-5" />;
-  if (lowerUrl.includes("youtube.com")) return <Youtube className="w-5 h-5" />;
-  return <Globe className="w-5 h-5" />;
+  if (lowerUrl.includes("instagram.com")) return <Instagram className="w-[22px] h-[22px]" />;
+  if (lowerUrl.includes("linkedin.com")) return <Linkedin className="w-[22px] h-[22px]" />;
+  if (lowerUrl.includes("twitter.com") || lowerUrl.includes("x.com")) return <Twitter className="w-[22px] h-[22px]" />;
+  if (lowerUrl.includes("facebook.com") || lowerUrl.includes("fb.com")) return <Facebook className="w-[22px] h-[22px]" />;
+  if (lowerUrl.includes("github.com")) return <Github className="w-[22px] h-[22px]" />;
+  if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) return <Youtube className="w-[22px] h-[22px]" />;
+  if (lowerUrl.includes("tiktok.com")) return <Music className="w-[22px] h-[22px]" />;
+  if (lowerUrl.includes("wa.me") || lowerUrl.includes("whatsapp.com")) return <MessageCircle className="w-[22px] h-[22px]" />;
+  if (lowerUrl.startsWith("mailto:")) return <Mail className="w-[22px] h-[22px]" />;
+  if (lowerUrl.startsWith("tel:")) return <Phone className="w-[22px] h-[22px]" />;
+  return <Globe className="w-[22px] h-[22px]" />;
 };
 
 const getYouTubeEmbed = (url: string) => {
@@ -58,7 +67,6 @@ const getSpotifyEmbed = (url: string) => {
   return url;
 };
 
-// --- Estilos Base do Apple Glass OBSIDIAN ---
 const glassPanelStyle = (tema: any) => {
   const isDark = tema.bg_color === "#050505" || tema.bg_color === "#000000" || tema.text_color === "#ffffff";
   const baseColor = isDark ? "255,255,255" : "0,0,0";
@@ -102,41 +110,23 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
 
   const isDark = tema.bg_color === "#050505" || tema.bg_color === "#000000" || tema.text_color === "#ffffff";
 
+  const socialLinks = []; 
+  const regularLinks = visibleLinks || [];
+
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  const springX = useSpring(mouseX, { stiffness: 100, damping: 20 });
-  const springY = useSpring(mouseY, { stiffness: 100, damping: 20 });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const { left, top } = containerRef.current.getBoundingClientRect();
-      mouseX.set(e.clientX - left);
-      mouseY.set(e.clientY - top);
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY]);
-
-  const socialDomains = ["instagram.com", "linkedin.com", "twitter.com", "x.com", "github.com", "youtube.com", "facebook.com", "tiktok.com"];
-
-  const socialLinks = visibleLinks?.filter(link => 
-    link.type !== "youtube" && 
-    link.type !== "spotify" && 
-    socialDomains.some(domain => link.url?.toLowerCase().includes(domain))
-  ) || [];
-
-  const regularLinks = visibleLinks?.filter(link => 
-    link.type === "youtube" || 
-    link.type === "spotify" || 
-    !socialDomains.some(domain => link.url?.toLowerCase().includes(domain))
-  ) || [];
-
-  const springTransition = { type: "spring", stiffness: 110, damping: 18, mass: 0.8 };
+  const springX = useSpring(mouseX, { stiffness: 500, damping: 50 });
+  const springY = useSpring(mouseY, { stiffness: 500, damping: 50 });
+  const springTransition = { type: "spring", stiffness: 400, damping: 30 };
 
   return (
     <div 
       ref={containerRef}
+      onMouseMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        mouseX.set(e.clientX - rect.left);
+        mouseY.set(e.clientY - rect.top);
+      }}
       className={cn(
         "w-full font-sans overflow-x-hidden relative transition-colors duration-700 group/body",
         isPreview ? "min-h-full bg-transparent" : "min-h-screen",
@@ -181,7 +171,7 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
               transition={springTransition}
               className={cn(
                 "relative w-full rounded-[2.5rem] overflow-hidden group/card shadow-[0_0_100px_-20px_rgba(0,0,0,0.5)]",
-                isPreview ? "p-6" : "p-10"
+                isPreview ? "px-6 py-8" : "p-10"
               )}
               style={glassPanelStyle(tema)}
             >
@@ -207,16 +197,16 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                 <motion.div 
                   whileHover={{ scale: 1.05, y: -5 }}
                   transition={springTransition}
-                  className="relative group/photo cursor-pointer mb-6"
+                  className="relative group/photo cursor-pointer mb-3"
                 >
                   <div className="absolute inset-0 rounded-full blur-2xl opacity-40 group-hover/photo:opacity-70 transition-opacity animate-pulse" style={{ backgroundColor: tema.button_bg }} />
-                  <div className="p-1 rounded-full relative bg-white/5 backdrop-blur-md border border-white/10 shadow-inner">
+                  <div className="p-[3px] rounded-full relative bg-white/5 backdrop-blur-md border border-white/10 shadow-inner">
                     <img 
                       src={data.foto_url || "/placeholder-user.jpg"} 
                       alt={data.nome}
                       className={cn(
-                        "mx-auto rounded-full object-cover border-4 border-white shadow-xl",
-                        isPreview ? "w-20 h-20" : "w-28 h-28"
+                        "mx-auto rounded-full object-cover border-[3px] border-transparent shadow-xl",
+                        isPreview ? "w-16 h-16" : "w-16 h-16 lg:w-20 lg:h-20"
                       )}
                       style={{ objectPosition: tema.foto_posicao || "center" }}
                     />
@@ -227,32 +217,29 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4, ...springTransition }}
+                  className="flex flex-col items-center w-full"
                 >
                   <h2 
-                    className="text-[11px] font-black uppercase tracking-[5px] inline-flex items-center gap-2 px-3 py-1 rounded-full border"
-                    style={{ 
-                      color: `${tema.text_color}80`, 
-                      backgroundColor: `${tema.text_color}05`,
-                      borderColor: `${tema.text_color}10`
-                    }}
+                    className="text-[14px] lg:text-[15px] font-medium opacity-80 mb-2"
+                    style={{ color: tema.text_color }}
                   >
-                    {data.headline || "Bem-vindo à minha bio!"}
+                    {data.nome} 
                   </h2>
 
                   <h1 
                     className={cn(
-                      "mt-4 mb-4 font-black leading-[1.1] tracking-tighter drop-shadow-sm",
-                      isPreview ? "text-[22px]" : "text-4xl"
+                      "mb-3 font-bold leading-[1.15] tracking-tight drop-shadow-sm text-balance max-w-[90%]",
+                      isPreview ? "text-[28px]" : "text-3xl lg:text-[34px]"
                     )}
                     style={{ color: tema.text_color }}
                   >
-                    {data.nome} 
+                    {data.headline || "Bem-vindo à minha bio!"}
                   </h1>
 
                   <p 
                     className={cn(
-                      "leading-relaxed opacity-70 font-light",
-                      isPreview ? "text-[13px] px-2" : "text-[16px] px-4"
+                      "leading-relaxed opacity-70 font-normal",
+                      isPreview ? "text-[14px] px-2" : "text-[15px] px-4"
                     )}
                     style={{ color: tema.text_color }}
                   >
@@ -264,20 +251,21 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                   <motion.a 
                     href={`https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message)}`}
                     target="_blank"
-                    whileHover={{ scale: 1.02, y: -3 }}
+                    whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
-                    className="mt-8 w-full py-4 rounded-2xl flex items-center justify-center gap-0 font-black text-[11px] uppercase tracking-[3px] transition-all relative overflow-hidden group/btn shadow-[0_15px_40px_-10px_rgba(0,0,0,0.3)]"
+                    className="mt-6 px-8 py-3.5 rounded-full flex items-center justify-center gap-2.5 font-medium text-[14px] transition-all relative overflow-hidden group/btn shadow-[0_10px_30px_-10px_rgba(0,0,0,0.2)]"
                     style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
                   >
                     <div className="absolute inset-0 bg-white/30 translate-x-[-150%] group-hover/btn:translate-x-[150%] transition-transform duration-1000 skew-x-[-25deg]" />
-                    <MessageCircle className="w-5 h-5 mr-3 fill-white/10" />
-                    <span className="relative z-10">WhatsApp</span>
+                    <MessageCircle className="w-4 h-4 fill-white/10" />
+                    <span className="relative z-10 whitespace-nowrap">
+                      Say hi to {data.nome?.split(' ')[0] || "me"}
+                    </span>
                   </motion.a>
                 )}
               </div>
             </motion.div>
 
-            {/* Desktop Social - Micro Glass Pills */}
             {socialLinks.length > 0 && !isPreview && (
               <div className="hidden lg:flex flex-wrap items-center justify-center gap-4 mt-8 px-4">
                 {socialLinks.map((link: any, index: number) => (
@@ -304,13 +292,13 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
         <div className="flex-1 w-full flex flex-col">
 
           {socialLinks.length > 0 && (
-            <div className={cn("flex flex-wrap items-center justify-center gap-4 mt-6", !isPreview && "lg:hidden mb-8")}>
+            <div className={cn("flex flex-wrap items-center justify-center gap-6 mt-6 mb-2", !isPreview && "lg:hidden")}>
               {socialLinks.map((link: any, index: number) => (
                 <a 
                   key={`m-${index}`}
                   href={link.url}
-                  className="p-3.5 rounded-xl border backdrop-blur-md active:scale-95 transition-transform"
-                  style={{ color: tema.text_color, backgroundColor: `${tema.text_color}05`, borderColor: `${tema.text_color}10` }}
+                  className="p-1 opacity-60 hover:opacity-100 active:scale-95 transition-all"
+                  style={{ color: tema.text_color }}
                 >
                   {getSocialIcon(link.url)}
                 </a>
@@ -319,60 +307,62 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
           )}
 
           {data.featured_properties?.enabled && data.featured_properties.items?.length > 0 && (
-            <div className={cn(isPreview ? "mt-6" : "mt-8 lg:mt-0")}>
-              <div className="flex items-center justify-between mb-5 px-1 relative">
-                <div 
-                  className="absolute left-0 top-0 bottom-0 w-1 rounded-full" 
-                  style={{ background: `linear-gradient(to b, transparent, ${tema.text_color}20, transparent)` }}
-                />
-                <div className="pl-4">
-                  <h4 className="text-xl font-extrabold tracking-tighter" style={{ color: tema.text_color }}>Oportunidades</h4>
-                </div>
+            <div className={cn(isPreview ? "mt-4" : "mt-8 lg:mt-0")}>
+              
+              {/* Título de Oportunidades - Visual Fiel à Imagem */}
+              <div className="flex items-center justify-between mb-4 px-1">
+                <h4 className="text-[20px] font-bold tracking-tight" style={{ color: tema.text_color }}>Oportunidades</h4>
                 <motion.div 
                   whileHover={{ rotate: 180 }} 
-                  className="p-2.5 rounded-full border opacity-60 hover:opacity-100 cursor-pointer"
+                  className="w-10 h-10 rounded-full border opacity-80 hover:opacity-100 cursor-pointer flex items-center justify-center transition-opacity"
                   style={{ backgroundColor: `${tema.text_color}05`, borderColor: `${tema.text_color}10` }}
                 >
                     <Sparkles className="w-4 h-4 text-amber-300" />
                 </motion.div>
               </div>
 
-              <div className={cn(
-                "flex pb-6 snap-x snap-mandatory scrollbar-hide gap-4",
-                isPreview ? "overflow-x-auto" : "overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:px-0"
-              )}>
-                {data.featured_properties.items.map((imovel: any, idx: number) => (
-                  <motion.div 
-                    key={imovel.id} 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.15 + 0.3, ...springTransition }}
-                    whileHover={{ y: -6, scale: 1.01 }}
-                    onClick={() => setSelectedProperty(imovel)}
-                    className={cn(
-                      "shrink-0 snap-center relative rounded-[2rem] overflow-hidden cursor-pointer group shadow-[0_30px_70px_-15px_rgba(0,0,0,0.5)] border",
-                      isPreview ? "w-[180px] h-[240px]" : "min-w-[260px] w-full h-[320px]"
-                    )}
-                    style={{ borderColor: `${tema.text_color}10` }}
-                  >
-                    <img src={imovel.imagem} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent opacity-90 group-hover:opacity-100 transition-opacity duration-700" />
-                    <div className="absolute bottom-0 left-0 right-0 p-5 transform transition-transform duration-700 ease-out group-hover:translate-y-[-5px]">
-                      <h4 className="text-white font-bold text-[16px] leading-tight mb-2 drop-shadow-md line-clamp-2">{imovel.titulo}</h4>
-                      <div className="flex items-center gap-3 group-hover:gap-4 transition-all">
-                         <div className="h-px w-6 bg-white/30" />
-                         <p className="text-white/70 text-[10px] font-bold uppercase tracking-[2px] truncate">{imovel.preco || imovel.localizacao}</p>
-                         <Maximize2 className="w-3.5 h-3.5 text-white/40 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+              {/* Container de Scroll Horizontal */}
+              <div className="-mx-4 lg:mx-0">
+                <div className={cn(
+                  "flex pb-6 snap-x snap-mandatory scrollbar-hide gap-4 px-4 lg:px-0",
+                  isPreview ? "overflow-x-auto" : "overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-x-visible"
+                )}>
+                  {data.featured_properties.items.map((imovel: any, idx: number) => (
+                    <motion.div 
+                      key={imovel.id} 
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.15 + 0.3, ...springTransition }}
+                      whileHover={{ y: -6, scale: 1.01 }}
+                      onClick={() => setSelectedProperty(imovel)}
+                      className={cn(
+                        "shrink-0 snap-start relative rounded-[1.5rem] overflow-hidden cursor-pointer group shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)] border",
+                        // A CORREÇÃO DEFINITIVA DO PEEK EFFECT:
+                        // 'calc(100% - 4rem)' força a largura a ser sempre o tamanho da tela MENOS um espaço exato de sobra, criando o peek.
+                        isPreview ? "w-[calc(100%-2.5rem)] h-[280px]" : "w-[calc(100%-4rem)] sm:w-[320px] lg:w-full h-[320px]"
+                      )}
+                      style={{ borderColor: `${tema.text_color}10` }}
+                    >
+                      <img src={imovel.imagem} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-90 group-hover:opacity-100 transition-opacity duration-700" />
+                      
+                      {/* Footer do Card - Visual Fiel à Imagem Casa Caribe */}
+                      <div className="absolute bottom-0 left-0 right-0 p-5 transform transition-transform duration-700 ease-out group-hover:translate-y-[-4px]">
+                        <h4 className="text-white font-bold text-[17px] leading-tight mb-2 drop-shadow-md truncate">{imovel.titulo}</h4>
+                        <div className="flex items-center gap-3">
+                           <div className="w-6 h-[1px] bg-white/40" /> {/* A linha horizontal sutil antes do preço */}
+                           <p className="text-white/80 text-[12px] font-semibold tracking-widest uppercase truncate">{imovel.preco || imovel.localizacao}</p>
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
 
           {regularLinks.length > 0 && (
-            <div className={cn("flex flex-col gap-3.5", isPreview ? "mt-4" : "mt-8")}>
+            <div className={cn("flex flex-col gap-3.5", isPreview ? "mt-2" : "mt-8")}>
               {regularLinks.map((link: any, index: number) => {
                 if (link.type === "youtube" || link.type === "spotify") {
                   return (
@@ -388,7 +378,7 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover/player:translate-x-[100%] transition-transform duration-1000" />
                         <div className="flex items-center gap-3 z-10">
                           <div className={cn("w-2 h-2 rounded-full animate-pulse", link.type === "youtube" ? "bg-red-500" : "bg-emerald-500")} />
-                          <span className="font-black uppercase tracking-[2px] text-[10px] opacity-70" style={{ color: tema.text_color }}>
+                          <span className="font-bold uppercase tracking-[2px] text-[10px] opacity-70" style={{ color: tema.text_color }}>
                             {link.type === "youtube" ? "Conteúdo Exclusivo" : "Podcast / Áudio"}
                           </span>
                         </div>
@@ -428,7 +418,7 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                         style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
                       >
                          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-black/20" />
-                         {link.type === "vcard" ? <UserPlus className="w-5 h-5" /> : <LinkIcon className="w-4 h-4 opacity-90" />}
+                         {link.type === "vcard" ? <UserPlus className="w-5 h-5" /> : getSocialIcon(link.url)}
                       </motion.div>
                       <div className="flex flex-col">
                         <span className="font-extrabold text-[13px] uppercase tracking-[2px] transition-colors" style={{ color: tema.text_color }}>
