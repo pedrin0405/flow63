@@ -236,7 +236,7 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                       borderColor: `${tema.text_color}10`
                     }}
                   >
-                    <Zap className="w-3 h-3 fill-current text-amber-400" /> {data.headline || "Alta Performance"}
+                    {data.headline || "Bem-vindo à minha bio!"}
                   </h2>
 
                   <h1 

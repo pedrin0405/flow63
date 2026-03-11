@@ -38,9 +38,10 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/forgot-password')
   const isPublicFormRoute = path.startsWith('/forms/') && path !== '/forms'
+  const isPublicBioRoute = path.startsWith('/bio/')
 
   // Proteção básica de rotas não logadas
-  if (!session && !isAuthRoute && !isPublicFormRoute) {
+  if (!session && !isAuthRoute && !isPublicFormRoute && !isPublicBioRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

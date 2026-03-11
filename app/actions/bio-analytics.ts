@@ -1,30 +1,60 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 
+// Cliente administrativo para bypassar RLS em ações de sistema
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
+);
+
+/**
+ * Incrementa o contador de visualizações de uma Bio
+ * Esta função roda no servidor para garantir permissões e evitar race conditions
+ */
 export async function trackBioView(bioId: string) {
-  const { data, error } = await supabase.rpc('increment_bio_views', { bio_id: bioId });
-  if (error) {
-    // Se a RPC falhar, tentamos update direto (menos eficiente mas estável)
-    await supabase
-      .from('bio_pages')
-      .update({ views_count: supabase.rpc('increment') as any })
-      .eq('id', bioId);
+  if (!bioId) return;
+
+  try {
+    // Chamada à função SQL que criamos no passo 1
+    const { error } = await supabaseAdmin.rpc('increment_bio_views', { bio_id: bioId });
+    
+    if (error) {
+      console.error("Erro RPC increment_bio_views:", error);
+      
+      // Fallback: Tentativa de update direto via admin client (caso a RPC ainda não exista)
+      await supabaseAdmin
+        .from('bio_pages')
+        .select('views_count')
+        .eq('id', bioId)
+        .single()
+        .then(async ({ data }) => {
+          if (data) {
+            await supabaseAdmin
+              .from('bio_pages')
+              .update({ views_count: (data.views_count || 0) + 1 })
+              .eq('id', bioId);
+          }
+        });
+    }
+  } catch (error) {
+    console.error("Erro crítico ao rastrear visualização:", error);
   }
 }
 
 export async function trackBioClick(bioId: string, linkIndex: number) {
-  // Em um cenário real, poderíamos ter uma tabela de cliques.
-  // Por simplicidade, vamos apenas registrar no console ou 
-  // poderíamos incrementar um contador JSONB se a estrutura permitir.
-  console.log(`Click tracked for bio ${bioId}, link ${linkIndex}`);
-  
-  // Exemplo de como incrementar visualizações totais (chamado no carregamento da página)
-  // await supabase.rpc('increment_bio_views', { row_id: bioId });
+  // Log de cliques (pode ser expandido para uma tabela de analytics futuramente)
+  console.log(`Link index ${linkIndex} clicado na bio ${bioId}`);
 }
 
 export async function saveBioLead(bioId: string, leadData: { nome: string, email: string, telefone?: string }) {
-  const { data, error } = await supabase
+  const { error } = await supabaseAdmin
     .from("bio_leads")
     .insert([{
       bio_id: bioId,
@@ -33,7 +63,7 @@ export async function saveBioLead(bioId: string, leadData: { nome: string, email
     }]);
 
   if (error) {
-    console.error("Erro ao salvar lead da bio:", error);
+    console.error("Erro ao salvar lead:", error);
     return { success: false, error: error.message };
   }
 

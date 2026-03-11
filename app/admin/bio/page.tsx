@@ -59,16 +59,18 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 
-// ─── Mini Bio Preview Real (Clamping Total) ───────────────────────────
+// ─── Mini Bio Preview Real (Clamping Total V2) ────────────────────────
 function MiniBioPreview({ page }: { page: any }) {
   const url = `/bio/${page.slug}?isPreview=true`;
   
+  // Constantes de hardware para clipping perfeito
   const width = 115;
   const height = 243;
-  const padding = 5;
-  const screenWidth = width - (padding * 2);
+  const padding = 6; // Aumentado levemente para selar melhor
+  const screenWidth = width - (padding * 2); 
   const screenHeight = height - (padding * 2);
   
+  // Escala baseada em viewport mobile de 400px
   const virtualWidth = 400;
   const scale = screenWidth / virtualWidth;
   const virtualHeight = screenHeight / scale;
@@ -78,9 +80,17 @@ function MiniBioPreview({ page }: { page: any }) {
       className="relative bg-[#050505] rounded-[2.2rem] shadow-2xl transition-all duration-500 group-hover:scale-110 group-hover:-rotate-2 group/phone ring-1 ring-white/10 overflow-hidden"
       style={{ width: `${width}px`, height: `${height}px`, padding: `${padding}px` }}
     >
+      {/* Notch */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-3 bg-[#050505] rounded-b-xl z-30" />
       
-      <div className="w-full h-full overflow-hidden rounded-[1.8rem] bg-zinc-950 relative">
+      {/* Tela do Celular com Clipping Reforçado */}
+      <div 
+        className="w-full h-full overflow-hidden rounded-[1.6rem] bg-zinc-950 relative"
+        style={{ 
+          maskImage: 'radial-gradient(white, black)', // Força o hardware a respeitar o border-radius
+          WebkitMaskImage: '-webkit-radial-gradient(white, black)',
+        }}
+      >
         <iframe 
           src={url} 
           className="border-none pointer-events-none select-none absolute top-0 left-0"
@@ -94,9 +104,13 @@ function MiniBioPreview({ page }: { page: any }) {
         />
       </div>
 
-      <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-8 h-1 bg-white/20 rounded-full z-30" />
+      {/* Home Bar */}
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-white/20 rounded-full z-30" />
+
+      {/* Camada de Vidro */}
       <div className="absolute inset-0 z-20 pointer-events-none bg-gradient-to-tr from-white/10 via-transparent to-transparent opacity-20" />
 
+      {/* Badge Live */}
       <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/90 backdrop-blur-md rounded-full border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity z-40">
         <span className="w-1 h-1 bg-white rounded-full animate-pulse" />
         <span className="text-[7px] font-black text-white uppercase">Live</span>
