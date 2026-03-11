@@ -64,18 +64,34 @@ const getSpotifyEmbed = (url: string) => {
   return url;
 };
 
-// --- Estilos Base Minimalista (Substitui o Apple Glass) ---
+// --- Estilos Base Minimalista ---
 const minimalCardStyle = (tema: any) => ({
-  backgroundColor: `${tema.text_color}05`, // 5% de opacidade da cor do texto (funciona no claro/escuro)
-  border: `1px solid ${tema.text_color}15`, // Borda fina de 15% de opacidade
+  backgroundColor: `${tema.text_color}05`, 
+  border: `1px solid ${tema.text_color}15`, 
 });
 
 export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: ThemeProps) {
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
 
-  // Todo link adicionado manualmente agora aparece como um botão
-  const socialLinks = []; 
-  const regularLinks = visibleLinks || [];
+  // ========================================================
+  // LÓGICA RESTAURADA: Separação automática das Redes Sociais
+  // ========================================================
+  const socialDomains = [
+    "instagram.com", "linkedin.com", "twitter.com", "x.com", 
+    "github.com", "youtube.com", "facebook.com", "tiktok.com"
+  ];
+
+  const socialLinks = visibleLinks?.filter(link => 
+    link.type !== "youtube" && 
+    link.type !== "spotify" && 
+    socialDomains.some(domain => link.url?.toLowerCase().includes(domain))
+  ) || [];
+
+  const regularLinks = visibleLinks?.filter(link => 
+    link.type === "youtube" || 
+    link.type === "spotify" || 
+    !socialDomains.some(domain => link.url?.toLowerCase().includes(domain))
+  ) || [];
 
   const tema = data.tema || { 
     bg_color: "#ffffff", 
@@ -218,38 +234,44 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
                 <h3 className="text-[11px] font-bold uppercase tracking-[3px] opacity-60" style={{ color: tema.text_color }}>Portfólio</h3>
               </div>
 
-              {/* GRID RESPONSIVO */}
-              <div className={cn(
-                "flex pb-6 snap-x snap-mandatory scrollbar-hide",
-                isPreview ? "gap-4 overflow-x-auto" : "gap-4 overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0"
-              )}>
-                {data.featured_properties.items.map((imovel: any) => (
-                  <motion.div 
-                    key={imovel.id} 
-                    whileHover={{ y: -4 }}
-                    onClick={() => setSelectedProperty(imovel)}
-                    className={cn(
-                      "shrink-0 snap-center relative rounded-[2rem] overflow-hidden group cursor-pointer",
-                      isPreview ? "w-[180px] h-[240px]" : "min-w-[260px] w-full lg:w-auto h-[320px]"
-                    )}
-                    style={minimalCardStyle(tema)}
-                  >
-                    <div className="absolute inset-2 rounded-[1.5rem] overflow-hidden bg-black/5">
-                      <img src={imovel.imagem} alt={imovel.titulo} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
-                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-300" />
-                    </div>
+              {/* ======================================================== */}
+              {/* RESPONSIVIDADE CORRIGIDA DOS CARDS DE PORTFÓLIO */}
+              {/* ======================================================== */}
+              <div className="w-full relative">
+                <div className={cn(
+                  "flex pt-2 pb-6 snap-x snap-mandatory gap-4",
+                  "overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0 lg:pt-0",
+                  "[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/40 [&::-webkit-scrollbar-thumb]:rounded-full",
+                  "[scrollbar-width:thin] [scrollbar-color:rgba(156,163,175,0.4)_transparent]"
+                )}>
+                  {data.featured_properties.items.map((imovel: any) => (
+                    <motion.div 
+                      key={imovel.id} 
+                      whileHover={{ y: -4 }}
+                      onClick={() => setSelectedProperty(imovel)}
+                      className={cn(
+                        "flex-none snap-start relative rounded-[2rem] overflow-hidden group cursor-pointer",
+                        isPreview ? "w-[240px] h-[280px]" : "w-[260px] sm:w-[280px] lg:w-full h-[320px]"
+                      )}
+                      style={minimalCardStyle(tema)}
+                    >
+                      <div className="absolute inset-2 rounded-[1.5rem] overflow-hidden bg-black/5">
+                        <img src={imovel.imagem} alt={imovel.titulo} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
+                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-300" />
+                      </div>
 
-                    <div className="absolute top-5 right-5 p-2 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-all shadow-sm">
-                      <Maximize2 className="w-4 h-4 text-black" />
-                    </div>
+                      <div className="absolute top-5 right-5 p-2 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-all shadow-sm">
+                        <Maximize2 className="w-4 h-4 text-black" />
+                      </div>
 
-                    {/* Caixa de Texto Clean no Rodapé do Imóvel */}
-                    <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl shadow-lg" style={{ backgroundColor: tema.bg_color }}>
-                      <h4 className="font-bold text-[14px] leading-tight mb-1 line-clamp-2" style={{ color: tema.text_color }}>{imovel.titulo}</h4>
-                      <p className="opacity-60 text-[10px] font-bold uppercase tracking-[1px] truncate" style={{ color: tema.text_color }}>{imovel.preco || imovel.localizacao}</p>
-                    </div>
-                  </motion.div>
-                ))}
+                      {/* Caixa de Texto Clean no Rodapé do Imóvel */}
+                      <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl shadow-lg" style={{ backgroundColor: tema.bg_color }}>
+                        <h4 className="font-bold text-[14px] leading-tight mb-1 line-clamp-2" style={{ color: tema.text_color }}>{imovel.titulo}</h4>
+                        <p className="opacity-60 text-[10px] font-bold uppercase tracking-[1px] truncate" style={{ color: tema.text_color }}>{imovel.preco || imovel.localizacao}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

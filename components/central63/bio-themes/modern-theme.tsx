@@ -67,10 +67,23 @@ const getSpotifyEmbed = (url: string) => {
 export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: ThemeProps) {
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
 
-  // Todo link adicionado manualmente agora aparece como um botão (regularLinks)
-  // Deixamos apenas as redes sociais automáticas (se existirem no futuro no payload específico) para ícones
-  const socialLinks = []; // Desativando a separação automática por domínio
-  const regularLinks = visibleLinks || [];
+  // Lógica restaurada: Identifica redes sociais automaticamente e separa dos botões comuns
+  const socialDomains = [
+    "instagram.com", "linkedin.com", "twitter.com", "x.com", 
+    "github.com", "youtube.com", "facebook.com", "tiktok.com"
+  ];
+
+  const socialLinks = visibleLinks?.filter(link => 
+    link.type !== "youtube" && 
+    link.type !== "spotify" && 
+    socialDomains.some(domain => link.url?.toLowerCase().includes(domain))
+  ) || [];
+
+  const regularLinks = visibleLinks?.filter(link => 
+    link.type === "youtube" || 
+    link.type === "spotify" || 
+    !socialDomains.some(domain => link.url?.toLowerCase().includes(domain))
+  ) || [];
 
   const tema = data.tema || { 
     bg_color: "#050505", 
@@ -223,34 +236,38 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
                 <span className="text-[9px] font-black uppercase tracking-widest opacity-40 cursor-pointer hover:opacity-80 transition-opacity">exclusivos</span>
               </div>
 
-              {/* GRID RESPONSIVO: Scroll no mobile, Grid no Desktop */}
-              <div className={cn(
-                "flex pb-6 snap-x snap-mandatory scrollbar-hide",
-                isPreview ? "gap-4 overflow-x-auto" : "gap-4 overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0"
-              )}>
-                {data.featured_properties.items.map((imovel: any) => (
-                  <motion.div 
-                    key={imovel.id} 
-                    whileHover={{ y: -6 }}
-                    onClick={() => setSelectedProperty(imovel)}
-                    className={cn(
-                      "shrink-0 snap-center relative rounded-[2rem] overflow-hidden shadow-2xl group cursor-pointer border border-white/10",
-                      isPreview ? "w-[180px] h-[240px]" : "min-w-[260px] w-full lg:w-auto h-[320px]"
-                    )}
-                  >
-                    <img src={imovel.imagem} alt={imovel.titulo} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+              <div className="w-full relative">
+                <div className={cn(
+                  "flex pt-2 pb-6 snap-x snap-mandatory gap-4",
+                  "overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0 lg:pt-0",
+                  // Classes para customizar a Scrollbar, a deixando com estilo "Glass"
+                  "[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full",
+                  "[scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]"
+                )}>
+                  {data.featured_properties.items.map((imovel: any) => (
+                    <motion.div 
+                      key={imovel.id} 
+                      whileHover={{ y: -6 }}
+                      onClick={() => setSelectedProperty(imovel)}
+                      className={cn(
+                        "flex-none snap-start relative rounded-[2rem] overflow-hidden shadow-2xl group cursor-pointer border border-white/10",
+                        isPreview ? "w-[240px] h-[280px]" : "w-[260px] sm:w-[280px] lg:w-full h-[320px]"
+                      )}
+                    >
+                      <img src={imovel.imagem} alt={imovel.titulo} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
-                    <div className="absolute top-4 right-4 p-2 rounded-full bg-white/10 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all">
-                      <Maximize2 className="w-4 h-4 text-white" />
-                    </div>
+                      <div className="absolute top-4 right-4 p-2 rounded-full bg-white/10 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all">
+                        <Maximize2 className="w-4 h-4 text-white" />
+                      </div>
 
-                    <div className="absolute bottom-5 left-5 right-5">
-                      <h4 className="text-white font-bold text-[16px] leading-tight mb-1 line-clamp-2">{imovel.titulo}</h4>
-                      <p className="text-white/60 text-[10px] font-bold uppercase tracking-[2px] truncate">{imovel.preco || imovel.localizacao}</p>
-                    </div>
-                  </motion.div>
-                ))}
+                      <div className="absolute bottom-5 left-5 right-5">
+                        <h4 className="text-white font-bold text-[16px] leading-tight mb-1 line-clamp-2">{imovel.titulo}</h4>
+                        <p className="text-white/60 text-[10px] font-bold uppercase tracking-[2px] truncate">{imovel.preco || imovel.localizacao}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -388,7 +405,7 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
           className={cn(
             "fixed rounded-full flex items-center justify-center shadow-2xl z-[100] transition-all bottom-8 right-8 w-16 h-16"
           )}
-          style={{ backgroundColor: "#25D366", color: "#ffffff" }}
+          style={{ backgroundColor: "#038432", color: "#ffffff" }}
         >
           <MessageCircle className="w-8 h-8" />
           <span className="absolute -top-1 -right-1 flex h-4 w-4">
