@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
-import { CheckCircle2, AlertCircle, FileText, Calendar as CalendarIcon, MapPin, Clock, ShieldCheck, Phone, Mail } from "lucide-react"
+import { CheckCircle2, AlertCircle, FileText, Calendar as CalendarIcon, MapPin, Clock, ShieldCheck, Phone, Mail, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -50,7 +50,7 @@ export default function PublicFormPage() {
     nome: "",
     email: "",
     telefone: "",
-    endereco: "",
+    enderecos: [""],
     tipo: "",
     prazo: "",
     termo_1: false,
@@ -104,6 +104,23 @@ export default function PublicFormPage() {
     }));
   };
 
+  const handleEnderecoChange = (index: number, value: string) => {
+    const newEnderecos = [...formData.enderecos];
+    newEnderecos[index] = value;
+    setFormData(prev => ({ ...prev, enderecos: newEnderecos }));
+  };
+
+  const addEndereco = () => {
+    setFormData(prev => ({ ...prev, enderecos: [...prev.enderecos, ""] }));
+  };
+
+  const removeEndereco = (index: number) => {
+    if (formData.enderecos.length > 1) {
+      const newEnderecos = formData.enderecos.filter((_, i) => i !== index);
+      setFormData(prev => ({ ...prev, enderecos: newEnderecos }));
+    }
+  };
+
   const handleCheckboxChange = (checked: boolean, name: string) => {
     setFormData(prev => ({ ...prev, [name]: checked }))
   }
@@ -130,7 +147,7 @@ export default function PublicFormPage() {
           nome: formData.nome,
           email: formData.email,
           telefone: formData.telefone,
-          endereco: formData.endereco,
+          endereco: formData.enderecos.filter(e => e.trim() !== "").join('\n'),
           tipo: formData.tipo,
           prazo: formData.prazo,
           termo_1: formData.termo_1,
@@ -304,19 +321,47 @@ export default function PublicFormPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="endereco" className="font-bold text-gray-700">Endereço</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                    <Input 
-                      id="endereco" 
-                      name="endereco"
-                      placeholder="Rua, Número, Bairro, Cidade - UF" 
-                      className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 focus:bg-white transition-all"
-                      value={formData.endereco}
-                      onChange={handleInputChange}
-                      required
-                    />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Label className="font-bold text-gray-700">Endereço(s)</Label>
+                    <Button 
+                      type="button" 
+                      onClick={addEndereco}
+                      variant="outline"
+                      size="icon"
+                      className="h-6 w-6 rounded-full border-primary/30 text-primary hover:bg-primary/5 transition-all active:scale-90"
+                      title="Adicionar outro endereço"
+                    >
+                      <Plus size={14} />
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {formData.enderecos.map((endereco, index) => (
+                      <div key={index} className="flex gap-2 animate-in slide-in-from-top-1 duration-200">
+                        <div className="relative flex-1">
+                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                          <Input 
+                            placeholder="Rua, Número, Bairro, Cidade - UF" 
+                            className="pl-10 h-12 rounded-xl bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                            value={endereco}
+                            onChange={(e) => handleEnderecoChange(index, e.target.value)}
+                            required
+                          />
+                        </div>
+                        {formData.enderecos.length > 1 && (
+                          <Button 
+                            type="button" 
+                            onClick={() => removeEndereco(index)}
+                            variant="ghost"
+                            size="icon"
+                            className="h-12 w-12 rounded-xl text-destructive hover:bg-destructive/10 shrink-0"
+                          >
+                            <Trash2 size={18} />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

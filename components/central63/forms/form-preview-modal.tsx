@@ -205,9 +205,9 @@ export function FormPreviewModal({ isOpen, onClose, formId, basicInfo }: FormPre
                     
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1">
-                        <MapPin size={12} /> Endereço
+                        <MapPin size={12} /> Endereço(s)
                       </label>
-                      <div className="text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-zinc-900 p-3.5 rounded-xl border border-slate-100 dark:border-zinc-800 leading-relaxed">
+                      <div className="text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-zinc-900 p-3.5 rounded-xl border border-slate-100 dark:border-zinc-800 leading-relaxed whitespace-pre-line">
                         {details.endereco || "Não informado"}
                       </div>
                     </div>
