@@ -73,9 +73,6 @@ const minimalCardStyle = (tema: any) => ({
 export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: ThemeProps) {
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
 
-  // ========================================================
-  // LÓGICA RESTAURADA: Separação automática das Redes Sociais
-  // ========================================================
   const socialDomains = [
     "instagram.com", "linkedin.com", "twitter.com", "x.com", 
     "github.com", "youtube.com", "facebook.com", "tiktok.com"
@@ -99,6 +96,9 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
     button_bg: "#000000", 
     button_text: "#ffffff" 
   };
+
+  // Logic: Show button if enabled AND (has number OR is in preview mode)
+  const showWhatsApp = data.whatsapp?.enabled && (data.whatsapp?.number || isPreview);
 
   return (
     <div 
@@ -158,25 +158,28 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
 
                 <p className={cn(
                   "leading-relaxed opacity-70 font-normal",
-                  isPreview ? "text-[13px] px-2" : "text-[15px] px-4"
+                  isPreview ? "text-[13px] px-2" : "text-[16px] px-4"
                 )} style={{ color: tema.text_color }}>
                   {data.bio}
                 </p>
 
-                {data.whatsapp?.enabled && data.whatsapp.number && (
+                {showWhatsApp && (
                   <motion.a 
-                    href={`https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message)}`}
-                    target="_blank"
+                    href={data.whatsapp?.number ? `https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message || "Olá, vim pelo seu Link na Bio")}` : "#"}
+                    target={data.whatsapp?.number ? "_blank" : undefined}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="mt-8 w-full py-4 rounded-full flex items-center justify-center gap-0 font-bold text-[12px] uppercase tracking-[2px] transition-all shadow-sm"
+                    className={cn(
+                      "mt-8 w-full py-4 rounded-full flex items-center justify-center gap-0 font-bold text-[12px] uppercase tracking-[2px] transition-all shadow-sm",
+                      !data.whatsapp?.number && "opacity-50 grayscale cursor-help"
+                    )}
                     style={{ 
                       backgroundColor: tema.button_bg, 
                       color: tema.button_text
                     }}
                   >
                     <MessageCircle className="w-5 h-5 mr-3" />
-                    <span>WhatsApp</span>
+                    <span>WhatsApp {!data.whatsapp?.number && "(Sem Número)"}</span>
                   </motion.a>
                 )}
               </div>
@@ -204,7 +207,7 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
         </div>
 
         {/* COLUNA DIREITA: CONTEÚDO */}
-        <div className="flex-1 w-full flex flex-col">
+        <div className="flex-1 w-full flex flex-col overflow-hidden">
 
           {/* Redes Sociais - Mobile */}
           {socialLinks.length > 0 && (
@@ -234,9 +237,6 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
                 <h3 className="text-[11px] font-bold uppercase tracking-[3px] opacity-60" style={{ color: tema.text_color }}>Portfólio</h3>
               </div>
 
-              {/* ======================================================== */}
-              {/* RESPONSIVIDADE CORRIGIDA DOS CARDS DE PORTFÓLIO */}
-              {/* ======================================================== */}
               <div className="w-full relative">
                 <div className={cn(
                   "flex pt-2 pb-6 snap-x snap-mandatory gap-4",
@@ -259,12 +259,9 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
                         <img src={imovel.imagem} alt={imovel.titulo} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
                         <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-300" />
                       </div>
-
                       <div className="absolute top-5 right-5 p-2 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-all shadow-sm">
                         <Maximize2 className="w-4 h-4 text-black" />
                       </div>
-
-                      {/* Caixa de Texto Clean no Rodapé do Imóvel */}
                       <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl shadow-lg" style={{ backgroundColor: tema.bg_color }}>
                         <h4 className="font-bold text-[14px] leading-tight mb-1 line-clamp-2" style={{ color: tema.text_color }}>{imovel.titulo}</h4>
                         <p className="opacity-60 text-[10px] font-bold uppercase tracking-[1px] truncate" style={{ color: tema.text_color }}>{imovel.preco || imovel.localizacao}</p>
@@ -276,133 +273,58 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
             </div>
           )}
 
-          {/* LINKS REGULARES E EMBEDS */}
           {regularLinks.length > 0 && (
             <div className={cn("flex flex-col gap-4", isPreview ? "mt-4" : "mt-8")}>
               {regularLinks.map((link: any, index: number) => {
-
-                // RENDER DO PLAYER (YouTube / Spotify)
                 if (link.type === "youtube" || link.type === "spotify") {
                   return (
-                    <motion.div 
-                      key={index} 
-                      className="w-full overflow-hidden rounded-[2rem] flex flex-col group"
-                      style={minimalCardStyle(tema)}
-                    >
+                    <motion.div key={index} className="w-full overflow-hidden rounded-[2rem] flex flex-col group" style={minimalCardStyle(tema)}>
                       <div className="flex items-center gap-4 px-5 py-4 border-b" style={{ borderColor: `${tema.text_color}10` }}>
-                        <div 
-                          className={cn(
-                            "rounded-full flex items-center justify-center shrink-0",
-                            isPreview ? "w-9 h-9" : "w-11 h-11"
-                          )}
-                          style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
-                        >
-                          {link.type === "youtube" ? (
-                            <Youtube className={cn(isPreview ? "w-4 h-4" : "w-5 h-5")} />
-                          ) : (
-                            <svg viewBox="0 0 24 24" fill="currentColor" className={cn(isPreview ? "w-4 h-4" : "w-5 h-5")}>
-                              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.84.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15.001 10.62 18.72 12.9c.36.181.54.78.241 1.14zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-                            </svg>
-                          )}
+                        <div className={cn("rounded-full flex items-center justify-center shrink-0", isPreview ? "w-9 h-9" : "w-11 h-11")} style={{ backgroundColor: tema.button_bg, color: tema.button_text }}>
+                          {link.type === "youtube" ? <Youtube className={cn(isPreview ? "w-4 h-4" : "w-5 h-5")} /> : getSocialIcon(link.url)}
                         </div>
-                        <span 
-                          className={cn("font-bold uppercase tracking-[2px] truncate", isPreview ? "text-[10px]" : "text-[11px]")} 
-                          style={{ color: tema.text_color }}
-                        >
-                          {link.title || (link.type === "youtube" ? "Vídeo em Destaque" : "Música em Destaque")}
-                        </span>
+                        <span className={cn("font-bold uppercase tracking-[2px] truncate", isPreview ? "text-[10px]" : "text-[11px]")} style={{ color: tema.text_color }}>{link.title || (link.type === "youtube" ? "Vídeo em Destaque" : "Música em Destaque")}</span>
                       </div>
-
                       <div className="w-full p-2">
                         <div className="rounded-[1.2rem] overflow-hidden bg-black/5">
                           {link.type === "youtube" ? (
-                            <iframe 
-                              width="100%" 
-                              className="aspect-video" 
-                              src={getYouTubeEmbed(link.url)} 
-                              title="YouTube video player"
-                              frameBorder="0" 
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                              allowFullScreen 
-                            />
+                            <iframe width="100%" className="aspect-video" src={getYouTubeEmbed(link.url)} title="YouTube video player" frameBorder="0" allowFullScreen />
                           ) : (
-                            <iframe 
-                              src={getSpotifyEmbed(link.url)} 
-                              width="100%" 
-                              height="152" 
-                              frameBorder="0" 
-                              allowFullScreen 
-                              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-                              loading="lazy"
-                              style={{ marginBottom: "-4px" }} 
-                            />
+                            <iframe src={getSpotifyEmbed(link.url)} width="100%" height="152" frameBorder="0" allowFullScreen allow="autoplay" loading="lazy" style={{ marginBottom: "-4px" }} />
                           )}
                         </div>
                       </div>
                     </motion.div>
                   );
                 }
-
-                // LINKS SIMPLES
                 return (
-                  <motion.a 
-                    key={index} 
-                    href={link.type === "vcard" ? "#" : link.url}
-                    onClick={(e) => { if (link.type === "vcard") e.preventDefault(); handleLinkClick(link, index); }}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    className="w-full rounded-[2rem] flex items-center justify-between transition-colors group hover:bg-black/5 dark:hover:bg-white/5"
-                    style={{ 
-                      ...minimalCardStyle(tema),
-                      padding: isPreview ? "12px" : "16px" 
-                    }}
-                  >
+                  <motion.a key={index} href={link.type === "vcard" ? "#" : link.url} onClick={(e) => { if (link.type === "vcard") e.preventDefault(); handleLinkClick(link, index); }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="w-full rounded-[2rem] flex items-center justify-between transition-colors group hover:bg-black/5 dark:hover:bg-white/5" style={{ ...minimalCardStyle(tema), padding: isPreview ? "12px" : "16px" }}>
                     <div className="flex items-center gap-5 overflow-hidden px-2">
-                      <div 
-                        className={cn(
-                          "rounded-full flex items-center justify-center shrink-0",
-                          isPreview ? "w-10 h-10" : "w-12 h-12"
-                        )}
-                        style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
-                      >
+                      <div className={cn("rounded-full flex items-center justify-center shrink-0", isPreview ? "w-10 h-10" : "w-12 h-12")} style={{ backgroundColor: tema.button_bg, color: tema.button_text }}>
                         {link.type === "vcard" ? <UserPlus className="w-5 h-5" /> : getSocialIcon(link.url)}
                       </div>
-                      <span 
-                        className={cn("font-bold uppercase tracking-[2px] truncate", isPreview ? "text-[11px]" : "text-[12px]")} 
-                        style={{ color: tema.text_color }}
-                      >
-                        {link.title}
-                      </span>
+                      <span className={cn("font-bold uppercase tracking-[2px] truncate", isPreview ? "text-[11px]" : "text-[12px]")} style={{ color: tema.text_color }}>{link.title}</span>
                     </div>
-
-                    <div className="pr-4 opacity-30 group-hover:opacity-100 transition-opacity">
-                      <ArrowUpRight className="w-5 h-5" style={{ color: tema.text_color }} />
-                    </div>
+                    <div className="pr-4 opacity-30 group-hover:opacity-100 transition-opacity"><ArrowUpRight className="w-5 h-5" style={{ color: tema.text_color }} /></div>
                   </motion.a>
                 );
               })}
             </div>
           )}
         </div>
-
       </div>
 
       <AnimatePresence>
         {selectedProperty && (
-          <BioPropertyDetails 
-            property={selectedProperty} 
-            onClose={() => setSelectedProperty(null)} 
-            tema={tema}
-            whatsappNumber={data.whatsapp?.number}
-          />
+          <BioPropertyDetails property={selectedProperty} onClose={() => setSelectedProperty(null)} tema={tema} whatsappNumber={data.whatsapp?.number} />
         )}
       </AnimatePresence>
 
-      {/* WHATSAPP FLUTUANTE MINIMALISTA */}
-      {data.whatsapp?.enabled && data.whatsapp.number && !isPreview && (
+      {/* WHATSAPP FLUTUANTE MINIMALISTA - MOVIDO PARA A ESQUERDA */}
+      {showWhatsApp && !isPreview && (
         <motion.a 
-          href={`https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message)}`}
-          target="_blank"
+          href={data.whatsapp?.number ? `https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message || "Olá, vim pelo seu Link na Bio")}` : "#"}
+          target={data.whatsapp?.number ? "_blank" : undefined}
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           whileHover={{ scale: 1.1, rotate: 5 }}
@@ -410,10 +332,7 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
           className={cn(
             "fixed rounded-full flex items-center justify-center z-[100] transition-all bottom-8 right-8 w-14 h-14 shadow-lg"
           )}
-          style={{ 
-            backgroundColor: "#25D366",
-            color: "#ffffff"
-          }}
+          style={{ backgroundColor: tema.button_bg, color: "#ffffff" }}
         >
           <MessageCircle className="w-6 h-6" />
         </motion.a>

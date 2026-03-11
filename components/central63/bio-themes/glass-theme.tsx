@@ -143,6 +143,9 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
 
   const springTransition = { type: "spring", stiffness: 110, damping: 18, mass: 0.8 };
 
+  // Logic: Show button if enabled AND (has number OR is in preview mode)
+  const showWhatsApp = data.whatsapp?.enabled && (data.whatsapp?.number || isPreview);
+
   return (
     <div 
       ref={containerRef}
@@ -269,18 +272,21 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                   </p>
                 </motion.div>
 
-                {data.whatsapp?.enabled && data.whatsapp.number && (
+                {showWhatsApp && (
                   <motion.a 
-                    href={`https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message)}`}
-                    target="_blank"
+                    href={data.whatsapp?.number ? `https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message || "Olá, vim pelo seu Link na Bio")}` : "#"}
+                    target={data.whatsapp?.number ? "_blank" : undefined}
                     whileHover={{ scale: 1.02, y: -3 }}
                     whileTap={{ scale: 0.98 }}
-                    className="mt-8 w-full py-4 rounded-2xl flex items-center justify-center gap-0 font-black text-[11px] uppercase tracking-[3px] transition-all relative overflow-hidden group/btn shadow-[0_15px_40px_-10px_rgba(0,0,0,0.3)]"
+                    className={cn(
+                      "mt-8 w-full py-4 rounded-2xl flex items-center justify-center gap-0 font-black text-[11px] uppercase tracking-[3px] transition-all relative overflow-hidden group/btn shadow-[0_15px_40px_-10px_rgba(0,0,0,0.3)]",
+                      !data.whatsapp?.number && "opacity-50 grayscale cursor-help"
+                    )}
                     style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
                   >
                     <div className="absolute inset-0 bg-white/30 translate-x-[-150%] group-hover/btn:translate-x-[150%] transition-transform duration-1000 skew-x-[-25deg]" />
                     <MessageCircle className="w-5 h-5 mr-3 fill-white/10" />
-                    <span className="relative z-10">WhatsApp</span>
+                    <span>WhatsApp {!data.whatsapp?.number && "(Sem Número)"}</span>
                   </motion.a>
                 )}
               </div>
@@ -341,13 +347,9 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                 </motion.div>
               </div>
 
-              {/* ========================================= */}
-              {/* AJUSTES DE RESPONSIVIDADE (SCROLL E PADDING) */}
-              {/* ========================================= */}
               <div className="w-full relative">
                 <div className={cn(
                   "flex pt-2 pb-6 snap-x snap-mandatory gap-4",
-                  // Removidas as margens negativas e adicionada formatação "Glass" para a scrollbar
                   "overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0 lg:pt-0",
                   "[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full",
                   "[scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]"
@@ -368,7 +370,6 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                     >
                       <img src={imovel.imagem} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent opacity-90 group-hover:opacity-100 transition-opacity duration-700" />
-                      
                       <div className="absolute bottom-0 left-0 right-0 p-5 transform transition-transform duration-700 ease-out group-hover:translate-y-[-4px]">
                         <h4 className="text-white font-bold text-[17px] leading-tight mb-2 drop-shadow-md truncate">{imovel.titulo}</h4>
                         <div className="flex items-center gap-3">
@@ -388,79 +389,37 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
               {regularLinks.map((link: any, index: number) => {
                 if (link.type === "youtube" || link.type === "spotify") {
                   return (
-                    <motion.div 
-                      key={index} 
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.5 + index * 0.1, ...springTransition }}
-                      className="w-full overflow-hidden rounded-[1.5rem] flex flex-col group/player border shadow-inner bg-black/10"
-                      style={glassPanelStyle(tema)}
-                    >
+                    <motion.div key={index} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + index * 0.1, ...springTransition }} className="w-full overflow-hidden rounded-[1.5rem] flex flex-col group/player border shadow-inner bg-black/10" style={glassPanelStyle(tema)}>
                       <div className="flex items-center justify-between px-4 py-3 border-b relative" style={{ borderColor: `${tema.text_color}10` }}>
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover/player:translate-x-[100%] transition-transform duration-1000" />
                         <div className="flex items-center gap-3 z-10">
                           <div className={cn("w-2 h-2 rounded-full animate-pulse", link.type === "youtube" ? "bg-red-500" : "bg-emerald-500")} />
                           <span className="font-black uppercase tracking-[2px] text-[10px] opacity-70" style={{ color: tema.text_color }}>
                             {link.type === "youtube" ? "Conteúdo Exclusivo" : "Podcast / Áudio"}
                           </span>
                         </div>
-                        <div className="opacity-50 group-hover/player:opacity-100 transition-opacity z-10 w-4 h-4 flex items-center justify-center" style={{ color: tema.text_color }}>
-                            {getSocialIcon(link.url)}
-                        </div>
+                        <div className="opacity-50 group-hover/player:opacity-100 transition-opacity z-10 w-4 h-4 flex items-center justify-center" style={{ color: tema.text_color }}>{getSocialIcon(link.url)}</div>
                       </div>
                       <div className="p-3">
                          <div className="rounded-[1rem] overflow-hidden bg-black/70 shadow-2xl relative">
-                            {link.type === "youtube" ? (
-                              <iframe width="100%" className="aspect-video relative z-10" src={getYouTubeEmbed(link.url)} frameBorder="0" allowFullScreen loading="lazy" />
-                            ) : (
-                              <iframe src={getSpotifyEmbed(link.url)} width="100%" height="152" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" className="relative z-10" style={{ marginBottom: "-4px" }} />
-                            )}
+                            {link.type === "youtube" ? <iframe width="100%" className="aspect-video relative z-10" src={getYouTubeEmbed(link.url)} frameBorder="0" allowFullScreen /> : <iframe src={getSpotifyEmbed(link.url)} width="100%" height="152" frameBorder="0" allow="autoplay" loading="lazy" className="relative z-10" style={{ marginBottom: "-4px" }} />}
                          </div>
                       </div>
                     </motion.div>
                   );
                 }
-
                 return (
-                  <motion.a 
-                    key={index} 
-                    href={link.type === "vcard" ? "#" : link.url}
-                    onClick={(e) => { if (link.type === "vcard") e.preventDefault(); handleLinkClick(link, index); }}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 + index * 0.1, ...springTransition }}
-                    whileHover={{ x: 8, backgroundColor: isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.04)", scale: 1.01 }}
-                    className="w-full rounded-[2rem] flex items-center justify-between p-2.5 pr-5 transition-all group/link relative overflow-hidden"
-                    style={glassPanelStyle(tema)}
-                  >
+                  <motion.a key={index} href={link.type === "vcard" ? "#" : link.url} onClick={(e) => { if (link.type === "vcard") e.preventDefault(); handleLinkClick(link, index); }} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 + index * 0.1, ...springTransition }} whileHover={{ x: 8, backgroundColor: isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.04)", scale: 1.01 }} className="w-full rounded-[2rem] flex items-center justify-between p-2.5 pr-5 transition-all group/link relative overflow-hidden" style={glassPanelStyle(tema)}>
                     <div className="flex items-center gap-4 relative z-10">
-                      <motion.div 
-                        whileHover={{ scale: 1.1, rotate: [0, 5, -5, 0] }}
-                        className="w-12 h-12 rounded-[1rem] flex items-center justify-center shrink-0 shadow-2xl relative overflow-hidden group-hover/link:shadow-white/10 transition-shadow"
-                        style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
-                      >
+                      <motion.div whileHover={{ scale: 1.1, rotate: [0, 5, -5, 0] }} className="w-12 h-12 rounded-[1rem] flex items-center justify-center shrink-0 shadow-2xl relative overflow-hidden group-hover/link:shadow-white/10 transition-shadow" style={{ backgroundColor: tema.button_bg, color: tema.button_text }}>
                          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-black/20" />
                          {link.type === "vcard" ? <UserPlus className="w-5 h-5" /> : <LinkIcon className="w-4 h-4 opacity-90" />}
                       </motion.div>
                       <div className="flex flex-col">
-                        <span className="font-extrabold text-[13px] uppercase tracking-[2px] transition-colors" style={{ color: tema.text_color }}>
-                          {link.title}
-                        </span>
-                        <motion.span 
-                            initial={{ x: 0 }}
-                            whileHover={{ x: 5 }}
-                            className="text-[9px] opacity-40 font-bold uppercase tracking-widest mt-0.5 inline-flex items-center gap-1.5"
-                            style={{ color: tema.text_color }}
-                        >
-                            Explorar <ArrowUpRight className="w-3 h-3" />
-                        </motion.span>
+                        <span className="font-extrabold text-[13px] uppercase tracking-[2px] transition-colors" style={{ color: tema.text_color }}>{link.title}</span>
+                        <motion.span whileHover={{ x: 5 }} className="text-[9px] opacity-40 font-bold uppercase tracking-widest mt-0.5 inline-flex items-center gap-1.5" style={{ color: tema.text_color }}>Explorar <ArrowUpRight className="w-3 h-3" /></motion.span>
                       </div>
                     </div>
-                    <div className="relative z-10">
-                      <div className="p-2 rounded-full bg-white/0 group-hover/link:bg-white/5 transition-colors">
-                        <ArrowUpRight className="w-5 h-5 opacity-15 group-hover/link:opacity-100 group-hover/link:translate-x-1 group-hover/link:-translate-y-1 transition-all duration-300" style={{ color: tema.text_color }} />
-                      </div>
-                    </div>
+                    <div className="relative z-10"><ArrowUpRight className="w-5 h-5 opacity-15 group-hover/link:opacity-100 group-hover/link:translate-x-1 group-hover/link:-translate-y-1 transition-all duration-300" style={{ color: tema.text_color }} /></div>
                   </motion.a>
                 );
               })}
@@ -471,12 +430,7 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
 
       <AnimatePresence>
         {selectedProperty && (
-          <BioPropertyDetails 
-            property={selectedProperty} 
-            onClose={() => setSelectedProperty(null)} 
-            tema={tema}
-            whatsappNumber={data.whatsapp?.number}
-          />
+          <BioPropertyDetails property={selectedProperty} onClose={() => setSelectedProperty(null)} tema={tema} whatsappNumber={data.whatsapp?.number} />
         )}
       </AnimatePresence>
 
@@ -487,20 +441,24 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
         </div>
       )}
 
-      {data.whatsapp?.enabled && data.whatsapp.number && !isPreview && (
+      {/* WHATSAPP FLUTUANTE - MOVIDO PARA A ESQUERDA */}
+      {showWhatsApp && !isPreview && (
         <motion.a 
-          href={`https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message)}`}
-          target="_blank"
+          href={data.whatsapp?.number ? `https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message || "Olá, vim pelo seu Link na Bio")}` : "#"}
+          target={data.whatsapp?.number ? "_blank" : undefined}
           initial={{ y: 100, scale: 0.5, opacity: 0 }}
           animate={{ y: 0, scale: 1, opacity: 1 }}
           transition={{ delay: 1, ...springTransition }}
           whileHover={{ scale: 1.1, rotate: -5, y: -5 }}
-          className="fixed bottom-8 right-8 w-16 h-16 rounded-[2rem] flex items-center justify-center z-[100] border border-white/20 backdrop-blur-3xl shadow-[0_30px_60px_-10px_rgba(0,0,0,0.5)] group overflow-hidden"
-          style={{ background: "linear-gradient(135deg, rgba(37, 211, 102, 0.3), rgba(10, 10, 10, 0.8))" }}
+          className={cn(
+            "fixed bottom-8 right-8 w-16 h-16 rounded-[2rem] flex items-center justify-center z-[100] border border-white/20 backdrop-blur-3xl shadow-[0_30px_60px_-10px_rgba(0,0,0,0.5)] group overflow-hidden",
+            !data.whatsapp?.number && "opacity-50 grayscale cursor-help"
+          )}
+          style={{ background: `linear-gradient(135deg, ${tema.button_bg}, rgba(10, 10, 10, 0.8))` }}
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.15),transparent_70%)] group-hover:scale-150 transition-transform duration-1000" />
           <MessageCircle className="w-8 h-8 text-white opacity-90 group-hover:scale-110 group-hover:opacity-100 transition-all" />
-          <div className="absolute inset-0 rounded-[2rem] border-[1.5px] border-green-400 opacity-0 group-hover:opacity-100 transition-opacity animate-pulse" />
+          <div className={`absolute inset-0 rounded-[2rem] border-[1.5px] ${tema.button_bg} opacity-0 group-hover:opacity-100 transition-opacity animate-pulse`} />
         </motion.a>
       )}
     </div>

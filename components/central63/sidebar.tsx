@@ -430,6 +430,8 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               </div>
             )}
 
+            {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
+
             {/* Itens restritos */}
             {isHighLevelUser && (
               <>
