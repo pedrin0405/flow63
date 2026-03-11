@@ -429,12 +429,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
                 Documentos & Métricas
               </div>
             )}
-            {!isCollapsed && !isHighLevelUser && (
-               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
-                Ferramentas
-              </div>
-            )}
-            {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
             {/* Itens restritos */}
             {isHighLevelUser && (

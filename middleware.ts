@@ -31,7 +31,6 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // ATUALIZAÇÃO: getUser() no lugar de getSession() valida o token de verdade
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -41,81 +40,75 @@ export async function middleware(request: NextRequest) {
   const isPublicFormRoute = path.startsWith('/forms/') && path !== '/forms'
   const isPublicBioRoute = path.startsWith('/bio/')
 
-  // Proteção básica de rotas não logadas usando 'user'
+  // 1. Proteção básica: Usuário não logado
   if (!user && !isAuthRoute && !isPublicFormRoute && !isPublicBioRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // 2. Proteção para usuários Logados
   if (user) {
+    const isPendingRoute = path === '/auth/pending'
     const isRootRoute = path === '/'
-    
-    // Lista de rotas proibidas para corretores
-    const restrictedRoutes = [
-      '/services', 
-      '/homes', 
-      '/units', 
-      '/brokers', // Cuidado com essa rota base
-      '/admin', 
-      '/indicators', 
-      '/forms', 
-      '/spreadsheets', 
-      '/custom-dashboard', 
-      '/chat-support', 
-      '/support',
-      '/campaigns'
-    ]
 
-    // CORREÇÃO DO LOOP: Exclui expressamente a rota para a qual você redireciona quem não tem permissão
-    const isRestrictedRoute = 
-      restrictedRoutes.some(route => path.startsWith(route)) && 
-      !path.startsWith('/brokers/my-card')
-
-    if (isRootRoute || isRestrictedRoute || path === '/login' || path === '/auth/pending') {
-      try {
-        // Criar um cliente admin temporário para checagem de status (bypass RLS)
-        const supabaseAdmin = createServerClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
-        )
-
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('role, status')
-          .eq('id', user.id)
-          .maybeSingle()
-
-        // 1. Tratamento para novos usuários ou pendentes
-        const isPending = !profile || profile.status === 'pendente'
-        const isPendingRoute = path === '/auth/pending'
-
-        if (isPending && !isPendingRoute && !isAuthRoute && !path.startsWith('/auth/callback')) {
-          return NextResponse.redirect(new URL('/auth/pending', request.url))
+    try {
+      // Cliente admin para checar status sem restrições de RLS
+      const supabaseAdmin = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { 
+          cookies: { 
+            getAll: () => request.cookies.getAll(), 
+            setAll: (cookiesToSet) => {
+              cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+            } 
+          } 
         }
+      )
 
-        if (!isPending && isPendingRoute) {
-          return NextResponse.redirect(new URL('/', request.url))
-        }
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role, status')
+        .eq('id', user.id)
+        .maybeSingle()
 
-        const role = profile?.role
-        const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(role)
+      // A. BLOQUEIO GLOBAL DE PENDENTES (Não acessa nada além de auth e pendência)
+      const isPending = !profile || profile.status === 'pendente'
 
-        // Lógica para a página de Login
-        if (path === '/login') {
-          return NextResponse.redirect(new URL(isHighLevelUser ? '/' : '/brokers/my-card', request.url))
-        }
-
-        // Lógica de TRAVA para a Home (/) e Rotas Restritas
-        if (!isHighLevelUser && (isRootRoute || (isRestrictedRoute && !isPublicFormRoute))) {
-          return NextResponse.redirect(new URL('/brokers/my-card', request.url))
-        }
-      } catch (error) {
-        console.error("Erro no middleware:", error)
-        // Se a consulta falhar, bloqueia por segurança
-        if (isRootRoute || isRestrictedRoute) {
-          return NextResponse.redirect(new URL('/brokers/my-card', request.url))
-        }
+      if (isPending && !isPendingRoute && !isAuthRoute && !path.startsWith('/auth/callback')) {
+        return NextResponse.redirect(new URL('/auth/pending', request.url))
       }
+
+      // Se liberado, não pode ficar na página de pendência
+      if (!isPending && isPendingRoute) {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+
+      // B. REGRAS DE RBAC (Apenas se já estiver ativo)
+      const restrictedRoutes = [
+        '/services', '/homes', '/units', '/brokers', '/admin', 
+        '/indicators', '/forms', '/spreadsheets', '/custom-dashboard', 
+        '/chat-support', '/support', '/campaigns'
+      ]
+
+      const isRestrictedRoute = 
+        restrictedRoutes.some(route => path.startsWith(route)) && 
+        !path.startsWith('/brokers/my-card')
+
+      const role = profile?.role
+      const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(role || '')
+
+      // Redireciona logados que tentam ir para o login
+      if (path === '/login') {
+        return NextResponse.redirect(new URL(isHighLevelUser ? '/' : '/brokers/my-card', request.url))
+      }
+
+      // Trava para Home e Rotas Restritas (Corretores vão para my-card)
+      if (!isHighLevelUser && (isRootRoute || (isRestrictedRoute && !isPublicFormRoute))) {
+        return NextResponse.redirect(new URL('/brokers/my-card', request.url))
+      }
+
+    } catch (error) {
+      console.error("Erro crítico no middleware:", error)
     }
   }
 

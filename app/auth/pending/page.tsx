@@ -22,6 +22,11 @@ export default function PendingAuthPage() {
     }, 500);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F9FC] dark:bg-black flex items-center justify-center p-6 font-sans">
       <motion.div 
