@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense, useCallback } from "react"
+import { useState, useEffect, Suspense, useCallback, useMemo } from "react"
 import { 
   CreditCard, Menu, Plus, Search, Filter, Edit2, 
   CheckCircle, XCircle, Clock, Trash2, Star, 
@@ -48,6 +48,7 @@ import {
 } from "@/app/actions/benefit-cards"
 import * as XLSX from 'xlsx'
 import { Slider } from "@/components/ui/slider"
+import { Avatar, AvatarImage, AvatarFallback } from "@radix-ui/react-avatar"
 
 // Função para destacar valores no texto (Ex: 10%, OFF, VIP)
 const HighlightValue = ({ text }: { text: string }) => {
@@ -468,6 +469,8 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
     benefitIds: [] as string[]
   })
   const [users, setUsers] = useState<any[]>([])
+  const [userSearch, setUserSearch] = useState("")
+  const [isUserListOpen, setIsUserUserListOpen] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -491,11 +494,18 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase.from('profiles').select('id, full_name, role').order('full_name')
+      const { data } = await supabase.from('profiles').select('id, full_name, role, avatar_url').order('full_name')
       setUsers(data || [])
     }
     if (isOpen) fetchUsers()
   }, [isOpen])
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch) return users;
+    return users.filter(u => u.full_name?.toLowerCase().includes(userSearch.toLowerCase()));
+  }, [users, userSearch]);
+
+  const selectedUser = useMemo(() => users.find(u => u.id === formData.user_id), [users, formData.user_id]);
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -557,7 +567,7 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
     }))
   }
 
-  const selectedUserName = users.find(u => u.id === formData.user_id)?.full_name || "NOME DO MEMBRO";
+  const selectedUserName = selectedUser?.full_name || "NOME DO MEMBRO";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -630,18 +640,67 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
 
                 <div className="space-y-5">
                   <div className="bg-white/40 p-5 rounded-[2rem] border border-white/40 shadow-lg space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                        <User size={10} className="text-[#e91c74]" /> Colaborador
+                    <div className="space-y-1.5 relative">
+                      <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <User size={10} className="text-[#e91c74]" /> Colaborador
+                        </div>
+                        {formData.user_id && !card && (
+                          <button onClick={() => setFormData(p => ({ ...p, user_id: "" }))} className="text-[#e91c74] hover:underline lowercase font-bold">Trocar</button>
+                        )}
                       </label>
-                      <Select value={formData.user_id} onValueChange={(val) => setFormData(p => ({ ...p, user_id: val }))} disabled={!!card}>
-                        <SelectTrigger className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner font-bold text-xs focus:ring-2 focus:ring-[#e91c74]/20 transition-all">
-                          <SelectValue placeholder="Selecione o membro..." />
-                        </SelectTrigger>
-                        <SelectContent className="z-[150] rounded-xl border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl">
-                          {users.map(u => <SelectItem key={u.id} value={u.id} className="text-xs font-medium focus:bg-[#e91c74]/10 focus:text-[#e91c74]">{u.full_name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      
+                      {!formData.user_id && !card ? (
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                            <Input 
+                              placeholder="Pesquisar por nome..." 
+                              value={userSearch}
+                              onChange={(e) => setUserSearch(e.target.value)}
+                              className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner font-bold text-xs pl-9 focus:ring-2 focus:ring-[#e91c74]/20 transition-all"
+                            />
+                          </div>
+                          <div className="max-h-[200px] overflow-y-auto rounded-xl border border-white/40 bg-white/40 shadow-inner custom-scrollbar">
+                            {filteredUsers.length > 0 ? (
+                              filteredUsers.map(u => (
+                                <div 
+                                  key={u.id}
+                                  onClick={() => setFormData(p => ({ ...p, user_id: u.id }))}
+                                  className="flex items-center gap-3 p-3 hover:bg-[#e91c74]/10 cursor-pointer transition-all border-b border-white/10 last:border-0 group"
+                                >
+                                  <Avatar className="h-8 w-8 rounded-full shadow-sm border border-white/40">
+                                    <AvatarImage src={u.avatar_url} className="object-cover rounded-full" />
+                                    <AvatarFallback className="text-[10px] font-black bg-white text-slate-700 flex items-center justify-center w-8 h-8 rounded-full">{u.full_name?.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-slate-700 truncate group-hover:text-[#e91c74] transition-colors">{u.full_name}</p>
+                                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">{u.role}</p>
+                                  </div>
+                                  <ChevronRight size={14} className="text-slate-300 group-hover:text-[#e91c74] group-hover:translate-x-1 transition-all" />
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-8 text-center opacity-40">
+                                <Search size={24} className="mx-auto mb-2" />
+                                <p className="text-[10px] font-bold uppercase">Nenhum membro encontrado</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/60 border border-white/40 shadow-inner">
+                          <Avatar className="h-10 w-10 rounded-full shadow-md border-2 border-white">
+                            <AvatarImage src={selectedUser?.avatar_url} className="object-cover" />
+                            <AvatarFallback className="text-sm font-black bg-slate-100 text-slate-400">{selectedUserName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-black text-slate-800 truncate">{selectedUserName}</p>
+                            <p className="text-[9px] text-[#e91c74] uppercase font-black tracking-widest">{selectedUser?.role || "Membro"}</p>
+                          </div>
+                          {card && <ShieldCheck size={18} className="text-blue-500" />}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-1.5">
