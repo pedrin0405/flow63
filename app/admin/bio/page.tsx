@@ -14,22 +14,17 @@ import {
   LayoutGrid,
   List as ListIcon,
   Copy,
-  MoreHorizontal,
-  Check,
   Library,
   MousePointer2,
-  Edit2,
   Edit3,
   ExternalLink,
-  Share2,
-  ShieldCheck,
-  Zap,
-  MoreVertical,
-  ChevronRight,
-  Sparkles,
-  Smartphone,
   CheckCircle2,
-  ArrowUpRight
+  Activity,
+  ArrowUpRight,
+  Sparkles,
+  RefreshCw,
+  Globe,
+  Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -66,7 +61,7 @@ function MiniBioPreview({ page }: { page: any }) {
   // Constantes de hardware para clipping perfeito
   const width = 115;
   const height = 243;
-  const padding = 6; // Aumentado levemente para selar melhor
+  const padding = 6; 
   const screenWidth = width - (padding * 2); 
   const screenHeight = height - (padding * 2);
   
@@ -87,7 +82,7 @@ function MiniBioPreview({ page }: { page: any }) {
       <div 
         className="w-full h-full overflow-hidden rounded-[1.6rem] bg-zinc-950 relative"
         style={{ 
-          maskImage: 'radial-gradient(white, black)', // Força o hardware a respeitar o border-radius
+          maskImage: 'radial-gradient(white, black)', 
           WebkitMaskImage: '-webkit-radial-gradient(white, black)',
         }}
       >
@@ -130,16 +125,42 @@ export default function BioAdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("bio-admin")
   const [loading, setLoading] = useState(true)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const { toast } = useToast()
 
   const fetchPages = useCallback(async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      
+      setCurrentUserId(user.id)
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      const role = profile?.role || 'Corretor'
+      setUserRole(role)
+
+      const isHighLevel = ['Diretor', 'Gestor', 'Marketing', 'Admin'].includes(role)
+      
+      let query = supabase
         .from("bio_pages")
         .select(`*, profiles:user_id (full_name, avatar_url)`)
         .order("created_at", { ascending: false });
+
+      // Filtragem por papel: Corretores veem apenas os seus
+      if (!isHighLevel) {
+        query = query.eq('user_id', user.id)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       setPages(data || [])
@@ -208,7 +229,7 @@ export default function BioAdminPage() {
   }, [pages])
 
   return (
-    <div className="flex h-screen bg-[#FAFAFA] dark:bg-background overflow-hidden font-sans text-foreground">
+    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden font-sans text-foreground">
       <Sidebar 
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)} 
@@ -216,176 +237,216 @@ export default function BioAdminPage() {
         onTabChange={(tab) => { setActiveTab(tab); setSidebarOpen(false); }} 
       />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
-          <div className="flex items-center gap-4">
-            <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
-            <LinkIcon className="text-primary hidden lg:block" />
-            <h2 className="text-2xl font-bold text-foreground tracking-tight">Links na Bio</h2>
-            <p className="text-primary hidden sm:block" >| Member Bios</p>
-          </div>
-          <NotificationBell />
-        </header>
-
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-[1600px] mx-auto p-6 md:p-8 space-y-8 pb-20">
-
-            {/* Dashboard Analítico */}
-            <div className="bg-white dark:bg-card rounded-2xl border shadow-sm p-1 grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-800">
-              <div className="p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Library size={20} /></div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total de Bios</p>
-                  <p className="text-xl font-bold tracking-tight">{stats.total}</p>
-                </div>
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative animate-in fade-in duration-700">
+        
+        {/* ── HEADER GLASS (Bento Style) ── */}
+        <header className="h-20 shrink-0 px-8 flex items-center justify-between z-30">
+          <div className="flex items-center gap-5">
+            <Button variant="ghost" size="icon" className="lg:hidden rounded-xl bg-white/50 dark:bg-white/[0.02] border border-white/20" onClick={() => setSidebarOpen(true)}>
+              <Menu size={22} />
+            </Button>
+            
+            <div className="relative flex items-center gap-4 bg-white/60 dark:bg-white/[0.02] backdrop-blur-2xl border border-white/20 dark:border-white/[0.06] px-5 py-2.5 rounded-2xl shadow-sm">
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+              <div className="h-10 w-10 bg-gradient-to-br from-primary/90 to-primary/60 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                <LinkIcon className="text-white" size={20} />
               </div>
-              <div className="p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><Eye size={20} /></div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Visualizações</p>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-xl font-bold tracking-tight">{stats.totalViews.toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><MousePointer2 size={20} /></div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Páginas Ativas</p>
-                  <p className="text-xl font-bold tracking-tight">{stats.active}</p>
-                </div>
-              </div>
-              <div className="p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center"><Users size={20} /></div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Leads</p>
-                  <p className="text-xl font-bold tracking-tight">{stats.leads}</p>
+              <div>
+                <h2 className="text-sm font-black tracking-tight text-foreground uppercase">Links na Bio</h2>
+                <div className="flex items-center gap-2 mt-0.5">
+                   <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                   <span className="text-[9px] text-muted-foreground/60 font-black uppercase tracking-widest">Digital Presence Hub</span>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Toolbar Principal */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center w-full">
-              <div className="flex items-center gap-2 w-full md:flex-1 bg-white dark:bg-card p-1 rounded-xl border shadow-sm">
-                 <div className="relative flex-1">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+          <div className="flex items-center gap-4">
+             <div className="bg-white/60 dark:bg-white/[0.02] backdrop-blur-xl border border-white/20 dark:border-white/[0.06] rounded-xl h-10 px-5 flex items-center gap-3 shadow-sm">
+               <Activity className="h-3.5 w-3.5 text-primary" />
+               <span className="text-[10px] font-black uppercase tracking-[0.15em] text-foreground/70">
+                 {userRole} Mode
+               </span>
+             </div>
+             <Button variant="outline" size="icon" onClick={fetchPages} className="rounded-xl border-white/20 bg-white/40 dark:bg-white/[0.02]">
+               <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+             </Button>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto px-8 pb-12">
+          <div className="max-w-[1600px] mx-auto space-y-8">
+
+            {/* ── ANALYTICS BENTO TILES ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              {[
+                { label: 'Total Bios', value: stats.total, icon: Library, color: 'blue' },
+                { label: 'Views', value: stats.totalViews.toLocaleString(), icon: Eye, color: 'amber' },
+                { label: 'Ativas', value: stats.active, icon: MousePointer2, color: 'emerald' },
+                { label: 'Leads Est.', value: stats.leads, icon: Users, color: 'purple' }
+              ].map((stat, idx) => (
+                <div key={idx} className="group relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-sm p-6 transition-all hover:shadow-xl hover:-translate-y-1">
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg",
+                      stat.color === 'blue' ? "bg-blue-500/10 text-blue-600 shadow-blue-500/5" :
+                      stat.color === 'amber' ? "bg-amber-500/10 text-amber-600 shadow-amber-500/5" :
+                      stat.color === 'emerald' ? "bg-emerald-500/10 text-emerald-600 shadow-emerald-500/5" :
+                      "bg-purple-500/10 text-purple-600 shadow-purple-500/5"
+                    )}>
+                      <stat.icon size={22} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 mb-1">{stat.label}</p>
+                      <p className="text-2xl font-black text-foreground tracking-tight">{stat.value}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── TOOLBAR GLASS ── */}
+            <div className="flex flex-col lg:flex-row gap-4 justify-between items-center w-full">
+              <div className="flex items-center gap-2 w-full lg:flex-1 bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl p-1.5 rounded-2xl border border-white/20 dark:border-white/[0.08] shadow-sm">
+                 <div className="relative flex-1 group">
+                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/30 group-focus-within:text-primary transition-colors" size={16} />
                    <Input 
-                     placeholder="Buscar por nome, slug ou corretor..." 
-                     className="pl-9 h-10 border-0 bg-transparent focus-visible:ring-0 w-full font-medium"
+                     placeholder="Procurar bios ou slugs..." 
+                     className="pl-11 h-11 border-0 bg-transparent focus-visible:ring-0 w-full text-xs font-bold uppercase tracking-widest placeholder:text-muted-foreground/20"
                      value={search}
                      onChange={(e) => setSearch(e.target.value)}
                    />
                  </div>
-                 <div className="h-6 w-px bg-border mx-1 flex-shrink-0" />
+                 <div className="h-6 w-px bg-black/[0.05] dark:bg-white/[0.05] mx-1 flex-shrink-0" />
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                       <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground flex-shrink-0">
-                         <Filter size={14} />
-                         <span className="text-xs font-medium hidden sm:inline-block">
-                           {statusFilter === 'all' ? 'Status' : statusFilter === 'active' ? 'Ativas' : 'Rascunhos'}
+                       <Button variant="ghost" size="sm" className="h-11 gap-2 rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-black/[0.02] dark:hover:bg-white/[0.02] flex-shrink-0 px-4">
+                         <Filter size={14} className="text-primary" />
+                         <span className="text-[10px] font-black uppercase tracking-widest">
+                           {statusFilter === 'all' ? 'Filtro' : statusFilter === 'active' ? 'Ativas' : 'Drafts'}
                          </span>
                        </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setStatusFilter('all')}>Todos</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setStatusFilter('active')}>Ativas</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setStatusFilter('draft')}>Rascunhos</DropdownMenuItem>
+                    <DropdownMenuContent align="end" className="rounded-2xl border-white/20 dark:border-white/[0.08] bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl">
+                      <DropdownMenuItem onClick={() => setStatusFilter('all')} className="text-[10px] font-black uppercase tracking-widest py-3">Todos</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setStatusFilter('active')} className="text-[10px] font-black uppercase tracking-widest py-3">Ativas</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setStatusFilter('draft')} className="text-[10px] font-black uppercase tracking-widest py-3">Rascunhos</DropdownMenuItem>
                     </DropdownMenuContent>
                  </DropdownMenu>
               </div>
 
-              <div className="flex items-center gap-2 w-full md:w-auto flex-shrink-0">
-                <div className="flex items-center bg-white dark:bg-card border rounded-xl p-1 shadow-sm flex-shrink-0">
+              <div className="flex items-center gap-3 w-full lg:w-auto">
+                <div className="flex items-center bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl border border-white/20 dark:border-white/[0.08] rounded-2xl p-1.5 shadow-sm">
                   <Button variant="ghost" size="icon" onClick={() => setViewMode('grid')}
-                    className={`h-9 w-9 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-slate-100 dark:bg-zinc-800 text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                    className={cn(
+                      "h-10 w-10 rounded-xl transition-all",
+                      viewMode === 'grid' ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground/40 hover:text-foreground"
+                    )}
                   >
                     <LayoutGrid size={18} />
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => setViewMode('list')}
-                    className={`h-9 w-9 rounded-lg transition-all ${viewMode === 'list' ? 'bg-slate-100 dark:bg-zinc-800 text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                    className={cn(
+                      "h-10 w-10 rounded-xl transition-all",
+                      viewMode === 'list' ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground/40 hover:text-foreground"
+                    )}
                   >
                     <ListIcon size={18} />
                   </Button>
                 </div>
 
-                <Link href="/admin/bio/new" className="flex-1 md:flex-none">
-                  <Button className="h-11 px-6 font-bold bg-primary text-white shadow-lg hover:bg-primary/90 rounded-xl w-full">
-                    <Plus size={18} className="mr-2" strokeWidth={3} /> Nova Bio
+                <Link href="/admin/bio/new" className="flex-1 lg:flex-none">
+                  <Button className="h-12 px-8 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 w-full">
+                    <Plus size={18} className="mr-2" strokeWidth={3} /> Criar Bio
                   </Button>
                 </Link>
               </div>
             </div>
 
             {loading ? (
-              <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
+              <div className="flex flex-col items-center justify-center py-32 gap-4">
+                <Loader2 className="animate-spin text-primary" size={40} />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/40">Sincronizando Links...</span>
+              </div>
             ) : filteredPages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="bg-gray-50 p-4 rounded-full mb-3"><LinkIcon className="text-gray-300" size={32} /></div>
-                <p className="text-muted-foreground font-medium">Nenhuma bio encontrada.</p>
+              <div className="flex flex-col items-center justify-center py-32 text-center bg-white/40 dark:bg-white/[0.02] rounded-[3rem] border border-dashed border-black/10 dark:border-white/10">
+                <div className="bg-primary/10 p-6 rounded-[2rem] mb-6 shadow-inner"><Globe className="text-primary/40" size={48} /></div>
+                <h3 className="text-lg font-black uppercase tracking-tight text-foreground">Nada por aqui</h3>
+                <p className="text-xs font-bold text-muted-foreground/40 uppercase tracking-widest mt-2 max-w-[280px]">Não encontramos nenhuma bio digital vinculada a sua conta.</p>
               </div>
             ) : (
-              <>
+              <AnimatePresence mode="popLayout">
                 {viewMode === 'grid' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8"
+                  >
                     {filteredPages.map((page) => (
                       <motion.div 
                         key={page.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-[2.5rem] overflow-hidden flex shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 w-full group h-[380px]"
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="group relative rounded-[2.5rem] overflow-hidden flex border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 w-full h-[420px]"
                       >
-                        <div className="w-[62%] p-6 flex flex-col justify-between relative bg-white dark:bg-zinc-900 z-10">
-                          <div className="space-y-5">
-                            <div className="flex items-center gap-3">
-                              <div className="relative flex-shrink-0">
-                                <img 
-                                  src={page.foto_url || "/placeholder-user.jpg"} 
-                                  className="w-12 h-12 rounded-2xl object-cover border border-slate-100 dark:border-white/5 shadow-sm transition-transform group-hover:scale-105" 
-                                  alt={page.nome} 
-                                  style={{ objectPosition: page.tema?.foto_posicao || 'center' }}
-                                />
-                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white dark:border-zinc-900">
+                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent z-20" />
+                        
+                        <div className="w-[60%] p-8 flex flex-col justify-between relative z-10">
+                          <div className="space-y-6">
+                            <div className="flex items-center gap-4">
+                              <div className="relative shrink-0">
+                                <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <Avatar className="h-14 w-14 rounded-2xl border-2 border-white/40 dark:border-white/10 shadow-lg relative z-10 group-hover:scale-110 transition-transform duration-500">
+                                  <AvatarImage src={page.foto_url} className="object-cover" style={{ objectPosition: page.tema?.foto_posicao || 'center' }} />
+                                  <AvatarFallback className="text-xs font-black bg-primary/10 text-primary">{page.nome?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                                <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-blue-500 rounded-lg flex items-center justify-center border-2 border-white dark:border-zinc-900 shadow-sm z-20">
                                   <CheckCircle2 size={10} className="text-white" />
                                 </div>
                               </div>
                               <div className="min-w-0">
-                                <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-tight truncate">{page.nome}</h3>
-                                <p className="text-[10px] text-blue-500 font-bold uppercase tracking-wider truncate">/{page.slug}</p>
+                                <h3 className="font-black text-foreground text-sm tracking-tight truncate mb-1">{page.nome}</h3>
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                  <span className="text-[8px] font-black uppercase tracking-widest">/{page.slug}</span>
+                                </div>
                               </div>
                             </div>
 
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-slate-100/50 dark:border-white/5">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-7 h-7 bg-white dark:bg-zinc-800 rounded-lg flex items-center justify-center shadow-sm">
-                                    <Eye size={12} className="text-slate-400 dark:text-blue-400" />
+                            <div className="grid gap-3">
+                              <div className="flex items-center justify-between p-4 bg-black/[0.02] dark:bg-white/[0.02] rounded-2xl border border-black/[0.04] dark:border-white/[0.04] group/tile transition-all hover:bg-white dark:hover:bg-white/[0.06]">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-white dark:bg-zinc-800 rounded-xl flex items-center justify-center shadow-sm text-amber-500 group-hover/tile:scale-110 transition-transform">
+                                    <Eye size={14} />
                                   </div>
-                                  <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-tighter">Views</span>
+                                  <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest">Alcance</span>
                                 </div>
-                                <p className="text-sm font-black text-slate-800 dark:text-white">{(page.views_count || 0).toLocaleString()}</p>
+                                <p className="text-sm font-black text-foreground">{(page.views_count || 0).toLocaleString()}</p>
                               </div>
 
-                              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-slate-100/50 dark:border-white/5">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-7 h-7 bg-white dark:bg-zinc-800 rounded-lg flex items-center justify-center shadow-sm">
-                                    <Calendar size={12} className="text-slate-400 dark:text-purple-400" />
+                              <div className="flex items-center justify-between p-4 bg-black/[0.02] dark:bg-white/[0.02] rounded-2xl border border-black/[0.04] dark:border-white/[0.04] group/tile transition-all hover:bg-white dark:hover:bg-white/[0.06]">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-white dark:bg-zinc-800 rounded-xl flex items-center justify-center shadow-sm text-purple-500 group-hover/tile:scale-110 transition-transform">
+                                    <Calendar size={14} />
                                   </div>
-                                  <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-tighter">Criada</span>
+                                  <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest">Desde</span>
                                 </div>
-                                <p className="text-[11px] font-bold text-slate-800 dark:text-white/80">{new Date(page.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</p>
+                                <p className="text-[11px] font-black text-foreground/70">{new Date(page.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</p>
                               </div>
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                              <button onClick={(e) => handleCopyAction(page.id, page.slug, e)} className="flex-[2] flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-white/70 rounded-xl text-[10px] font-bold transition-all border border-slate-100 dark:border-white/5">
+                          <div className="space-y-3">
+                            <div className="flex gap-2.5">
+                              <button onClick={(e) => handleCopyAction(page.id, page.slug, e)} className="flex-1 flex items-center justify-center gap-2 py-3 bg-white/40 dark:bg-white/5 hover:bg-primary/5 hover:text-primary text-muted-foreground/60 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all border border-black/[0.04] dark:border-white/[0.04] active:scale-95">
                                 <LinkIcon size={12} className={cn(copiedId === page.id && "text-green-500")} /> {copiedId === page.id ? 'Pronto' : 'Link'}
                               </button>
-                              <button onClick={() => window.open(`/bio/${page.slug}`, '_blank')} className="flex-[2] flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-white/70 rounded-xl text-[10px] font-bold transition-all border border-slate-100 dark:border-white/5">
-                                <ExternalLink size={12} /> Bio
+                              <button onClick={() => window.open(`/bio/${page.slug}`, '_blank')} className="flex-1 flex items-center justify-center gap-2 py-3 bg-white/40 dark:bg-white/5 hover:bg-blue-500/5 hover:text-blue-500 text-muted-foreground/60 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all border border-black/[0.04] dark:border-white/[0.04] active:scale-95">
+                                <ArrowUpRight size={12} /> Visitar
                               </button>
-                              <button onClick={() => handleDeletePage(page.id)} className="flex-1 flex items-center justify-center bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl transition-all border border-red-100 dark:border-red-500/20 shadow-sm">
+                              <button onClick={() => handleDeletePage(page.id)} className="h-10 w-10 flex items-center justify-center bg-rose-500/5 hover:bg-rose-500 hover:text-white text-rose-500 rounded-xl transition-all border border-rose-500/20 active:scale-90 shadow-inner">
                                 <Trash2 size={12} />
                               </button>
                             </div>
@@ -395,20 +456,20 @@ export default function BioAdminPage() {
                                 onClick={() => handleEditNavigate(page.id)}
                                 disabled={navigatingId === page.id}
                                 className={cn(
-                                  "w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-[11px] font-black transition-all shadow-lg active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed",
+                                  "w-full flex items-center justify-center gap-3 h-14 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed",
                                   navigatingId === page.id 
                                     ? "bg-zinc-800 text-white" 
-                                    : "bg-slate-900 dark:bg-[#e91c74] hover:bg-black dark:hover:bg-[#d01866] text-white shadow-slate-200 dark:shadow-none"
+                                    : "bg-primary hover:bg-primary/90 text-white shadow-primary/20"
                                 )}
                               >
                                 {navigatingId === page.id ? (
                                   <>
-                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Abrindo...
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Abrindo Painel...
                                   </>
                                 ) : (
                                   <>
-                                    <Edit3 size={14} /> Editar Perfil
+                                    <Sparkles size={14} className="animate-pulse" /> Customizar Bio
                                   </>
                                 )}
                               </button>
@@ -416,77 +477,75 @@ export default function BioAdminPage() {
                           </div>
                         </div>
 
-                        <div className="w-[38%] bg-slate-50 dark:bg-zinc-950 flex items-center justify-center relative overflow-hidden border-l border-slate-100 dark:border-white/5">
-                          <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 dark:from-blue-900/10 to-transparent"></div>
+                        <div className="w-[40%] bg-zinc-100 dark:bg-black/40 flex items-center justify-center relative overflow-hidden border-l border-black/[0.04] dark:border-white/[0.04]">
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(var(--primary),0.1),transparent)]" />
                           <MiniBioPreview page={page} />
-                          <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-                            <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Live</span>
+                          <div className="absolute bottom-6 right-6 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]"></span>
+                            <span className="text-[8px] font-black text-foreground/40 uppercase tracking-[0.3em]">Ambiente Live</span>
                           </div>
                         </div>
                       </motion.div>
                     ))}
-                  </div>
+                  </motion.div>
                 ) : (
-                  <div className="bg-white dark:bg-card rounded-2xl border shadow-sm overflow-hidden">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-[2.5rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-xl"
+                  >
+                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
-                          <TableHead className="font-bold uppercase text-[10px] tracking-widest opacity-50">Corretor / Página</TableHead>
-                          <TableHead className="font-bold uppercase text-[10px] tracking-widest opacity-50">Slug</TableHead>
-                          <TableHead className="text-center font-bold uppercase text-[10px] tracking-widest opacity-50">Performance</TableHead>
-                          <TableHead className="hidden md:table-cell font-bold uppercase text-[10px] tracking-widest opacity-50">Responsável</TableHead>
-                          <TableHead className="hidden md:table-cell font-bold uppercase text-[10px] tracking-widest opacity-50">Data</TableHead>
-                          <TableHead className="text-right font-bold uppercase text-[10px] tracking-widest opacity-50">Ações</TableHead>
+                        <TableRow className="border-black/[0.04] dark:border-white/[0.04] bg-black/[0.02] dark:bg-white/[0.01]">
+                          <TableHead className="h-14 font-black uppercase text-[10px] tracking-[0.2em] text-muted-foreground/40 pl-8">Proprietário / Hub</TableHead>
+                          <TableHead className="h-14 font-black uppercase text-[10px] tracking-[0.2em] text-muted-foreground/40">Sincronização</TableHead>
+                          <TableHead className="h-14 text-center font-black uppercase text-[10px] tracking-[0.2em] text-muted-foreground/40">Métricas</TableHead>
+                          <TableHead className="h-14 hidden md:table-cell font-black uppercase text-[10px] tracking-[0.2em] text-muted-foreground/40">Criado em</TableHead>
+                          <TableHead className="h-14 text-right font-black uppercase text-[10px] tracking-[0.2em] text-muted-foreground/40 pr-8">Configurações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredPages.map((page) => (
-                          <TableRow key={page.id} className="group cursor-pointer hover:bg-gray-50/50 transition-colors">
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
+                          <TableRow key={page.id} className="group border-black/[0.04] dark:border-white/[0.04] hover:bg-white dark:hover:bg-white/[0.02] transition-colors">
+                            <TableCell className="pl-8 py-5">
+                              <div className="flex items-center gap-4">
+                                <Avatar className="h-11 w-11 rounded-xl border border-white/40 dark:border-white/10 shadow-sm">
                                   <AvatarImage src={page.foto_url} className="object-cover" style={{ objectPosition: page.tema?.foto_posicao || 'center' }} />
-                                  <AvatarFallback className="text-[10px] font-bold">{page.nome?.substring(0, 2)}</AvatarFallback>
+                                  <AvatarFallback className="text-[10px] font-black bg-primary/10 text-primary">{page.nome?.substring(0, 2).toUpperCase()}</AvatarFallback>
                                 </Avatar>
-                                <span className="font-bold text-sm text-foreground">{page.nome}</span>
+                                <div className="flex flex-col">
+                                  <span className="font-black text-sm text-foreground tracking-tight">{page.nome}</span>
+                                  <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">{page.profiles?.full_name || 'Agente Flow63'}</span>
+                                </div>
                               </div>
                             </TableCell>
-                            <TableCell className="font-mono text-xs text-blue-600 font-bold">/{page.slug}</TableCell>
+                            <TableCell>
+                              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                <Globe size={10} />
+                                <span className="text-[9px] font-black uppercase tracking-[0.1em]">bio/{page.slug}</span>
+                              </div>
+                            </TableCell>
                             <TableCell className="text-center">
                               <div className="flex flex-col items-center">
-                                <span className="font-bold text-sm">{(page.views_count || 0).toLocaleString()}</span>
-                                <span className="text-[9px] uppercase font-black opacity-30 tracking-widest">Views</span>
+                                <span className="font-black text-sm text-foreground">{(page.views_count || 0).toLocaleString()}</span>
+                                <span className="text-[8px] uppercase font-black text-muted-foreground/30 tracking-[0.2em]">Interações</span>
                               </div>
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-6 w-6">
-                                  <AvatarImage src={page.profiles?.avatar_url} />
-                                  <AvatarFallback className="text-[8px]">{page.profiles?.full_name?.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <span className="font-medium">{page.profiles?.full_name || 'Central63'}</span>
-                              </div>
+                            <TableCell className="hidden md:table-cell">
+                               <span className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+                                 {new Date(page.created_at).toLocaleDateString('pt-BR')}
+                               </span>
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground hidden md:table-cell font-medium">
-                              {new Date(page.created_at).toLocaleDateString('pt-BR')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Link href={`/admin/bio/edit/${page.id}`}>
-                                  <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-blue-600 rounded-xl">
-                                    <Edit2 size={16} />
-                                  </Button>
-                                </Link>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-[#e91c74] rounded-xl" onClick={(e) => handleCopyAction(page.id, page.slug, e)}>
+                            <TableCell className="text-right pr-8">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all" onClick={() => handleEditNavigate(page.id)}>
+                                  <Edit3 size={16} />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground/40 hover:text-blue-500 hover:bg-blue-500/5 rounded-xl transition-all" onClick={(e) => handleCopyAction(page.id, page.slug, e)}>
                                   <Copy size={16} />
                                 </Button>
-                                <Link href={`/bio/${page.slug}`} target="_blank">
-                                  <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-emerald-600 rounded-xl">
-                                    <ExternalLink size={16} />
-                                  </Button>
-                                </Link>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-red-600 rounded-xl" onClick={() => handleDeletePage(page.id)}>
+                                <Button variant="ghost" size="icon" className="h-10 w-10 text-rose-500/40 hover:text-rose-500 hover:bg-rose-500/5 rounded-xl transition-all" onClick={() => handleDeletePage(page.id)}>
                                   <Trash2 size={16} />
                                 </Button>
                               </div>
@@ -495,13 +554,13 @@ export default function BioAdminPage() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
+                  </motion.div>
                 )}
-              </>
+              </AnimatePresence>
             )}
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   )
 }

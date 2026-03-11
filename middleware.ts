@@ -90,9 +90,12 @@ export async function middleware(request: NextRequest) {
         '/chat-support', '/support', '/campaigns'
       ]
 
+      const isBioAdminRoute = path.startsWith('/admin/bio')
+      
       const isRestrictedRoute = 
         restrictedRoutes.some(route => path.startsWith(route)) && 
-        !path.startsWith('/brokers/my-card')
+        !path.startsWith('/brokers/my-card') &&
+        !isBioAdminRoute
 
       const role = profile?.role
       const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(role || '')
