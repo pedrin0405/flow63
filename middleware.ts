@@ -31,21 +31,22 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // ATUALIZAÇÃO: getUser() no lugar de getSession() valida o token de verdade
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/forgot-password')
   const isPublicFormRoute = path.startsWith('/forms/') && path !== '/forms'
   const isPublicBioRoute = path.startsWith('/bio/')
 
-  // Proteção básica de rotas não logadas
-  if (!session && !isAuthRoute && !isPublicFormRoute && !isPublicBioRoute) {
+  // Proteção básica de rotas não logadas usando 'user'
+  if (!user && !isAuthRoute && !isPublicFormRoute && !isPublicBioRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (session) {
+  if (user) {
     const isRootRoute = path === '/'
     
     // Lista de rotas proibidas para corretores
@@ -53,7 +54,7 @@ export async function middleware(request: NextRequest) {
       '/services', 
       '/homes', 
       '/units', 
-      '/brokers',
+      '/brokers', // Cuidado com essa rota base
       '/admin', 
       '/indicators', 
       '/forms', 
@@ -64,16 +65,17 @@ export async function middleware(request: NextRequest) {
       '/campaigns'
     ]
 
-    const isRestrictedRoute = restrictedRoutes.some(route => path.startsWith(route))
+    // CORREÇÃO DO LOOP: Exclui expressamente a rota para a qual você redireciona quem não tem permissão
+    const isRestrictedRoute = 
+      restrictedRoutes.some(route => path.startsWith(route)) && 
+      !path.startsWith('/brokers/my-card')
 
-    // Só consulta o banco de dados se for acessar a Home, o Login ou uma Rota Restrita
-    // (Isso deixa o sistema mais rápido e evita bugs de Edge Runtime)
     if (isRootRoute || isRestrictedRoute || path === '/login') {
       try {
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', session.user.id)
+          .eq('id', user.id) // atualizado para user.id
           .single()
 
         const role = profile?.role
@@ -103,13 +105,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public assets (images, etc)
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
