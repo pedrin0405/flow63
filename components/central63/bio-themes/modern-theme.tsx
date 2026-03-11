@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   UserPlus, 
   MessageCircle, 
@@ -11,9 +12,11 @@ import {
   Globe, 
   Twitter,
   Link as LinkIcon,
-  ArrowUpRight
+  ArrowUpRight,
+  Maximize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BioPropertyDetails } from "../bio-property-details";
 
 interface ThemeProps {
   data: any;
@@ -53,9 +56,10 @@ const getSpotifyEmbed = (url: string) => {
 };
 
 export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: ThemeProps) {
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+
   const socialDomains = ["instagram.com", "linkedin.com", "twitter.com", "x.com", "github.com", "youtube.com", "facebook.com", "tiktok.com"];
-  
-  // 🔴 CORREÇÃO AQUI: Impede que YouTube e Spotify virem ícones pequenos e os força para a lista de embeds
+
   const socialLinks = visibleLinks?.filter(link => 
     link.type !== "youtube" && 
     link.type !== "spotify" && 
@@ -95,14 +99,14 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
         "mx-auto flex flex-col pb-24",
         isPreview ? "max-w-full px-4 pt-4 gap-4" : "max-w-[1100px] lg:flex-row lg:py-16 pt-8 px-4 lg:px-0 gap-10"
       )}>
-        
+
         {/* COLUNA ESQUERDA: HERO CARD */}
         <div className={cn(
           "w-full shrink-0",
           !isPreview && "lg:w-[420px]"
         )}>
           <div className={cn(!isPreview && "lg:sticky lg:top-16")}>
-            
+
             <motion.div 
               initial={{ y: -20, opacity: 0 }} 
               animate={{ y: 0, opacity: 1 }}
@@ -117,7 +121,7 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
             >
               <div className="absolute -top-20 -left-20 w-64 h-64 rounded-full mix-blend-overlay filter blur-[80px] pointer-events-none opacity-40" style={{ backgroundColor: tema.button_bg }} />
               <div className="absolute -bottom-20 -right-20 w-64 h-64 rounded-full mix-blend-overlay filter blur-[80px] pointer-events-none opacity-20" style={{ backgroundColor: tema.text_color }} />
-              
+
               <div className="relative z-10 flex flex-col items-center text-center">
                 <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }}>
                   <img 
@@ -127,21 +131,24 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
                       "mx-auto rounded-full object-cover border-4 shadow-2xl",
                       isPreview ? "w-20 h-20" : "w-28 h-28"
                     )}
-                    style={{ borderColor: tema.button_bg }}
+                    style={{ 
+                      borderColor: tema.button_bg,
+                      objectPosition: tema.foto_posicao || "center"
+                    }}
                   />
                 </motion.div>
 
                 <h2 className="mt-6 text-[11px] font-black uppercase tracking-[4px] opacity-60" style={{ color: tema.text_color }}>
                   {data.headline || "Corretor Imobiliário"}
                 </h2>
-                
+
                 <h1 className={cn(
                   "mt-3 mb-4 font-black leading-[1.1] tracking-tighter",
                   isPreview ? "text-[22px]" : "text-4xl"
                 )} style={{ color: tema.text_color }}>
                   {data.nome} 
                 </h1>
-                
+
                 <p className={cn(
                   "leading-relaxed opacity-70 font-medium",
                   isPreview ? "text-[13px] px-2" : "text-[16px] px-4"
@@ -156,9 +163,9 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     className="mt-8 w-full py-4 rounded-full flex items-center justify-center gap-0 font-black text-[11px] uppercase tracking-[3px] transition-all shadow-[0_0_40px_rgba(0,0,0,0.2)] hover:shadow-[0_0_40px_rgba(0,0,0,0.4)] border border-white/10"
-                    style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
+                    style={{ backgroundColor: tema.button_bg, color: "#ffffff" }}
                   >
-                    <MessageCircle className="w-15 h-5" />
+                    <MessageCircle className="w-5 h-5 mr-3" />
                     <span>WhatsApp</span>
                   </motion.a>
                 )}
@@ -187,7 +194,7 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
 
         {/* COLUNA DIREITA: CONTEÚDO */}
         <div className="flex-1 w-full flex flex-col">
-          
+
           {socialLinks.length > 0 && (
             <div className={cn(
               "flex flex-wrap items-center justify-center gap-4 mt-6",
@@ -211,27 +218,36 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
 
           {data.featured_properties?.enabled && data.featured_properties.items?.length > 0 && (
             <div className={cn(isPreview ? "mt-6" : "mt-8 lg:mt-0")}>
-              <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center justify-between mb-5 px-1">
                 <h3 className="text-[11px] font-black uppercase tracking-[4px] opacity-50" style={{ color: tema.text_color }}>Portfólio</h3>
-                <span className="text-[9px] font-black uppercase tracking-widest opacity-40 cursor-pointer hover:opacity-80 transition-opacity">ver tudo</span>
+                <span className="text-[9px] font-black uppercase tracking-widest opacity-40 cursor-pointer hover:opacity-80 transition-opacity">exclusivos</span>
               </div>
-              
-              <div className="flex gap-4 overflow-x-auto pb-6 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+
+              {/* GRID RESPONSIVO: Scroll no mobile, Grid no Desktop */}
+              <div className={cn(
+                "flex pb-6 snap-x snap-mandatory scrollbar-hide",
+                isPreview ? "gap-4 overflow-x-auto" : "gap-4 overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0"
+              )}>
                 {data.featured_properties.items.map((imovel: any) => (
                   <motion.div 
                     key={imovel.id} 
                     whileHover={{ y: -6 }}
+                    onClick={() => setSelectedProperty(imovel)}
                     className={cn(
                       "shrink-0 snap-center relative rounded-[2rem] overflow-hidden shadow-2xl group cursor-pointer border border-white/10",
-                      isPreview ? "w-[180px] h-[240px]" : "min-w-[260px] w-[260px] h-[340px]"
+                      isPreview ? "w-[180px] h-[240px]" : "min-w-[260px] w-full lg:w-auto h-[320px]"
                     )}
                   >
                     <img src={imovel.imagem} alt={imovel.titulo} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                    
+
+                    <div className="absolute top-4 right-4 p-2 rounded-full bg-white/10 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all">
+                      <Maximize2 className="w-4 h-4 text-white" />
+                    </div>
+
                     <div className="absolute bottom-5 left-5 right-5">
-                      <h4 className="text-white font-bold text-[17px] leading-tight mb-1 line-clamp-2">{imovel.titulo}</h4>
-                      <p className="text-white/60 text-[11px] font-bold uppercase tracking-[2px] truncate">{imovel.preco || imovel.localizacao}</p>
+                      <h4 className="text-white font-bold text-[16px] leading-tight mb-1 line-clamp-2">{imovel.titulo}</h4>
+                      <p className="text-white/60 text-[10px] font-bold uppercase tracking-[2px] truncate">{imovel.preco || imovel.localizacao}</p>
                     </div>
                   </motion.div>
                 ))}
@@ -243,7 +259,7 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
           {regularLinks.length > 0 && (
             <div className={cn("flex flex-col gap-3.5", isPreview ? "mt-4" : "mt-8")}>
               {regularLinks.map((link: any, index: number) => {
-                
+
                 // RENDER DO PLAYER (YouTube / Spotify)
                 if (link.type === "youtube" || link.type === "spotify") {
                   return (
@@ -260,7 +276,7 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
                             "rounded-full flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(0,0,0,0.2)]",
                             isPreview ? "w-9 h-9" : "w-11 h-11"
                           )}
-                          style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
+                          style={{ backgroundColor: tema.button_bg, color: "#ffffff" }}
                         >
                           {link.type === "youtube" ? (
                             <Youtube className={cn(isPreview ? "w-4 h-4" : "w-5 h-5")} />
@@ -325,7 +341,7 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
                           "rounded-full flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(0,0,0,0.2)]",
                           isPreview ? "w-10 h-10" : "w-12 h-12"
                         )}
-                        style={{ backgroundColor: tema.button_bg, color: tema.button_text }}
+                        style={{ backgroundColor: tema.button_bg, color: "#ffffff" }}
                       >
                         {link.type === "vcard" ? <UserPlus className="w-5 h-5" /> : <LinkIcon className="w-4 h-4" />}
                       </div>
@@ -336,7 +352,7 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
                         {link.title}
                       </span>
                     </div>
-                    
+
                     <div className="pr-5 opacity-20 group-hover:opacity-100 transition-opacity">
                       <ArrowUpRight className="w-5 h-5" style={{ color: tema.text_color }} />
                     </div>
@@ -346,8 +362,41 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
             </div>
           )}
         </div>
-        
+
       </div>
+
+      <AnimatePresence>
+        {selectedProperty && (
+          <BioPropertyDetails 
+            property={selectedProperty} 
+            onClose={() => setSelectedProperty(null)} 
+            tema={tema}
+            whatsappNumber={data.whatsapp?.number}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* WHATSAPP FLUTUANTE */}
+      {data.whatsapp?.enabled && data.whatsapp.number && !isPreview && (
+        <motion.a 
+          href={`https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message)}`}
+          target="_blank"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          whileHover={{ scale: 1.1, rotate: 5 }}
+          whileTap={{ scale: 0.9 }}
+          className={cn(
+            "fixed rounded-full flex items-center justify-center shadow-2xl z-[100] transition-all bottom-8 right-8 w-16 h-16"
+          )}
+          style={{ backgroundColor: "#25D366", color: "#ffffff" }}
+        >
+          <MessageCircle className="w-8 h-8" />
+          <span className="absolute -top-1 -right-1 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+          </span>
+        </motion.a>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { usePathname } from 'next/navigation'
 
 const ATENDENTES = [
   { id: 'marketing_1', nome: 'Equipe Marketing', cargo: 'Marketing' },
@@ -18,9 +19,13 @@ const ATENDENTES = [
 
 export function SuportePopup() {
   const { toast } = useToast()
+  const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   
+  // Ocultar suporte em páginas de bio públicas
+  const isBioPage = pathname?.startsWith('/bio/')
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -333,7 +338,7 @@ export function SuportePopup() {
     }
   }
 
-  if (!mounted) return null;
+  if (!mounted || isBioPage) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50">

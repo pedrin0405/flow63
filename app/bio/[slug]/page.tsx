@@ -44,8 +44,16 @@ const socialIcons: Record<string, any> = {
   email: Mail,
 };
 
-export default async function BioPublicPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function BioPublicPage({ 
+  params,
+  searchParams
+}: { 
+  params: Promise<{ slug: string }>,
+  searchParams: Promise<{ isPreview?: string }>
+}) {
   const { slug } = await params;
+  const { isPreview } = await searchParams;
+  const isPreviewMode = isPreview === "true";
   
   // Buscando os dados da página de bio no Supabase
   const { data: bioPage, error } = await supabase
@@ -60,42 +68,14 @@ export default async function BioPublicPage({ params }: { params: Promise<{ slug
 
   const data = bioPage;
 
+  if (isPreviewMode) {
+    return <BioClientContent data={data} slug={slug} isPreview={true} />;
+  }
+
   return (
-    <main >
-
-      {/* Redes Sociais */}
-      <div className="flex gap-5 mb-10">
-        {data.redes_sociais?.map((social: any, index: number) => {
-          const Icon = socialIcons[social.platform.toLowerCase()] || Globe;
-          return (
-            <a 
-              key={index} 
-              href={social.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:scale-125 transition-transform p-2 bg-white/10 rounded-full backdrop-blur-sm shadow-lg"
-            >
-              <Icon className="w-6 h-6" />
-            </a>
-          );
-        })}
-      </div>
-
+    <main className="min-h-screen flex flex-col">
       {/* Conteúdo Dinâmico (Links, Leads, etc) */}
-      <BioClientContent data={data} slug={params.slug} />
-
-      {/* Rodapé / Branding */}
-      <footer className="mt-auto pt-20 pb-6 opacity-40 text-[10px] flex flex-col items-center gap-2">
-        <div className="flex items-center gap-1 uppercase tracking-widest">
-          <span>Desenvolvido por</span>
-          <span className="font-black">Flow63</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span>Privacidade</span>
-          <span>•</span>
-          <span>Termos</span>
-        </div>
-      </footer>
+      <BioClientContent data={data} slug={slug} />
     </main>
   );
 }

@@ -35,7 +35,10 @@ import {
   ExternalLink,
   ChevronDown,
   Sparkles,
-  Zap
+  Zap,
+  AlertCircle,
+  CheckCircle2,
+  Copy
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,8 +63,12 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [activeSection, setActiveSection] = useState("conteudo");
 
+  const [navigatingId, setNavigatingId] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   const [formData, setFormData] = useState({
     nome: initialData?.nome || "",
+    headline: initialData?.headline || "Corretor Imobiliário",
     slug: initialData?.slug || "",
     bio: initialData?.bio || "",
     foto_url: initialData?.foto_url || "",
@@ -96,33 +103,83 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
       text_color: initialData?.tema?.text_color || "#f8fafc",
       button_bg: initialData?.tema?.button_bg || "#3b82f6",
       button_text: initialData?.tema?.button_text || "#ffffff",
-      button_style: initialData?.tema?.button_style || "rounded-xl"
+      button_style: initialData?.tema?.button_style || "rounded-xl",
+      foto_posicao: initialData?.tema?.foto_posicao || "center"
     }
   });
+
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+
+  useEffect(() => {
+    const checkSlug = async () => {
+      if (!formData.slug) {
+        setSlugStatus('idle');
+        return;
+      }
+
+      const slugRegex = /^[a-z0-9-]+$/;
+      if (!slugRegex.test(formData.slug)) {
+        setSlugStatus('invalid');
+        return;
+      }
+
+      if (id && formData.slug === initialData?.slug) {
+        setSlugStatus('available');
+        return;
+      }
+
+      setSlugStatus('checking');
+      
+      try {
+        const { data, error } = await supabase
+          .from("bio_pages")
+          .select("id")
+          .eq("slug", formData.slug)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          setSlugStatus('taken');
+        } else {
+          setSlugStatus('available');
+        }
+      } catch (err) {
+        console.error("Error checking slug:", err);
+        setSlugStatus('idle');
+      }
+    };
+
+    const timer = setTimeout(() => {
+      checkSlug();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formData.slug, id, initialData?.slug]);
 
   const applyPreset = (preset: string) => {
     const presets: Record<string, any> = {
       modern: {
         preset: "modern",
-        bg_color: "#0f172a",
-        text_color: "#f8fafc",
-        button_bg: "#3b82f6",
+        bg_color: "#050505", 
+        text_color: "#ffffff", 
+        button_bg: "#e91c74", 
         button_text: "#ffffff",
         button_style: "rounded-xl"
       },
       glass: {
         preset: "glass",
-        bg_color: "#f8fafc",
-        text_color: "#0f172a",
-        button_bg: "rgba(255, 255, 255, 0.4)",
-        button_text: "#0f172a",
+        bg_color: "#050505", 
+        text_color: "#ffffff", 
+        button_bg: "#e91c74", 
+        button_text: "#ffffff",
         button_style: "rounded-2xl"
       },
       minimalist: {
         preset: "minimalist",
-        bg_color: "#ffffff",
-        text_color: "#000000",
-        button_bg: "#000000",
+        bg_color: "#050505", 
+        text_color: "#ffffff", 
+        button_bg: "#e91c74", 
         button_text: "#ffffff",
         button_style: "rounded-none"
       }
@@ -130,31 +187,41 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
     setFormData({ ...formData, tema: presets[preset] });
   };
 
+  const [brokerSearchQuery, setBrokerSearchQuery] = useState("");
+  const [brokerSearchResults, setBrokerSearchResults] = useState<any[]>([]);
+  const [searchingBrokers, setSearchingBrokers] = useState(false);
+
   const handleSearchProperties = async () => {
     if (!searchQuery) return;
     setLoading(true);
     try {
+      const isNumeric = /^\d+$/.test(searchQuery);
+      
+      const buildQuery = (table: string) => {
+        let q = supabase.from(table).select("codigo, titulo, urlfotoprincipal, valor, endereco, bairro, cidade, tipo");
+        
+        // Se for numérico, busca por código OU texto. Se não, apenas texto.
+        // O Supabase permite misturar operadores no .or()
+        const orFilter = isNumeric 
+          ? `codigo.eq.${searchQuery},titulo.ilike.%${searchQuery}%,endereco.ilike.%${searchQuery}%,bairro.ilike.%${searchQuery}%`
+          : `titulo.ilike.%${searchQuery}%,endereco.ilike.%${searchQuery}%,bairro.ilike.%${searchQuery}%`;
+        
+        return q.or(orFilter).limit(8);
+      };
+
       const [pmwRes, auxRes] = await Promise.all([
-        supabase
-          .from("imovel_pmw")
-          .select("codigo, urlfotoprincipal, valor, endereco, bairro, cidade, tipo")
-          .or(`endereco.ilike.%${searchQuery}%,codigo.ilike.%${searchQuery}%,bairro.ilike.%${searchQuery}%`)
-          .limit(6),
-        supabase
-          .from("imovel_aux")
-          .select("codigo, urlfotoprincipal, valor, endereco, bairro, cidade, tipo")
-          .or(`endereco.ilike.%${searchQuery}%,codigo.ilike.%${searchQuery}%,bairro.ilike.%${searchQuery}%`)
-          .limit(6)
+        buildQuery("imovel_pmw"),
+        buildQuery("imovel_aux")
       ]);
 
-      if (pmwRes.error) throw pmwRes.error;
-      if (auxRes.error) throw auxRes.error;
-
-      const combined = [...(pmwRes.data || []), ...(auxRes.data || [])];
+      // Ignora erros de tabelas que podem não existir no ambiente
+      const pmwData = pmwRes.data || [];
+      const auxData = auxRes.data || [];
+      const combined = [...pmwData, ...auxData];
 
       const mapped = combined.map((u: any) => ({
-        id: u.codigo || Math.random().toString(),
-        titulo: u.endereco || u.bairro || "Imóvel",
+        id: u.codigo?.toString() || Math.random().toString(),
+        titulo: u.titulo || u.endereco || u.bairro || "Imóvel",
         preco: u.valor || "Sob consulta",
         localizacao: `${u.bairro || ""} - ${u.cidade || ""}`,
         imagem: u.urlfotoprincipal || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400",
@@ -164,11 +231,57 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
       setSearchResults(mapped);
       if (mapped.length === 0) toast.info("Nenhum imóvel encontrado");
     } catch (error: any) {
-      console.error("Erro detalhado na busca:", error);
-      toast.error(`Erro ao buscar imóveis: ${error.message || "Erro desconhecido"}`);
+      console.error("Erro na busca de imóveis:", error);
+      toast.error(`Erro ao buscar imóveis: ${error.message}`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearchBrokers = async () => {
+    if (!brokerSearchQuery) return;
+    setSearchingBrokers(true);
+    try {
+      const buildQuery = (table: string) => 
+        supabase.from(table)
+          .select("nome, imagem_url, unidade, departamento")
+          .ilike("nome", `%${brokerSearchQuery}%`)
+          .limit(5);
+
+      const [pmwRes, auxRes] = await Promise.all([
+        buildQuery("corretores_pmw"),
+        buildQuery("corretores_aux")
+      ]);
+
+      const combined = [...(pmwRes.data || []), ...(auxRes.data || [])];
+      setBrokerSearchResults(combined);
+      if (combined.length === 0) toast.info("Nenhum corretor encontrado");
+    } catch (error: any) {
+      console.error("Erro na busca de corretores:", error);
+    } finally {
+      setSearchingBrokers(false);
+    }
+  };
+
+  const applyBrokerData = (broker: any) => {
+    // Gerar slug a partir dos 2 primeiros nomes
+    const generatedSlug = broker.nome
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .join("-")
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, ""); // Remove acentos para garantir URL válida
+
+    setFormData({
+      ...formData,
+      nome: broker.nome,
+      slug: generatedSlug,
+      foto_url: broker.imagem_url || formData.foto_url,
+    });
+    setBrokerSearchResults([]);
+    setBrokerSearchQuery("");
+    toast.success("Dados do corretor aplicados!");
   };
 
   const togglePropertySelection = (imovel: any) => {
@@ -179,11 +292,13 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
         ...formData,
         featured_properties: { ...formData.featured_properties, items: items.filter((i: any) => i.id !== imovel.id) }
       });
+      toast.error("Imóvel removido do portfólio");
     } else {
       setFormData({
         ...formData,
         featured_properties: { ...formData.featured_properties, items: [...items, imovel] }
       });
+      toast.success("Imóvel adicionado ao portfólio");
     }
   };
 
@@ -209,6 +324,7 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
         schedule: { start: "", end: "" }
       }]
     });
+    toast.info("Novo link adicionado");
   };
 
   const handleReorderLinks = (newLinks: any[]) => {
@@ -217,6 +333,7 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
 
   const removeLink = (id: string) => {
     setFormData({ ...formData, links: formData.links.filter((l: any) => l.id !== id) });
+    toast.error("Link removido");
   };
 
   const updateLink = (id: string, field: string, value: any) => {
@@ -234,8 +351,12 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
   };
 
   const handleSave = async () => {
-    setLoading(true);
-    try {
+    if (slugStatus !== 'available') {
+      toast.error("Por favor, escolha um link (slug) válido e disponível antes de salvar.");
+      return;
+    }
+    
+    const promise = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -253,13 +374,16 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
       }
 
       if (error) throw error;
-      toast.success("Alterações publicadas");
+      setShowSuccessModal(true);
       router.refresh();
-    } catch (error: any) {
-      toast.error("Erro: " + error.message);
-    } finally {
-      setLoading(false);
-    }
+      return "Página publicada!";
+    };
+
+    toast.promise(promise(), {
+      loading: 'Publicando...',
+      success: (data) => data,
+      error: (err) => `Erro: ${err.message}`,
+    });
   };
 
   const sidebarItems = [
@@ -335,12 +459,70 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                       <div className="h-6 w-1 bg-blue-600 rounded-full" />
                       <h3 className="text-xl font-black tracking-tight">Identidade</h3>
                     </div>
+
+                    {/* MAGIC FILL CORRETOR */}
+                    <div className="p-5 rounded-[2rem] bg-blue-600/[0.03] border border-blue-600/10 space-y-5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 bg-blue-600 rounded-lg">
+                            <Sparkles className="w-3.5 h-3.5 text-white" />
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-[2px] text-blue-600">Magic Fill Corretor</span>
+                        </div>
+                        {searchingBrokers && <Zap className="w-3 h-3 text-blue-600 animate-pulse" />}
+                      </div>
+
+                      <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
+                        <Input 
+                          placeholder="Buscar corretor por nome..." 
+                          className="h-11 pl-11 rounded-xl bg-white border-none focus:ring-4 focus:ring-blue-500/10 text-sm font-bold shadow-sm"
+                          value={brokerSearchQuery} 
+                          onChange={(e) => setBrokerSearchQuery(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSearchBrokers()}
+                        />
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={handleSearchBrokers} 
+                          disabled={searchingBrokers}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 rounded-lg text-blue-600 hover:bg-blue-600/10 font-black text-[9px] uppercase tracking-widest"
+                        >
+                          {searchingBrokers ? "..." : "Buscar"}
+                        </Button>
+                      </div>
+
+                      {brokerSearchResults.length > 0 && (
+                        <div className="grid grid-cols-1 gap-2 pt-2 animate-in fade-in slide-in-from-top-2">
+                          {brokerSearchResults.map((b, idx) => (
+                            <div 
+                              key={idx} 
+                              onClick={() => applyBrokerData(b)}
+                              className="flex items-center gap-4 p-3 bg-white rounded-2xl border border-black/[0.05] hover:border-blue-600/30 hover:shadow-lg cursor-pointer transition-all hover:scale-[1.01] group"
+                            >
+                              <div className="w-10 h-10 rounded-full overflow-hidden shadow-inner bg-muted">
+                                <img src={b.imagem_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100"} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="text-[11px] font-black">{b.nome}</div>
+                                <div className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{b.unidade || b.departamento || "Consultor"}</div>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-blue-600 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     
                     <div className="flex flex-col md:flex-row gap-10 items-start">
                       <div className="relative group shrink-0 self-center md:self-start">
                         <div className="w-20 h-20 rounded-full bg-white dark:bg-white/5 border border-black/[0.05] shadow-xl overflow-hidden relative cursor-pointer">
                           {formData.foto_url ? (
-                            <img src={formData.foto_url} className="w-full h-full object-cover" />
+                            <img 
+                              src={formData.foto_url} 
+                              className="w-full h-full object-cover" 
+                              style={{ objectPosition: formData.tema.foto_posicao || "center" }}
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-muted opacity-30">
                               <ImageIcon className="h-6 w-6" />
@@ -356,6 +538,71 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                         <div className="space-y-2">
                           <Label className="text-[9px] font-black uppercase opacity-40 tracking-widest ml-1">Nome Profissional</Label>
                           <Input value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} className="h-10 rounded-xl bg-black/[0.02] border-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold text-sm"/>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[9px] font-black uppercase opacity-40 tracking-widest ml-1">Título / Cargo</Label>
+                          <Input 
+                            value={formData.headline} 
+                            onChange={(e) => setFormData({...formData, headline: e.target.value})} 
+                            placeholder="Ex: Corretor Imobiliário"
+                            className="h-10 rounded-xl bg-black/[0.02] border-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between ml-1">
+                            <Label className="text-[9px] font-black uppercase opacity-40 tracking-widest">Link da Página (slug)</Label>
+                            <div className="flex items-center gap-1">
+                              {slugStatus === 'checking' && <Zap className="w-2.5 h-2.5 text-blue-500 animate-pulse" />}
+                              {slugStatus === 'available' && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />}
+                              {slugStatus === 'taken' && <AlertCircle className="w-2.5 h-2.5 text-destructive" />}
+                              {slugStatus === 'invalid' && <AlertCircle className="w-2.5 h-2.5 text-amber-500" />}
+                              <span className={cn(
+                                "text-[8px] font-bold uppercase tracking-wider",
+                                slugStatus === 'available' ? "text-emerald-500" : 
+                                slugStatus === 'taken' ? "text-destructive" : 
+                                slugStatus === 'invalid' ? "text-amber-500" : "text-blue-500"
+                              )}>
+                                {slugStatus === 'idle' && "Digite o link"}
+                                {slugStatus === 'checking' && "Verificando..."}
+                                {slugStatus === 'available' && "Disponível"}
+                                {slugStatus === 'taken' && "Já em uso"}
+                                {slugStatus === 'invalid' && "Formato inválido"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="relative group">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold opacity-30 pointer-events-none">bio/</span>
+                            <Input 
+                              value={formData.slug} 
+                              onChange={(e) => setFormData({...formData, slug: e.target.value.toLowerCase().trim()})} 
+                              placeholder="seu-nome"
+                              className={cn(
+                                "h-10 rounded-xl bg-black/[0.02] border-none focus:ring-4 transition-all font-bold text-sm pl-[42px]",
+                                slugStatus === 'available' ? "focus:ring-emerald-500/10" : 
+                                slugStatus === 'taken' ? "focus:ring-destructive/10" : "focus:ring-blue-500/10"
+                              )}
+                            />
+                          </div>
+                          <p className="text-[8px] text-muted-foreground ml-1 italic">* Use apenas letras, números e hífens.</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[9px] font-black uppercase opacity-40 tracking-widest ml-1">Enquadramento da Foto</Label>
+                          <Select 
+                            value={formData.tema.foto_posicao || "center"} 
+                            onValueChange={(v) => setFormData({...formData, tema: {...formData.tema, foto_posicao: v}})}
+                          >
+                            <SelectTrigger className="h-10 rounded-xl bg-black/[0.02] border-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold text-sm">
+                              <SelectValue placeholder="Selecione o enquadramento" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="top">Topo (Focar rosto)</SelectItem>
+                              <SelectItem value="center">Centro (Padrão)</SelectItem>
+                              <SelectItem value="bottom">Fundo</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="space-y-2">
                           <Label className="text-[9px] font-black uppercase opacity-40 tracking-widest ml-1">Descrição curta</Label>
@@ -458,6 +705,65 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                     </div>
                   </section>
 
+                  {/* PRESETS DE CORES FACILITADOS */}
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-6 w-1 bg-[#e91c74] rounded-full" />
+                      <h3 className="text-xl font-black tracking-tight text-[#e91c74]">Modo de Cores</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button 
+                        onClick={() => setFormData({
+                          ...formData, 
+                          tema: { 
+                            ...formData.tema, 
+                            bg_color: "#ffffff", 
+                            text_color: "#000000", 
+                            button_bg: "#e91c74", 
+                            button_text: "#ffffff" 
+                          }
+                        })}
+                        className="flex items-center justify-between p-5 rounded-[2rem] bg-white border-2 border-black/5 shadow-sm hover:shadow-xl transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-black/5">
+                            <Sparkles className="w-4 h-4 text-[#e91c74]" />
+                          </div>
+                          <span className="text-[11px] font-black uppercase tracking-widest text-black">Modo Claro</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <div className="w-3 h-3 rounded-full bg-[#e91c74]" />
+                          <div className="w-3 h-3 rounded-full bg-slate-200" />
+                        </div>
+                      </button>
+
+                      <button 
+                        onClick={() => setFormData({
+                          ...formData, 
+                          tema: { 
+                            ...formData.tema, 
+                            bg_color: "#050505", 
+                            text_color: "#ffffff", 
+                            button_bg: "#e91c74", 
+                            button_text: "#ffffff" 
+                          }
+                        })}
+                        className="flex items-center justify-between p-5 rounded-[2rem] bg-[#111111] border-2 border-white/5 shadow-sm hover:shadow-xl transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                            <Sparkles className="w-4 h-4 text-[#e91c74]" />
+                          </div>
+                          <span className="text-[11px] font-black uppercase tracking-widest text-white">Modo Escuro</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <div className="w-3 h-3 rounded-full bg-[#e91c74]" />
+                          <div className="w-3 h-3 rounded-full bg-white/10" />
+                        </div>
+                      </button>
+                    </div>
+                  </section>
+
                   <section className="p-8 rounded-[2.5rem] bg-black/[0.01] border border-black/[0.03] space-y-10">
                     <h4 className="text-[10px] font-black tracking-[3px] uppercase opacity-30 text-center">Ajuste Fino</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -537,47 +843,112 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                     </div>
 
                     {formData.featured_properties.enabled && (
-                      <div className="space-y-6 pt-4 animate-in fade-in slide-in-from-top-4">
-                        <div className="relative group">
-                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
-                          <Input 
-                            placeholder="Buscar imóvel..." 
-                            className="h-11 pl-11 rounded-2xl bg-black/[0.02] border-none focus:ring-4 focus:ring-blue-500/10 text-sm font-bold shadow-inner"
-                            value={searchQuery} 
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSearchProperties()}
-                          />
-                        </div>
-                        
-                        <div className="grid grid-cols-1 gap-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar p-1">
-                          {searchResults.length > 0 ? (
-                            searchResults.map(i => {
-                              const isSelected = (formData.featured_properties.items || []).some((s:any) => s.id === i.id);
-                              return (
-                                <div 
-                                  key={i.id} 
-                                  onClick={() => togglePropertySelection(i)} 
-                                  className={cn(
-                                    "p-3 rounded-2xl border-2 cursor-pointer flex items-center gap-4 transition-all duration-300 hover:scale-[1.02]",
-                                    isSelected ? "border-blue-600 bg-blue-600/[0.02]" : "border-transparent bg-black/[0.02] hover:bg-black/[0.04]"
-                                  )}
-                                >
-                                  <img src={i.imagem} className="w-12 h-12 object-cover rounded-xl shadow-md border border-white" />
-                                  <div className="flex-1">
-                                    <div className="text-xs font-black truncate">{i.titulo}</div>
-                                    <div className="text-[10px] font-bold text-blue-600 mt-0.5 tracking-tight">{i.preco}</div>
+                      <div className="space-y-10 pt-4 animate-in fade-in slide-in-from-top-4">
+                        {/* BUSCADOR MAGIC FILL IMÓVEIS */}
+                        <div className="p-5 rounded-[2rem] bg-blue-600/[0.03] border border-blue-600/10 space-y-5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 bg-blue-600 rounded-lg">
+                                <Sparkles className="w-3.5 h-3.5 text-white" />
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-[2px] text-blue-600">Magic Fill Portfólio</span>
+                            </div>
+                            {loading && <Zap className="w-3 h-3 text-blue-600 animate-pulse" />}
+                          </div>
+
+                          <div className="relative group">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
+                            <Input 
+                              placeholder="Buscar por código, título ou bairro..." 
+                              className="h-11 pl-11 rounded-xl bg-white border-none focus:ring-4 focus:ring-blue-500/10 text-sm font-bold shadow-sm"
+                              value={searchQuery} 
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && handleSearchProperties()}
+                            />
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={handleSearchProperties} 
+                              disabled={loading}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 rounded-lg text-blue-600 hover:bg-blue-600/10 font-black text-[9px] uppercase tracking-widest"
+                            >
+                              {loading ? "..." : "Buscar"}
+                            </Button>
+                          </div>
+
+                          {searchResults.length > 0 && (
+                            <div className="grid grid-cols-1 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                              {searchResults.map(i => {
+                                const isSelected = (formData.featured_properties.items || []).some((s:any) => s.id === i.id);
+                                return (
+                                  <div 
+                                    key={i.id} 
+                                    onClick={() => togglePropertySelection(i)} 
+                                    className={cn(
+                                      "p-3 rounded-2xl border-2 cursor-pointer flex items-center gap-4 transition-all duration-300 hover:scale-[1.01] group bg-white",
+                                      isSelected ? "border-blue-600 shadow-md" : "border-black/[0.03] hover:border-blue-600/20"
+                                    )}
+                                  >
+                                    <div className="w-14 h-14 rounded-xl overflow-hidden shadow-inner shrink-0">
+                                      <img src={i.imagem} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-[11px] font-black truncate">{i.titulo}</div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[9px] font-bold text-blue-600">{i.preco}</span>
+                                        <span className="text-[8px] font-bold opacity-30 uppercase tracking-widest truncate">{i.localizacao}</span>
+                                      </div>
+                                    </div>
+                                    <div className={cn("w-6 h-6 rounded-full flex items-center justify-center transition-all", isSelected ? "bg-blue-600 text-white" : "bg-black/5 opacity-40 group-hover:opacity-100")}>
+                                      {isSelected ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                                    </div>
                                   </div>
-                                  <div className={cn("w-6 h-6 rounded-full flex items-center justify-center transition-all", isSelected ? "bg-blue-600 text-white" : "bg-black/5 opacity-40")}>
-                                    {isSelected ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="py-12 text-center border-2 border-dashed border-black/5 rounded-3xl opacity-20">
-                              <p className="text-[10px] font-bold uppercase tracking-widest tracking-[3px]">Pesquise para listar</p>
+                                );
+                              })}
                             </div>
                           )}
+                        </div>
+
+                        {/* LISTAGEM DE SELECIONADOS */}
+                        <div className="space-y-5">
+                          <div className="flex items-center justify-between px-1">
+                            <Label className="text-[10px] font-black uppercase opacity-40 tracking-widest">Imóveis Selecionados ({formData.featured_properties.items?.length || 0})</Label>
+                            {formData.featured_properties.items?.length > 0 && (
+                              <button 
+                                onClick={() => setFormData({...formData, featured_properties: {...formData.featured_properties, items: []}})}
+                                className="text-[9px] font-bold text-destructive uppercase tracking-widest hover:underline"
+                              >
+                                Limpar tudo
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            {formData.featured_properties.items?.map((item: any) => (
+                              <div key={item.id} className="group relative bg-black/[0.02] border border-black/[0.05] rounded-2xl p-3 flex flex-col gap-3 animate-in zoom-in-95 duration-200">
+                                <div className="aspect-video w-full rounded-xl overflow-hidden relative shadow-sm">
+                                  <img src={item.imagem} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                  <button 
+                                    onClick={() => togglePropertySelection(item)}
+                                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/90 backdrop-blur-sm text-destructive flex items-center justify-center shadow-lg hover:scale-110 transition-all opacity-0 group-hover:opacity-100"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="text-[10px] font-black truncate leading-tight">{item.titulo}</div>
+                                  <div className="text-[9px] font-bold text-blue-600">{item.preco}</div>
+                                </div>
+                              </div>
+                            ))}
+
+                            {(!formData.featured_properties.items || formData.featured_properties.items.length === 0) && (
+                              <div className="col-span-2 py-12 text-center border-2 border-dashed border-black/5 rounded-[2rem] opacity-20">
+                                <LayoutGrid className="w-6 h-6 mx-auto mb-2" />
+                                <p className="text-[9px] font-bold uppercase tracking-widest">Nenhum imóvel selecionado</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -611,18 +982,25 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
 
         {/* PREVIEW MOBILE (SYNC COM TEMAS) */}
         <div className="hidden xl:flex w-[38%] bg-[#F5F5F7] dark:bg-black items-center justify-center border-l border-black/[0.03] p-12 relative overflow-hidden">
-          {/* BACKGROUND EFFECTS */}
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-400/[0.02] blur-[120px] rounded-full translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-400/[0.02] blur-[120px] rounded-full -translate-x-1/2 translate-y-1/2" />
+          {/* BACKGROUND EFFECTS - Neutralizados para evitar flashes de cor */}
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-slate-400/[0.03] blur-[120px] rounded-full translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-slate-400/[0.03] blur-[120px] rounded-full -translate-x-1/2 translate-y-1/2" />
 
           <div className="relative w-[280px] h-[580px] bg-white dark:bg-black rounded-[2.8rem] border-[7px] border-black dark:border-[#151515] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] overflow-hidden">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-black dark:bg-[#151515] rounded-b-2xl z-[100]"></div>
             
             <div className="w-full h-full overflow-y-auto scroll-smooth custom-scrollbar relative">
-              {/* RENDERIZAÇÃO DINÂMICA DO TEMA NO PREVIEW */}
-              <AnimatePresence mode="wait">
+              {/* RENDERIZAÇÃO DINÂMICA DO TEMA NO PREVIEW - Removido mode="wait" para cross-fade suave */}
+              <AnimatePresence>
                 {formData.tema.preset === "glass" && (
-                  <motion.div key="preview-glass" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <motion.div 
+                    key="preview-glass" 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0"
+                  >
                     <GlassTheme 
                       data={formData} 
                       visibleLinks={visibleLinks} 
@@ -633,7 +1011,14 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                   </motion.div>
                 )}
                 {formData.tema.preset === "minimalist" && (
-                  <motion.div key="preview-mini" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <motion.div 
+                    key="preview-mini" 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0"
+                  >
                     <MinimalistTheme 
                       data={formData} 
                       visibleLinks={visibleLinks} 
@@ -644,7 +1029,14 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                   </motion.div>
                 )}
                 {formData.tema.preset === "modern" && (
-                  <motion.div key="preview-modern" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <motion.div 
+                    key="preview-modern" 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0"
+                  >
                     <ModernTheme 
                       data={formData} 
                       visibleLinks={visibleLinks} 
@@ -664,6 +1056,62 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {showSuccessModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl border border-black/5 dark:border-white/10 text-center"
+            >
+              <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+              </div>
+              <h2 className="text-2xl font-black tracking-tight mb-2">Site Publicado!</h2>
+              <p className="text-muted-foreground text-sm mb-8">
+                Sua página de links já está no ar e pronta para ser compartilhada.
+              </p>
+              
+              <div className="bg-black/5 dark:bg-white/5 p-4 rounded-2xl mb-8 flex items-center justify-between gap-3 group border border-transparent hover:border-blue-500/20 transition-all">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <Globe className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span className="text-xs font-bold truncate">central63.vercel.com/bio/{formData.slug}</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/bio/${formData.slug}`);
+                    toast.success("Link copiado!");
+                  }}
+                  className="p-2 bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-black/5 dark:border-white/5 active:scale-95 transition-all"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => window.open(`/bio/${formData.slug}`, '_blank')}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98]"
+                >
+                  Visualizar Agora
+                </button>
+                <button 
+                  onClick={() => setShowSuccessModal(false)}
+                  className="w-full py-4 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                >
+                  Continuar Editando
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
