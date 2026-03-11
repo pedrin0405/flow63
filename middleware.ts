@@ -70,13 +70,32 @@ export async function middleware(request: NextRequest) {
       restrictedRoutes.some(route => path.startsWith(route)) && 
       !path.startsWith('/brokers/my-card')
 
-    if (isRootRoute || isRestrictedRoute || path === '/login') {
+    if (isRootRoute || isRestrictedRoute || path === '/login' || path === '/auth/pending') {
       try {
-        const { data: profile } = await supabase
+        // Criar um cliente admin temporário para checagem de status (bypass RLS)
+        const supabaseAdmin = createServerClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
+        )
+
+        const { data: profile } = await supabaseAdmin
           .from('profiles')
-          .select('role')
-          .eq('id', user.id) // atualizado para user.id
-          .single()
+          .select('role, status')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        // 1. Tratamento para novos usuários ou pendentes
+        const isPending = !profile || profile.status === 'pendente'
+        const isPendingRoute = path === '/auth/pending'
+
+        if (isPending && !isPendingRoute && !isAuthRoute && !path.startsWith('/auth/callback')) {
+          return NextResponse.redirect(new URL('/auth/pending', request.url))
+        }
+
+        if (!isPending && isPendingRoute) {
+          return NextResponse.redirect(new URL('/', request.url))
+        }
 
         const role = profile?.role
         const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(role)

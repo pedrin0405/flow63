@@ -45,16 +45,39 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
   const [isInviting, setIsInviting] = useState(false)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "pendente" | "inativo">("todos")
 
   // Filtro de utilizadores
   const filteredUsers = useMemo(() => {
-    return users.filter(u => 
-      u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }, [users, searchTerm])
+    return users.filter(u => {
+      const matchesSearch = u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "todos" || u.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+  }, [users, searchTerm, statusFilter])
 
   // --- Handlers ---
+
+  const handleToggleStatus = async (userId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'ativo' ? 'inativo' : 'ativo';
+    const actionLabel = currentStatus === 'pendente' ? 'autorizar' : (newStatus === 'ativo' ? 'ativar' : 'desativar');
+    
+    if (!confirm(`Deseja realmente ${actionLabel} este usuário?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: currentStatus === 'pendente' ? 'ativo' : newStatus })
+        .eq('id', userId);
+
+      if (error) throw error;
+      toast.success(`Usuário ${currentStatus === 'pendente' ? 'autorizado' : (newStatus === 'ativo' ? 'ativado' : 'desativado')} com sucesso!`);
+      onRefresh();
+    } catch (error) {
+      toast.error("Erro ao atualizar status do usuário.");
+    }
+  }
 
   const handleInviteMember = async () => {
     if (!inviteData.email || !inviteData.email.includes('@')) {
@@ -168,6 +191,18 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+            <SelectTrigger className="w-full sm:w-[140px] h-9 rounded-xl bg-muted/30 border-border/60 text-[10px] font-bold uppercase tracking-wider">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-border/40 backdrop-blur-xl">
+              <SelectItem value="todos" className="text-[10px] font-bold">TODOS</SelectItem>
+              <SelectItem value="ativo" className="text-[10px] font-bold text-emerald-600">ATIVOS</SelectItem>
+              <SelectItem value="pendente" className="text-[10px] font-bold text-amber-600">PENDENTES</SelectItem>
+              <SelectItem value="inativo" className="text-[10px] font-bold text-rose-600">INATIVOS</SelectItem>
+            </SelectContent>
+          </Select>
+
           <div className="relative group w-full sm:w-64">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input 
@@ -226,6 +261,15 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
                     <DropdownMenuItem onClick={() => handleOpenEditUser(u)} className="rounded-xl gap-2.5 py-2.5 cursor-pointer font-bold text-[11px] hover:bg-primary/5">
                       <UserCog className="h-3.5 w-3.5 text-primary" /> Editar Cadastro
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleToggleStatus(u.id, u.status || 'ativo')} className="rounded-xl gap-2.5 py-2.5 cursor-pointer font-bold text-[11px] hover:bg-primary/5">
+                      {u.status === 'pendente' ? (
+                        <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Autorizar Acesso</>
+                      ) : u.status === 'ativo' ? (
+                        <><Shield className="h-3.5 w-3.5 text-rose-500" /> Desativar Usuário</>
+                      ) : (
+                        <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Ativar Usuário</>
+                      )}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleOpenResetPassword(u.id)} className="rounded-xl gap-2.5 py-2.5 cursor-pointer font-bold text-[11px] hover:bg-primary/5">
                       <Key className="h-3.5 w-3.5 text-primary" /> Redefinir Senha
                     </DropdownMenuItem>
@@ -271,12 +315,21 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
                     {u.id === currentUserId && (
                       <Badge variant="outline" className="text-[7px] h-4 px-1.5 font-black uppercase border-primary/40 text-primary bg-primary/5">Dono</Badge>
                     )}
+                    <Badge 
+                      variant="outline" 
+                      className={`text-[7px] h-4 px-1.5 font-black uppercase border-none ${
+                        u.status === 'ativo' ? 'bg-emerald-500/10 text-emerald-600' :
+                        u.status === 'pendente' ? 'bg-amber-500/10 text-amber-600' :
+                        'bg-rose-500/10 text-rose-600'
+                      }`}
+                    >
+                      {u.status || 'ativo'}
+                    </Badge>
                   </div>
                   
                   <CardTitle className="text-base font-black truncate tracking-tight text-foreground leading-none" title={u.full_name}>
-                    {u.full_name || "Pendente"}
+                    {u.full_name && u.full_name !== "Pendente" ? u.full_name : (u.email?.split('@')[0] || "Membro")}
                   </CardTitle>
-
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5 text-muted-foreground font-bold text-[10px] truncate">
                       <AtSign className="h-3 w-3 opacity-40 shrink-0" />

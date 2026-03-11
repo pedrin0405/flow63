@@ -328,7 +328,9 @@ export default function BenefitCardsAdminPage() {
 
                             <div className="mt-6 sm:mt-8 relative z-10">
                               <p className="text-[7px] sm:text-[8px] opacity-30 uppercase tracking-[0.4em] font-black mb-0.5">Membro</p>
-                              <h2 className="text-sm sm:text-lg font-bold tracking-tight uppercase truncate text-white/90 drop-shadow-sm max-w-[75%]">{card.card_display_name || card.profiles?.full_name}</h2>
+                              <h2 className="text-sm sm:text-lg font-bold tracking-tight uppercase truncate text-white/90 drop-shadow-sm max-w-[75%]">
+                                {card.card_display_name || (card.profiles?.full_name && card.profiles.full_name !== "Pendente" ? card.profiles.full_name : card.profiles?.email?.split('@')[0])}
+                              </h2>
                               
                               <div className="flex gap-4 sm:gap-6 mt-3 sm:mt-4">
                                 <div>
@@ -567,7 +569,13 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
     }))
   }
 
-  const selectedUserName = selectedUser?.full_name || "NOME DO MEMBRO";
+  const selectedUserName = useMemo(() => {
+    if (formData.card_display_name) return formData.card_display_name;
+    if (!selectedUser) return "NOME DO MEMBRO";
+    return selectedUser.full_name && selectedUser.full_name !== "Pendente" 
+      ? selectedUser.full_name 
+      : selectedUser.email?.split('@')[0] || "NOME DO MEMBRO";
+  }, [formData.card_display_name, selectedUser]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       .from('benefit_cards')
       .select(`
         *,
-        profiles:user_id (full_name, email)
+        profiles:user_id (*)
       `)
       .eq('id', cardId)
       .maybeSingle()
@@ -50,6 +50,11 @@ export async function GET(req: NextRequest) {
       console.error('Erro ao buscar cartão:', error)
       return NextResponse.json({ error: 'Cartão não encontrado' }, { status: 404 })
     }
+
+    const userName = card.card_display_name || 
+                     (card.profiles?.full_name && card.profiles.full_name !== "Pendente" 
+                        ? card.profiles.full_name 
+                        : card.profiles?.email?.split('@')[0] || "Membro");
 
     // 2. Verificar certificados
     const appleWwdr = process.env.APPLE_WWDR_CERTIFICATE; // Base64 encoded
@@ -67,7 +72,7 @@ export async function GET(req: NextRequest) {
         },
         debug_data: {
           serialNumber: card.apple_pass_serial,
-          userName: card.profiles?.full_name
+          userName: userName
         }
       }, { status: 501 })
     }
@@ -119,7 +124,7 @@ export async function GET(req: NextRequest) {
     pass.generic.addPrimaryFields({
       key: "member",
       label: "CORRETOR",
-      value: card.profiles?.full_name || "Membro"
+      value: userName
     });
 
     pass.generic.addSecondaryFields({
