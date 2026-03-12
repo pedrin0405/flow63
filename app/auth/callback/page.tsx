@@ -36,17 +36,43 @@ export default function AuthCallbackPage() {
           // Verifica se o e-mail do usuário existe na tabela 'profiles'
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('email')
+            .select('*')
             .eq('email', user.email)
             .maybeSingle()
 
-          if (profileError || !profile) {
-            // E-mail não autorizado: encerra a sessão e mostra o modal
-            await supabase.auth.signOut()
-            setErrorMessage("Seu e-mail não está cadastrado na nossa base de usuários autorizados. Entre em contato com o administrador.")
-            setShowErrorModal(true)
-            setIsVerifying(false)
-            return
+          if (profileError) throw profileError
+
+          // Caso 1: Usuário não existe na base (Acesso Externo via Google)
+          if (!profile) {
+            // Cria o perfil como 'pendente'
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert([{
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+                avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+                role: 'Corretor', // Papel padrão inicial
+                status: 'pendente', // Bloqueado até aprovação
+                updated_at: new Date().toISOString()
+              }])
+
+            if (insertError) throw insertError
+
+            // Notifica os gestores via tabela de sistema
+            await supabase.from('system_notifications').insert([{
+              type: 'pending_auth',
+              title: 'Novo Acesso Pendente',
+              message: `O usuário ${user.email} solicitou acesso via Google.`,
+              user_id: user.id
+            }])
+
+            return router.push('/auth/pending')
+          }
+
+          // Caso 2: Usuário já existe, mas está com status pendente
+          if (profile.status === 'pendente') {
+            return router.push('/auth/pending')
           }
 
           // Sucesso: Redireciona para o dashboard

@@ -3,6 +3,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
+import { createClient } from '@supabase/supabase-js'
+
+// Cliente administrativo para operações que exigem bypass de RLS ou acesso a auth.users
+const getSupabaseAdmin = () => createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 // Função auxiliar para obter o cliente Supabase no servidor
 async function getSupabase() {
@@ -90,7 +97,7 @@ export async function getBenefitCards(filters?: { status?: string; search?: stri
       .from('benefit_cards')
       .select(`
         *,
-        profiles:user_id (full_name, email)
+        profiles:user_id (*)
       `)
 
     if (filters?.status && filters.status !== 'all') {
@@ -105,7 +112,7 @@ export async function getBenefitCards(filters?: { status?: string; search?: stri
     if (filters?.search) {
       const search = filters.search.toLowerCase()
       result = result.filter(card => 
-        card.profiles?.full_name?.toLowerCase().includes(search) ||
+        (card.card_display_name || card.profiles?.full_name || "").toLowerCase().includes(search) ||
         card.profiles?.email?.toLowerCase().includes(search)
       )
     }
@@ -199,14 +206,45 @@ export async function getCardWithBenefits(userId: string) {
 export async function getAllUsers() {
   try {
     const supabase = await getSupabase()
-    const { data, error } = await supabase
+    
+    // Primeiro pegamos os profiles
+    const { data: profiles, error: profileError } = await supabase
       .from('profiles')
-      .select('id, full_name, email, role')
+      .select('*')
       .order('full_name')
 
-    if (error) return { success: false, error: error.message }
-    return { success: true, data }
+    if (profileError) throw profileError
+
+    // Se tivermos a service role, tentamos enriquecer com metadados do auth
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const adminClient = getSupabaseAdmin()
+      const { data: { users: authUsers }, error: authError } = await adminClient.auth.admin.listUsers()
+      
+      if (!authError && authUsers) {
+        const enrichedProfiles = profiles.map(p => {
+          const authUser = authUsers.find(au => au.id === p.id)
+          // Tenta pegar o nome de várias fontes: profile, metadata do auth (full_name, name, display_name)
+          const fallbackName = authUser?.user_metadata?.full_name || 
+                               authUser?.user_metadata?.name || 
+                               authUser?.user_metadata?.display_name || 
+                               p.email?.split('@')[0] || 
+                               "Usuário"
+
+          return {
+            ...p,
+            // Prioridade: full_name (se não for nulo/"Pendente") > metadata do auth > fallback
+            full_name: (p.full_name && p.full_name !== "Pendente") 
+              ? p.full_name 
+              : fallbackName
+          }
+        })
+        return { success: true, data: enrichedProfiles }
+      }
+    }
+
+    return { success: true, data: profiles }
   } catch (err: any) {
+    console.error('Erro ao buscar usuários:', err)
     return { success: false, error: err.message }
   }
 }

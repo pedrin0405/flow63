@@ -1,128 +1,332 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { UserPlus, MessageCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, useMotionTemplate } from "framer-motion";
+import { 
+  UserPlus, 
+  MessageCircle, 
+  ArrowUpRight,
+  Maximize2,
+  Sparkles,
+  Link as LinkIcon
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BioPropertyDetails } from "../bio-property-details";
+import { 
+  getSocialIcon, 
+  getYouTubeEmbed, 
+  getSpotifyEmbed, 
+  processLinks, 
+  BioThemeProps 
+} from "@/lib/bio-utils";
 
-interface ThemeProps {
-  data: any;
-  visibleLinks: any[];
-  handleLinkClick: (link: any, index: number) => void;
-  getAnimationProps: (type: string) => any;
-  isPreview?: boolean;
-}
+const FloatParticle = ({ delay = 0, color = "#fff" }) => (
+  <motion.div 
+    initial={{ opacity: 0, scale: 0 }} 
+    animate={{ opacity: [0, 0.5, 0], scale: [0, 1, 0], y: [-20, -100] }} 
+    transition={{ duration: 3 + Math.random() * 2, delay, repeat: Infinity, ease: "easeInOut" }} 
+    className="absolute w-1 h-1 rounded-full pointer-events-none z-0" 
+    style={{ backgroundColor: color, filter: "blur(1px)" }} 
+  />
+);
 
-export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: ThemeProps) {
+export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: BioThemeProps) {
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { socialLinks, regularLinks } = useMemo(() => processLinks(visibleLinks), [visibleLinks]);
+
+  const tema = data.tema || { bg_color: "#050505", text_color: "#ffffff", button_bg: "#3b82f6", button_text: "#ffffff" };
+  const isDark = tema.bg_color === "#050505" || tema.bg_color === "#000000" || tema.text_color === "#ffffff";
+
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const springX = useSpring(mouseX, { stiffness: 100, damping: 20 });
+  const springY = useSpring(mouseY, { stiffness: 100, damping: 20 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const { left, top } = containerRef.current.getBoundingClientRect();
+      mouseX.set(e.clientX - left); mouseY.set(e.clientY - top);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [mouseX, mouseY]);
+
+  const springTransition = { type: "spring", stiffness: 110, damping: 18, mass: 0.8 };
+  const showWhatsApp = data.whatsapp?.enabled && (data.whatsapp?.number || isPreview);
+
+  const baseColor = isDark ? "255,255,255" : "0,0,0";
+  
+  const themeStyles = {
+    "--theme-bg": tema.bg_color,
+    "--theme-text": tema.text_color,
+    "--theme-primary": tema.button_bg,
+    "--theme-primary-text": tema.button_text,
+    "--theme-base-rgb": baseColor,
+    "--theme-glass-opacity": isDark ? "0.12" : "0.08",
+  } as React.CSSProperties;
+
+  const glassPanelStyle = {
+    background: `linear-gradient(135deg, rgba(var(--theme-base-rgb), 0.06) 0%, rgba(var(--theme-base-rgb), 0.01) 100%)`,
+    backdropFilter: "blur(50px) saturate(210%)",
+    WebkitBackdropFilter: "blur(50px) saturate(210%)",
+    border: `1px solid rgba(var(--theme-base-rgb), var(--theme-glass-opacity))`,
+    boxShadow: isDark 
+      ? `0 25px 60px -10px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 20px 40px -15px rgba(255, 255, 255, 0.05)` 
+      : `0 25px 60px -10px rgba(0, 0, 0, 0.05), inset 0 0 0 1px rgba(0, 0, 0, 0.03)`,
+  };
+
+  const handlePropertyClick = (imovel: any) => {
+    handleLinkClick({ title: `Portfólio: ${imovel.titulo}`, url: `property-${imovel.id}`, type: 'property' }, 0);
+    setSelectedProperty(imovel);
+  };
+
+  const handleWhatsAppClick = () => {
+    handleLinkClick({ title: 'Botão WhatsApp', url: `https://wa.me/${data.whatsapp?.number}`, type: 'whatsapp' }, 0);
+  };
+
   return (
-    <div className={cn(
-      "w-full mx-auto min-h-full pb-24 relative font-sans text-white transition-all",
-      isPreview ? "max-w-full" : "max-w-md md:max-w-2xl px-6"
-    )}>
-      {/* BACKGROUND GRADIENT FLOW - MUDADO PARA ABSOLUTE */}
-      <div className="absolute inset-0 -z-20 pointer-events-none bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-gradient-flow" />
-
-      {/* HEADER */}
-      <header className="pt-12 mb-12 text-center px-4">
-        <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="inline-block relative mb-6">
-          <div className="w-24 h-24 mx-auto relative z-10 overflow-hidden rounded-[2.5rem] border-4 border-white/30 backdrop-blur-xl shadow-2xl bg-white/10">
-            <img src={data.foto_url || "/placeholder-user.jpg"} className="w-full h-full object-cover" />
-          </div>
-        </motion.div>
-        <h1 className="text-2xl font-black mb-2 tracking-tighter drop-shadow-md">{data.nome}</h1>
-        <p className="text-[11px] leading-relaxed max-w-[280px] mx-auto opacity-80 font-bold uppercase tracking-widest">{data.bio}</p>
-      </header>
-
-      {/* LINKS LIST */}
-      <div className="px-4 space-y-4">
-        {visibleLinks?.map((link: any, index: number) => {
-          if (link.type === "youtube" || link.type === "spotify") {
-            return (
-              <motion.div key={index} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} className="overflow-hidden mb-4 rounded-[2rem] shadow-2xl border border-white/20 backdrop-blur-xl">
-                {link.type === "youtube" ? (
-                  <iframe width="100%" className="aspect-video" src={`https://www.youtube.com/embed/${link.url.split('v=')[1]?.split('&')[0]}`} frameBorder="0" allowFullScreen></iframe>
-                ) : (
-                  <iframe src={link.url.replace("open.spotify.com", "open.spotify.com/embed")} width="100%" height="152" frameBorder="0" allowTransparency={true}></iframe>
-                )}
-              </motion.div>
-            );
-          }
-
-          return (
-            <motion.a 
-              key={index} 
-              href={link.type === "vcard" ? "#" : link.url}
-              onClick={(e) => { if (link.type === "vcard") e.preventDefault(); handleLinkClick(link, index); }}
-              whileHover={{ scale: 1.02, y: -2 }}
-              className="relative group flex items-center justify-center transition-all duration-300 h-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl"
-            >
-              <div className="flex items-center gap-2">
-                {link.type === "vcard" && <UserPlus className="w-4 h-4" />}
-                <span className="font-black uppercase tracking-[2px] text-center text-xs">{link.title}</span>
-              </div>
-            </motion.a>
-          );
-        })}
+    <div 
+      ref={containerRef} 
+      className={cn("w-full font-sans overflow-x-hidden relative transition-colors duration-700 group/body", isPreview ? "min-h-full bg-transparent" : "min-h-screen", isDark ? "selection:bg-white/30" : "selection:bg-black/10")} 
+      style={{ ...themeStyles, backgroundColor: "var(--theme-bg)", color: "var(--theme-text)" }}
+    >
+      <div className={cn("overflow-hidden pointer-events-none -z-20", isPreview ? "absolute inset-0 h-[200%]" : "fixed inset-0")}>
+        <motion.div animate={{ x: [0, 50, 0], y: [0, 30, 0], scale: [1, 1.15, 1] }} transition={{ duration: 15, repeat: Infinity, ease: "linear" }} className="absolute top-[-10%] left-[-15%] w-[120%] aspect-square rounded-full mix-blend-screen filter blur-[100px] opacity-20" style={{ backgroundColor: "var(--theme-primary)" }} />
+        <motion.div animate={{ x: [0, -40, 0], y: [0, -50, 0] }} transition={{ duration: 18, repeat: Infinity, ease: "linear" }} className="absolute bottom-[-10%] right-[-15%] w-[100%] aspect-square rounded-full mix-blend-overlay filter blur-[120px] opacity-25" style={{ backgroundColor: "var(--theme-text)" }} />
+        <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.03] mix-blend-overlay pointer-events-none" />
       </div>
-
-      {/* PORTFOLIO GRID */}
-      {data.featured_properties?.enabled && data.featured_properties.items?.length > 0 && (
-        <div className="mt-20 px-4 space-y-12">
-          <div className="flex items-center gap-4">
-            <span className="text-[9px] font-black uppercase tracking-[5px] opacity-30 whitespace-nowrap text-white">Featured Deck</span>
-            <div className="h-[1px] w-full bg-white/10" />
-          </div>
-          <div className={cn(
-            "grid gap-8",
-            isPreview ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
-          )}>
-            {data.featured_properties.items.map((imovel: any) => (
+      
+      <div className={cn("mx-auto flex flex-col relative z-10 transition-all", isPreview ? "max-w-full px-4 pt-6 pb-24 gap-2" : "max-w-[1100px] lg:flex-row lg:py-16 pt-8 px-4 lg:px-0 gap-10 pb-24")}>
+        
+        <div className={cn("w-full shrink-0 relative", !isPreview && "lg:w-[420px]")}>
+          <div className={cn(!isPreview && "lg:sticky lg:top-16")}>
+            <FloatParticle delay={0.5} color="var(--theme-primary)" /> 
+            <FloatParticle delay={2.2} color="var(--theme-text)" /> 
+            <FloatParticle delay={4.8} color="var(--theme-primary)" />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              transition={springTransition} 
+              className={cn("relative w-full rounded-[2.5rem] overflow-hidden group/card shadow-[0_0_100px_-20px_rgba(0,0,0,0.5)]", isPreview ? "p-6" : "p-10")} 
+              style={glassPanelStyle}
+            >
               <motion.div 
-                key={imovel.id} 
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                whileHover={{ y: -10, scale: 1.02 }}
-                className="overflow-hidden group relative transition-all duration-700 rounded-[3rem] border border-white/20 bg-white/10 backdrop-blur-3xl shadow-2xl"
-              >
-                <div className="aspect-[16/10] relative overflow-hidden">
-                  <img src={imovel.imagem} className="w-full h-full object-cover transition-transform duration-[3s] group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
-                  <div className="absolute top-6 left-6 flex gap-2">
-                    <span className="bg-white/90 backdrop-blur-md text-black text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-xl">Exclusive</span>
+                className="absolute inset-0 z-0 pointer-events-none opacity-0 group-hover/card:opacity-100 transition-opacity duration-500" 
+                style={{ background: useMotionTemplate`radial-gradient(350px circle at ${springX}px ${springY}px, ${isDark ? "rgba(255, 255, 255, 0.07)" : "rgba(0, 0, 0, 0.03)"}, transparent 80%)` }} 
+              />
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[2px] blur-[1px]" style={{ background: `linear-gradient(to r, transparent, ${isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.1)"}, transparent)` }} />
+              <div className="relative z-10 flex flex-col items-center text-center">
+                <motion.div whileHover={{ scale: 1.05, y: -5 }} transition={springTransition} className="relative group/photo cursor-pointer mb-6">
+                  <div className="absolute inset-0 rounded-full blur-2xl opacity-40 group-hover/photo:opacity-70 transition-opacity animate-pulse" style={{ backgroundColor: "var(--theme-primary)" }} />
+                  <div className="p-1 rounded-full relative bg-white/5 backdrop-blur-md border border-white/10 shadow-inner">
+                    <img 
+                      src={data.foto_url || "/placeholder-user.jpg"} 
+                      alt={data.nome} 
+                      className={cn("mx-auto rounded-full object-cover border-4 border-white shadow-xl", isPreview ? "w-20 h-20" : "w-28 h-28")} 
+                      style={{ objectPosition: data.foto_posicao || "center" }} 
+                    />
                   </div>
-                </div>
-                <div className="p-8 text-white">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="space-y-1 overflow-hidden">
-                      <h4 className="font-black text-xl leading-tight tracking-tighter uppercase truncate">{imovel.titulo}</h4>
-                      <p className="text-[10px] font-bold text-white/60 tracking-[3px] uppercase truncate">{imovel.localizacao}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-2xl font-black tracking-tighter">{imovel.preco}</p>
-                    </div>
-                  </div>
-                  <Button className="w-full h-14 rounded-2xl font-black uppercase text-[10px] tracking-[4px] bg-white text-black hover:bg-white/90 shadow-2xl">Solicitar Informações</Button>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, ...springTransition }}>
+                  <h2 className="text-[11px] font-black uppercase tracking-[5px] inline-flex items-center gap-2 px-3 py-1 rounded-full border" style={{ color: "var(--theme-text)", opacity: 0.5, backgroundColor: "rgba(var(--theme-base-rgb), 0.05)", borderColor: "rgba(var(--theme-base-rgb), 0.1)" }}>{data.headline || "Bem-vindo!"}</h2>
+                  <h1 className={cn("mt-4 mb-4 font-black leading-[1.1] tracking-tighter drop-shadow-sm", isPreview ? "text-2xl" : "text-4xl")} style={{ color: "var(--theme-text)" }}>{data.nome}</h1>
+                  <p className={cn("leading-relaxed opacity-70 font-light", isPreview ? "text-[14px] px-2" : "text-[16px] px-4")} style={{ color: "var(--theme-text)" }}>{data.bio}</p>
+                </motion.div>
+                {showWhatsApp && (
+                  <motion.a 
+                    href={data.whatsapp?.number ? `https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message || "Olá, vim pelo seu Link na Bio")}` : "#"}
+                    target={data.whatsapp?.number ? "_blank" : undefined}
+                    onClick={handleWhatsAppClick}
+                    whileHover={{ scale: 1.02, y: -3 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={cn("mt-8 w-full py-4 rounded-2xl flex items-center justify-center gap-0 font-black text-[11px] uppercase tracking-[3px] transition-all relative overflow-hidden group/btn shadow-[0_15px_40px_-10px_rgba(0,0,0,0.3)]", !data.whatsapp?.number && "opacity-50 grayscale cursor-help")}
+                    style={{ backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }}
+                  >
+                    <div className="absolute inset-0 bg-white/30 translate-x-[-150%] group-hover/btn:translate-x-[150%] transition-transform duration-1000 skew-x-[-25deg]" />
+                    <MessageCircle className="w-5 h-5 mr-3 fill-white/10" />
+                    <span className="relative z-10">WhatsApp {!data.whatsapp?.number && "(Sem Número)"}</span>
+                  </motion.a>
+                )}
+              </div>
+            </motion.div>
+            {socialLinks.length > 0 && !isPreview && ( 
+              <div className="hidden lg:flex flex-wrap items-center justify-center gap-4 mt-8 px-4">
+                {socialLinks.map((link: any, index: number) => (
+                  <motion.a 
+                    key={`d-${index}`} 
+                    href={link.url} 
+                    initial={{ opacity: 0, y: 10 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    transition={{ delay: 0.6 + index * 0.1 }} 
+                    whileHover={{ y: -6, scale: 1.1, backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.05)" }} 
+                    className="p-3.5 rounded-full transition-all border shadow-md backdrop-blur-2xl" 
+                    style={{ color: "var(--theme-text)", borderColor: "rgba(var(--theme-base-rgb), 0.1)", backgroundColor: "rgba(var(--theme-base-rgb), 0.05)" }}
+                  >
+                    <motion.div whileHover={{ rotate: [0, 10, -10, 0] }}>{getSocialIcon(link.url)}</motion.div>
+                  </motion.a>
+                ))}
+              </div> 
+            )}
           </div>
         </div>
+
+        <div className="flex-1 w-full flex flex-col">
+          {socialLinks.length > 0 && ( 
+            <div className={cn("flex flex-wrap items-center justify-center gap-4 mt-6", (isPreview) ? "mb-6" : "lg:hidden mb-8")}>
+              {socialLinks.map((link: any, index: number) => (
+                <a 
+                  key={`m-${index}`} 
+                  href={link.url} 
+                  className="p-3.5 rounded-xl border backdrop-blur-md active:scale-95 transition-transform" 
+                  style={{ color: "var(--theme-text)", backgroundColor: "rgba(var(--theme-base-rgb), 0.05)", borderColor: "rgba(var(--theme-base-rgb), 0.1)" }}
+                >
+                  {getSocialIcon(link.url)}
+                </a>
+              ))}
+            </div> 
+          )}
+          
+          {data.featured_properties?.enabled && data.featured_properties.items?.length > 0 && (
+            <div className={cn(isPreview ? "mt-2" : "mt-8 lg:mt-0")}>
+              <div className="flex items-center justify-between mb-4 px-1">
+                <h4 className="text-[20px] font-bold tracking-tight" style={{ color: "var(--theme-text)" }}>Oportunidades</h4>
+                <motion.div 
+                  whileHover={{ rotate: 180 }} 
+                  className="w-10 h-10 rounded-full border opacity-80 hover:opacity-100 cursor-pointer flex items-center justify-center transition-opacity" 
+                  style={{ backgroundColor: "rgba(var(--theme-base-rgb), 0.05)", borderColor: "rgba(var(--theme-base-rgb), 0.1)" }}
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                </motion.div>
+              </div>
+              <div className="w-full relative">
+                <div className={cn("flex pt-2 pb-6 snap-x snap-mandatory gap-4 overflow-x-auto", !isPreview && "lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0 lg:pt-0")}>
+                  {data.featured_properties.items.map((imovel: any, idx: number) => (
+                    <motion.div 
+                      key={imovel.id} 
+                      initial={{ opacity: 0, y: 30 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      transition={{ delay: idx * 0.15 + 0.3, ...springTransition }} 
+                      whileHover={{ y: -6, scale: 1.01 }} 
+                      onClick={() => handlePropertyClick(imovel)} 
+                      className={cn("flex-none snap-start relative rounded-[1.5rem] overflow-hidden cursor-pointer group shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)] border", isPreview ? "w-[240px] h-[300px]" : "w-[260px] sm:w-[280px] lg:w-full h-[320px]")} 
+                      style={{ borderColor: "rgba(var(--theme-base-rgb), 0.1)" }}
+                    >
+                      <img src={imovel.imagem} className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent opacity-90" />
+                      <div className="absolute bottom-0 left-0 right-0 p-5">
+                        <h4 className="text-white font-bold text-[17px] leading-tight mb-2 truncate">{imovel.titulo}</h4>
+                        <div className="flex items-center gap-3">
+                          <div className="w-6 h-[1px] bg-white/40 shrink-0" />
+                          <p className="text-white/80 text-[12px] font-semibold tracking-widest uppercase truncate">{imovel.preco || imovel.localizacao}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {regularLinks.length > 0 && (
+            <div className={cn("flex flex-col gap-3.5", isPreview ? "mt-6" : "mt-8")}>
+              {regularLinks.map((link: any, index: number) => {
+                if (link.type === "youtube" || link.type === "spotify") {
+                  return ( 
+                    <motion.div 
+                      key={index} 
+                      initial={{ opacity: 0, x: 20 }} 
+                      animate={{ opacity: 1, x: 0 }} 
+                      transition={{ delay: 0.5 + index * 0.1, ...springTransition }} 
+                      className="w-full overflow-hidden rounded-[1.5rem] flex flex-col group/player border shadow-inner bg-black/10" 
+                      style={glassPanelStyle}
+                    >
+                      <div className="flex items-center justify-between px-4 py-3 border-b relative" style={{ borderColor: "rgba(var(--theme-base-rgb), 0.1)" }}>
+                        <div className="flex items-center gap-3 z-10">
+                          <div className={cn("w-2 h-2 rounded-full animate-pulse", link.type === "youtube" ? "bg-red-500" : "bg-emerald-500")} />
+                          <span className="font-black uppercase tracking-[2px] text-[10px] opacity-70" style={{ color: "var(--theme-text)" }}>{link.type === "youtube" ? "Conteúdo Exclusivo" : "Podcast / Áudio"}</span>
+                        </div>
+                        <div className="opacity-50 z-10 w-4 h-4 flex items-center justify-center" style={{ color: "var(--theme-text)" }}>{getSocialIcon(link.url)}</div>
+                      </div>
+                      <div className="p-3">
+                        <div className="rounded-[1rem] overflow-hidden bg-black/70 relative">
+                          {link.type === "youtube" ? (
+                            <iframe width="100%" className="aspect-video relative z-10" src={getYouTubeEmbed(link.url)} frameBorder="0" allowFullScreen /> 
+                          ) : (
+                            <iframe src={getSpotifyEmbed(link.url)} width="100%" height="152" frameBorder="0" allow="autoplay" loading="lazy" className="relative z-10" style={{ marginBottom: "-4px" }} />
+                          )}
+                        </div>
+                      </div>
+                    </motion.div> 
+                  );
+                }
+                return ( 
+                  <motion.a 
+                    key={index} 
+                    href={link.type === "vcard" ? "#" : link.url} 
+                    onClick={(e) => { if (link.type === "vcard") e.preventDefault(); handleLinkClick(link, index); }} 
+                    initial={{ opacity: 0, y: 15 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    transition={{ delay: 0.5 + index * 0.1, ...springTransition }} 
+                    whileHover={{ x: 8 }} 
+                    className="w-full rounded-[2rem] flex items-center justify-between p-2.5 pr-5 transition-all group/link relative overflow-hidden" 
+                    style={glassPanelStyle}
+                  >
+                    <div className="flex items-center gap-4 relative z-10">
+                      <div 
+                        className="w-12 h-12 rounded-[1rem] flex items-center justify-center shrink-0 shadow-2xl relative overflow-hidden" 
+                        style={{ backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-black/20" />
+                        {link.type === "vcard" ? <UserPlus className="w-5 h-5" /> : <LinkIcon className="w-4 h-4 opacity-90" />}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-extrabold text-[13px] uppercase tracking-[2px]" style={{ color: "var(--theme-text)" }}>{link.title}</span>
+                        <span className="text-[9px] opacity-40 font-bold uppercase tracking-widest mt-0.5 inline-flex items-center gap-1.5" style={{ color: "var(--theme-text)" }}>Explorar <ArrowUpRight className="w-3 h-3" /></span>
+                      </div>
+                    </div>
+                    <div className="relative z-10"><ArrowUpRight className="w-5 h-5 opacity-15" style={{ color: "var(--theme-text)" }} /></div>
+                  </motion.a> 
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {selectedProperty && ( 
+          <BioPropertyDetails 
+            property={selectedProperty} 
+            onClose={() => setSelectedProperty(null)} 
+            tema={tema} 
+            whatsappNumber={data.whatsapp?.number} 
+          /> 
+        )}
+      </AnimatePresence>
+      
+      {showWhatsApp && (
+        <motion.a 
+          href={data.whatsapp?.number ? `https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message || "Olá, vim pelo seu Link na Bio")}` : "#"}
+          target={data.whatsapp?.number ? "_blank" : undefined}
+          onClick={handleWhatsAppClick}
+          initial={{ scale: 0 }} 
+          animate={{ scale: 1 }} 
+          transition={{ delay: 1, ...springTransition }} 
+          className={cn("fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center z-[100] border border-white/20 backdrop-blur-3xl shadow-2xl", !data.whatsapp?.number && "opacity-50 grayscale cursor-help")} 
+          style={{ background: `linear-gradient(135deg, var(--theme-primary), #111)` }}
+        >
+          <MessageCircle className="w-7 h-7 text-white" />
+        </motion.a>
       )}
 
-      {/* WHATSAPP */}
-      {data.whatsapp?.enabled && data.whatsapp.number && (
-        <motion.a 
-          href={`https://wa.me/${data.whatsapp.number.replace(/\D/g, "")}?text=${encodeURIComponent(data.whatsapp.message)}`}
-          target="_blank"
-          className={cn(
-            "fixed rounded-full flex items-center justify-center shadow-2xl z-[100] transition-all bg-white/20 backdrop-blur-3xl border border-white/30 text-white shadow-white/10",
-            isPreview ? "bottom-6 right-6 w-12 h-12" : "bottom-8 right-8 w-14 h-14"
-          )}
-          whileHover={{ scale: 1.1, rotate: 10 }}
-        >
-          <MessageCircle className="w-6 h-6" />
-        </motion.a>
+      {!isPreview && ( 
+        <div className="w-full py-12 flex flex-col items-center opacity-20 hover:opacity-50 transition-opacity gap-3 pointer-events-none">
+          <div className="w-12 h-[1px]" style={{ background: `linear-gradient(to r, transparent, var(--theme-text), transparent)` }} />
+          <p className="text-[9px] font-black uppercase tracking-[4px]" style={{ color: "var(--theme-text)" }}>FLOW63</p>
+        </div> 
       )}
     </div>
   );

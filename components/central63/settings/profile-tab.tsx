@@ -177,207 +177,234 @@ export function ProfileTab({ profile, setProfile, onRefresh }: ProfileTabProps) 
   useEffect(() => { setMounted(true) }, [])
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 animate-in fade-in duration-700 pb-16 px-4 sm:px-0">
+    <div className="w-full max-w-6xl mx-auto space-y-5 animate-in fade-in duration-500 pb-16 px-4 sm:px-0">
       
-      {/* Cabeçalho da Secção */}
-      <div className="flex flex-col space-y-1 ml-2">
-        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Definições de Perfil</h2>
-        <p className="text-muted-foreground text-[13px] font-medium flex items-center gap-2 opacity-80 uppercase tracking-widest">
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          Personalização e Segurança da Conta
-        </p>
+      {/* ── BENTO HEADER ─────────────────────────────────────────── */}
+      <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.06] bg-white/50 dark:bg-white/[0.02] backdrop-blur-2xl shadow-[0_2px_20px_rgba(0,0,0,0.06)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/90 dark:via-white/30 to-transparent" />
+
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-6 py-5">
+          <div className="flex items-center gap-4">
+            <div className="relative h-12 w-12 rounded-2xl bg-gradient-to-br from-primary/90 to-primary/60 shadow-lg shadow-primary/20 flex items-center justify-center shrink-0">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-transparent to-white/20" />
+              <UserCircle className="h-5 w-5 text-white relative z-10" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black tracking-tight text-foreground">Definições de Perfil</h2>
+                <BadgeCheck className="h-4 w-4 text-primary animate-pulse" />
+              </div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 mt-0.5">Personalização e Segurança da Conta</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+             <div className="hidden sm:flex flex-col items-end">
+                <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 leading-none">Status da Conta</p>
+                <p className="text-[11px] font-bold text-emerald-500">Verificado & Ativo</p>
+             </div>
+             <div className="h-8 w-[1px] bg-black/[0.05] dark:bg-white/[0.05] hidden sm:block" />
+             <div className="relative h-10 w-10 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] flex items-center justify-center border border-black/[0.05] dark:border-white/[0.1]">
+                <ShieldCheck className="h-5 w-5 text-primary/60" />
+             </div>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+      <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
         
-        {/* COLUNA ESQUERDA: Identidade Visual */}
+        {/* ── COLUNA ESQUERDA: Identidade Visual ─────────────────── */}
         <div className="space-y-5">
-          <Card className="overflow-hidden border-border/50 shadow-xl rounded-[2.25rem] bg-card/50 backdrop-blur-md border group transition-all duration-500 hover:shadow-primary/5">
-            {/* Header Decorativo */}
-            <div className="h-28 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent relative overflow-hidden">
+          <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl transition-all duration-500 hover:shadow-primary/5 group">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+            
+            {/* Header Decorativo Glass */}
+            <div className="h-28 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent relative overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(var(--primary),0.05),transparent)]" />
                 <div className="absolute top-4 right-4">
-                  <BadgeCheck className="text-primary h-6 w-6 opacity-10 group-hover:opacity-100 transition-all duration-700" />
+                  <Sparkles className="text-primary h-5 w-5 opacity-20 group-hover:opacity-100 transition-all duration-700" />
                 </div>
             </div>
             
-            <CardContent className="relative px-8 pb-8 text-center">
-              {/* Secção do Avatar com Design Elevado */}
-              <div className="relative -mt-14 mb-5 inline-block group/avatar">
-                <div className="relative h-28 w-28 rounded-[2rem] ring-[5px] ring-background shadow-2xl overflow-hidden bg-muted border border-border/50 transition-all duration-500 group-hover/avatar:scale-[1.03] group-hover/avatar:ring-primary/10">
+            <div className="relative px-8 pb-8 text-center">
+              {/* Avatar Design Apple Glass */}
+              <div className="relative -mt-14 mb-6 inline-block group/avatar">
+                <div className="relative h-32 w-32 rounded-[2.5rem] ring-[6px] ring-white/40 dark:ring-white/[0.02] shadow-2xl overflow-hidden bg-white/40 dark:bg-white/[0.02] backdrop-blur-xl border border-white/20 dark:border-white/[0.08] transition-all duration-500 group-hover/avatar:scale-[1.03] group-hover/avatar:ring-primary/20">
                   <Avatar className="h-full w-full rounded-none">
                     <AvatarImage src={profile.avatar_url} className="object-cover" />
-                    <AvatarFallback className="text-3xl font-black bg-muted text-muted-foreground/30">
+                    <AvatarFallback className="text-4xl font-black bg-transparent text-muted-foreground/20">
                       {isUploading ? <Loader2 className="animate-spin h-8 w-8" /> : profile.name?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   
                   <div 
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 opacity-0 group-hover/avatar:opacity-100 transition-all duration-300 cursor-pointer backdrop-blur-[2px]"
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-all duration-300 cursor-pointer backdrop-blur-sm"
                   >
-                    <UploadCloud className="text-white h-7 w-7 mb-1 animate-pulse" />
-                    <span className="text-[9px] text-white font-black uppercase tracking-[0.2em]">Upload</span>
+                    <UploadCloud className="text-white h-8 w-8 mb-1" />
+                    <span className="text-[9px] text-white font-black uppercase tracking-[0.2em]">Trocar Foto</span>
                   </div>
                 </div>
                 
-                <Button
-                  size="icon"
-                  className="absolute -bottom-1 -right-1 h-9 w-9 rounded-2xl shadow-xl border-4 border-background bg-primary text-white hover:bg-primary/90 transition-all active:scale-90"
+                <button
+                  className="absolute -bottom-1 -right-1 h-10 w-10 rounded-2xl shadow-xl border-4 border-white dark:border-zinc-900 bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-all active:scale-90"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
                 >
                   <Camera className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
 
-              <div className="space-y-1 mb-6 min-w-0 text-center">
-                <h3 className="font-black text-lg tracking-tight text-foreground truncate px-2">{profile.name || "Configurar Nome"}</h3>
-                <p className="text-[11px] font-bold text-muted-foreground/50 truncate tracking-wide uppercase mb-2">{profile.email}</p>
+              <div className="space-y-1 mb-8">
+                <h3 className="font-black text-xl tracking-tight text-foreground truncate">{profile.name || "Configurar Nome"}</h3>
+                <p className="text-[10px] font-bold text-muted-foreground/40 truncate tracking-widest uppercase">{profile.email}</p>
                 
-                {/* Toggle Modo Escuro Compacto */}
-                {mounted && (
-                  <div className="flex flex-col items-center justify-center pt-1 border-t border-border/30 mt-3">
-                    <div className="flex items-center gap-3 bg-muted/40 px-3 py-1.5 rounded-full border border-border/50 shadow-sm transition-all hover:bg-muted/60">
-                      <Sun className={cn("h-3.5 w-3.5 transition-colors", resolvedTheme === 'light' ? "text-orange-500" : "text-muted-foreground/40")} />
-                      <Switch 
-                        checked={resolvedTheme === 'dark'} 
-                        onCheckedChange={async (checked) => {
-                          const newTheme = checked ? 'dark' : 'light'
-                          setTheme(newTheme)
-                          // Persiste no banco de dados
-                          try {
-                            await supabase.from('profiles').update({ app_theme: newTheme }).eq('id', profile.id)
-                          } catch (e) {
-                            console.error("Erro ao salvar tema:", e)
-                          }
-                        }} 
-                        className="scale-75 data-[state=checked]:bg-primary"
-                      />
-                      <Moon className={cn("h-3.5 w-3.5 transition-colors", resolvedTheme === 'dark' ? "text-primary" : "text-muted-foreground/40")} />
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mt-1.5">Modo Escuro</span>
-                  </div>
-                )}
-
-                <div className="pt-3 flex justify-center">
-                  <Badge className={`rounded-full px-4 py-0.5 font-black text-[9px] uppercase tracking-[0.15em] border-none ${
-                    profile.role === 'Diretor' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                    profile.role === 'Gestor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                    'bg-primary/10 text-primary'
-                  }`}>
+                <div className="pt-4 flex justify-center gap-2">
+                  <div className={cn(
+                    "rounded-full px-4 py-1 text-[9px] font-black uppercase tracking-[0.15em] border",
+                    profile.role === 'Diretor' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
+                    profile.role === 'Gestor' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                    'bg-primary/10 text-primary border-primary/20'
+                  )}>
                     {profile.role || "Membro"}
-                  </Badge>
+                  </div>
                 </div>
               </div>
+
+              {/* Tema Switch Glass */}
+              {mounted && (
+                <div className="mb-8 p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-start">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-foreground/40 leading-none mb-1">Aparência</p>
+                      <p className="text-[11px] font-bold text-foreground/60">{resolvedTheme === 'dark' ? 'Modo Escuro' : 'Modo Claro'}</p>
+                    </div>
+                    <div className="flex items-center gap-3 bg-white/40 dark:bg-black/20 p-1 rounded-xl border border-white/20 dark:border-white/[0.05]">
+                      <button 
+                        onClick={() => setTheme('light')}
+                        className={cn("p-1.5 rounded-lg transition-all", resolvedTheme === 'light' ? "bg-white shadow-sm text-orange-500" : "text-muted-foreground/40")}
+                      >
+                        <Sun size={14} />
+                      </button>
+                      <button 
+                        onClick={() => setTheme('dark')}
+                        className={cn("p-1.5 rounded-lg transition-all", resolvedTheme === 'dark' ? "bg-zinc-800 shadow-sm text-primary" : "text-muted-foreground/40")}
+                      >
+                        <Moon size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleUploadAvatar} disabled={isUploading} />
               
               <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full text-[10px] font-black uppercase tracking-[0.2em] h-10 gap-2.5 rounded-2xl border-border/60 hover:bg-primary/5 hover:text-primary transition-all active:scale-[0.98] shadow-sm" 
+                variant="ghost" 
+                className="w-full text-[10px] font-black uppercase tracking-widest h-12 gap-2.5 rounded-2xl border border-black/[0.06] dark:border-white/[0.08] hover:bg-primary/5 hover:text-primary transition-all active:scale-[0.98] shadow-sm bg-white/40 dark:bg-white/[0.02]" 
                 onClick={() => handleSyncAvatar(true)}
                 disabled={isSyncingAvatar || isUploading}
               >
                 {isSyncingAvatar ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 Sincronizar Cloud
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Card de ID Técnico */}
-          <Card className="border-border/40 shadow-sm rounded-[1.75rem] bg-muted/20 border-none p-5 group/id hover:bg-muted/30 transition-colors">
+          {/* Card de ID Técnico Glass */}
+          <div className="relative rounded-[1.75rem] overflow-hidden border border-white/20 dark:border-white/[0.06] bg-white/40 dark:bg-white/[0.02] backdrop-blur-xl p-5 group/id transition-all hover:bg-white/60 dark:hover:bg-white/[0.04]">
+             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
              <div className="flex items-center gap-4">
-                <div className="h-9 w-9 rounded-xl bg-background border border-border/40 flex items-center justify-center shadow-sm shrink-0 group-hover/id:scale-105 transition-transform">
-                  <Fingerprint className="h-4.5 w-4.5 text-primary/40" />
+                <div className="h-10 w-10 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/[0.05] dark:border-white/[0.1] flex items-center justify-center shadow-sm shrink-0 group-hover/id:scale-105 transition-transform">
+                  <Fingerprint className="h-5 w-5 text-primary/40" />
                 </div>
-                <div className="space-y-0.5 min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 leading-none">ID Identificador</p>
-                  <p className="text-[11px] font-mono font-bold opacity-40 truncate">{profile.id}</p>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 leading-none">ID Identificador</p>
+                  <p className="text-[11px] font-mono font-bold text-foreground/30 truncate">{profile.id}</p>
                 </div>
              </div>
-          </Card>
+          </div>
         </div>
 
-        {/* COLUNA DIREITA: Formulários de Dados e Segurança */}
-        <div className="space-y-6">
+        {/* ── COLUNA DIREITA: Formulários de Dados e Segurança ──────── */}
+        <div className="space-y-5">
           
-          {/* Card: Dados da Identidade */}
-          <Card className="border-border/50 shadow-xl rounded-[2.25rem] bg-card border overflow-hidden">
-            <CardHeader className="px-8 pt-8 pb-5 border-b border-border/30 bg-muted/10">
-              <div className="flex items-center gap-3.5">
-                <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm">
-                  <UserCircle className="h-6 w-6" />
+          {/* Card: Dados da Identidade Glass */}
+          <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl transition-all duration-500">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+            
+            <div className="px-8 pt-8 pb-5 border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                  <User size={24} />
                 </div>
                 <div>
-                  <CardTitle className="text-base font-black tracking-tight uppercase">Informação Geral</CardTitle>
-                  <CardDescription className="text-[12px] font-medium opacity-60">Dados de identificação no ecossistema Flow63.</CardDescription>
+                  <h3 className="text-sm font-black tracking-[0.1em] uppercase text-foreground">Informação Geral</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Dados de identificação no ecossistema</p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-8 space-y-6">
+            </div>
+
+            <div className="p-8 space-y-6">
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Nome Completo</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-foreground/60 ml-1">Nome Completo</Label>
                   <div className="relative group">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 group-focus-within:text-primary transition-all duration-300" />
                     <Input 
-                      id="name"
                       value={profile.name} 
                       onChange={(e) => setProfile({ ...profile, name: e.target.value })} 
-                      className="h-11 pl-11 bg-muted/30 border-transparent focus:bg-background focus:ring-primary/10 transition-all rounded-xl font-bold text-sm shadow-inner"
+                      className="h-12 pl-12 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border-black/[0.05] dark:border-white/[0.06] focus:bg-white dark:focus:bg-white/[0.06] text-xs font-bold transition-all"
                       placeholder="Introduza o seu nome"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Endereço de E-mail</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-foreground/60 ml-1">Endereço de E-mail</Label>
                   <div className="relative group opacity-60">
                     <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30" />
                     <Input 
-                      id="email"
                       value={profile.email} 
                       disabled 
-                      className="h-11 pl-11 bg-muted/50 text-muted-foreground font-bold cursor-not-allowed border-dashed border-border/40 rounded-xl text-sm" 
+                      className="h-12 pl-12 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border-dashed border-black/[0.1] dark:border-white/[0.1] text-xs font-bold cursor-not-allowed" 
                     />
                   </div>
                 </div>
               </div>
               
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end pt-4">
                 <Button 
                   onClick={handleUpdateProfile} 
                   disabled={isSaving} 
-                  className="rounded-xl gap-2.5 px-8 h-11 shadow-lg shadow-primary/20 font-black uppercase text-[10px] tracking-[0.15em] transition-all hover:scale-[1.02] active:scale-95"
+                  className="rounded-xl gap-2.5 px-10 h-12 shadow-lg shadow-primary/20 font-black uppercase text-[10px] tracking-widest transition-all hover:scale-[1.02] active:scale-95 bg-primary text-white"
                 >
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Guardar Perfil
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Card: Segurança & Autenticação */}
-          <Card className="border-border/50 shadow-xl rounded-[2.25rem] bg-card border relative overflow-hidden group/security">
-            {/* Efeito Visual de Segurança */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/[0.03] rounded-full blur-[80px] -z-10 group-hover/security:bg-orange-500/[0.06] transition-all duration-700" />
+          {/* Card: Segurança & Autenticação Glass */}
+          <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl transition-all duration-500">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
             
-            <CardHeader className="px-8 pt-8 pb-5 border-b border-border/30 bg-muted/10">
-              <div className="flex items-center gap-3.5">
-                <div className="h-11 w-11 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-600 shadow-sm">
-                  <Lock className="h-5 w-5" />
+            <div className="px-8 pt-8 pb-5 border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/20">
+                  <Lock size={22} />
                 </div>
                 <div>
-                  <CardTitle className="text-base font-black tracking-tight uppercase">Segurança da Conta</CardTitle>
-                  <CardDescription className="text-[12px] font-medium opacity-60">Altere a sua senha de acesso periodicamente.</CardDescription>
+                  <h3 className="text-sm font-black tracking-[0.1em] uppercase text-foreground">Segurança da Conta</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Gestão de credenciais e acesso</p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-8 space-y-6">
+            </div>
+
+            <div className="p-8 space-y-6">
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Nova Senha</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-foreground/60 ml-1">Nova Senha</Label>
                   <div className="relative group">
                     <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 group-focus-within:text-orange-500 transition-all duration-300" />
                     <Input 
@@ -385,19 +412,19 @@ export function ProfileTab({ profile, setProfile, onRefresh }: ProfileTabProps) 
                       placeholder="Mínimo 6 caracteres"
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
-                      className="h-11 pl-11 pr-11 bg-muted/30 border-transparent focus:bg-background focus:ring-orange-500/10 transition-all rounded-xl font-bold text-sm shadow-inner"
+                      className="h-12 pl-12 pr-12 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border-black/[0.05] dark:border-white/[0.06] focus:bg-white dark:focus:bg-white/[0.06] text-xs font-bold transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-orange-500 p-1"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/30 hover:text-orange-500 transition-colors"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Confirmar Nova Senha</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-foreground/60 ml-1">Confirmar Nova Senha</Label>
                   <div className="relative group">
                     <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 group-focus-within:text-orange-500 transition-all duration-300" />
                     <Input 
@@ -405,51 +432,58 @@ export function ProfileTab({ profile, setProfile, onRefresh }: ProfileTabProps) 
                       placeholder="Repita a senha"
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
-                      className="h-11 pl-11 bg-muted/30 border-transparent focus:bg-background focus:ring-orange-500/10 transition-all rounded-xl font-bold text-sm shadow-inner"
+                      className="h-12 pl-12 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border-black/[0.05] dark:border-white/[0.06] focus:bg-white dark:focus:bg-white/[0.06] text-xs font-bold transition-all"
                     />
                   </div>
                 </div>
               </div>
               
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-orange-600/60 uppercase tracking-tighter">
-                  <ShieldAlert className="h-3.5 w-3.5" />
-                  Garante que a senha é forte e única.
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-4">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10">
+                  <ShieldAlert className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+                  <p className="text-[9px] font-bold text-orange-600/60 dark:text-orange-400/60 uppercase tracking-widest leading-relaxed">
+                    Recomendamos o uso de senhas complexas e únicas para maior proteção dos seus dados.
+                  </p>
                 </div>
                 <Button 
                   onClick={handleUpdatePassword} 
                   disabled={isChangingPassword} 
-                  className="w-full sm:w-auto rounded-xl gap-2.5 px-8 h-11 shadow-lg shadow-orange-500/10 border-none font-black uppercase text-[10px] tracking-[0.15em] transition-all bg-orange-500 text-white hover:bg-orange-600 active:scale-95"
+                  className="w-full sm:w-auto rounded-xl gap-2.5 px-10 h-12 shadow-lg shadow-orange-500/20 font-black uppercase text-[10px] tracking-widest transition-all bg-orange-500 text-white hover:bg-orange-600 active:scale-95 border-none"
                 >
                   {isChangingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   Atualizar Senha
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
         </div>
       </div>
 
-      {/* DIALOG DE SUCESSO PREMIUM */}
+      {/* ── DIALOG DE SUCESSO GLASS ─────────────────────────────── */}
       <Dialog open={isPasswordChangedDialogOpen} onOpenChange={setIsPasswordChangedDialogOpen}>
-        <DialogContent className="sm:max-w-md text-center flex flex-col items-center justify-center p-10 rounded-[2.5rem] border-none shadow-3xl overflow-hidden">
-          <div className="absolute top-0 inset-x-0 h-1 bg-emerald-500" />
-          <div className="h-20 w-20 rounded-[1.75rem] bg-emerald-50 dark:bg-emerald-950/20 flex items-center justify-center mb-6 ring-12 ring-emerald-50/50 dark:ring-emerald-900/10 animate-in zoom-in-50 duration-500">
-            <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+        <DialogContent className="sm:max-w-md text-center p-0 rounded-[2.5rem] border-white/20 dark:border-white/[0.08] bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl shadow-3xl overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600" />
+          
+          <div className="p-10 flex flex-col items-center">
+            <div className="h-24 w-24 rounded-[2rem] bg-emerald-500/10 flex items-center justify-center mb-8 ring-8 ring-emerald-500/5 animate-in zoom-in-50 duration-500 border border-emerald-500/20">
+              <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+            </div>
+            
+            <div className="space-y-3 mb-10">
+              <h3 className="text-2xl font-black tracking-tight text-foreground uppercase">Acesso Atualizado</h3>
+              <p className="text-muted-foreground/60 text-[12px] font-bold uppercase tracking-widest leading-relaxed max-w-[260px] mx-auto">
+                A sua senha foi modificada com sucesso. A sua conta está agora protegida.
+              </p>
+            </div>
+            
+            <Button 
+              className="w-full max-w-[200px] rounded-2xl h-12 font-black shadow-xl shadow-emerald-500/20 uppercase text-[10px] tracking-widest transition-all hover:scale-[1.02] active:scale-95 bg-emerald-500 text-white hover:bg-emerald-600" 
+              onClick={() => setIsPasswordChangedDialogOpen(false)}
+            >
+              Concluído
+            </Button>
           </div>
-          <div className="space-y-2 mb-8">
-            <h3 className="text-2xl font-black tracking-tight leading-none text-foreground">Acesso Atualizado</h3>
-            <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-[280px] mx-auto">
-              A sua senha foi modificada com sucesso. A sua conta está agora mais segura.
-            </p>
-          </div>
-          <Button 
-            className="w-full max-w-[180px] rounded-full h-12 font-black shadow-xl shadow-primary/20 uppercase text-[10px] tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-95" 
-            onClick={() => setIsPasswordChangedDialogOpen(false)}
-          >
-            Confirmar
-          </Button>
         </DialogContent>
       </Dialog>
     </div>

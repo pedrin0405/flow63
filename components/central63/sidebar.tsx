@@ -26,7 +26,8 @@ import {
   House,
   Palette,
   Wallet,
-  Megaphone
+  Megaphone,
+  LinkIcon
 } from "lucide-react"
 import {
   Tooltip,
@@ -379,19 +380,21 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             {/* Bloco: Club Casa63+ (Todos veem o título, mas as opções dependem da role) */}
             {!isCollapsed && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
-                Club Casa63+
+                Ferramentas
               </div>
             )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
             {isManagerOrAbove && (
-              <SidebarItem 
-                icon={Wallet} 
-                label="Gestão de Cartões" 
-                active={isActive("benefit-cards-admin", "/admin/benefit-cards")} 
-                onClick={() => handleNavigation("benefit-cards-admin", "/admin/benefit-cards")}
-                collapsed={isCollapsed}
-              />
+              <>
+                <SidebarItem 
+                  icon={Wallet} 
+                  label="Gestão de Cartões" 
+                  active={isActive("benefit-cards-admin", "/admin/benefit-cards")} 
+                  onClick={() => handleNavigation("benefit-cards-admin", "/admin/benefit-cards")}
+                  collapsed={isCollapsed}
+                />
+              </>
             )}  
 
             {/* Item liberado para todos (Corretores e Alta gestão) */}
@@ -403,20 +406,15 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               collapsed={isCollapsed}
             />
 
-            {/* Bloco: Documentos & Métricas (Título só aparece se houver itens liberados, ou seja, se for Gestão. Se for corretor, o Flow Design sobe sem título ou usa o título base) */}
-            {!isCollapsed && isHighLevelUser && (
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
-                Documentos & Métricas
-              </div>
-            )}
-            {!isCollapsed && !isHighLevelUser && (
-               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
-                Ferramentas
-              </div>
-            )}
-            {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
+            <SidebarItem 
+            icon={LinkIcon} 
+            label="Links na Bio" 
+            active={isActive("bio-admin", "/admin/bio")} 
+            onClick={() => handleNavigation("bio-admin", "/admin/bio")}
+            collapsed={isCollapsed}
+            />
 
-            {/* Liberado para todos */}
+            
             <SidebarItem 
               icon={Palette} 
               label="Flow Design" 
@@ -424,6 +422,15 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               onClick={() => handleNavigation("editor-arte", "/editor")}
               collapsed={isCollapsed}
             />
+
+            {/* Bloco: Documentos & Métricas (Título só aparece se houver itens liberados, ou seja, se for Gestão. Se for corretor, o Flow Design sobe sem título ou usa o título base) */}
+            {!isCollapsed && isHighLevelUser && (
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
+                Documentos & Métricas
+              </div>
+            )}
+
+            {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
             {/* Itens restritos */}
             {isHighLevelUser && (

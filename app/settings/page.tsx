@@ -13,6 +13,7 @@ import { ProfileTab } from "@/components/central63/settings/profile-tab"
 import { TeamTab } from "@/components/central63/settings/team-tab"
 import { IntegrationsTab } from "@/components/central63/settings/integrations-tab"
 import { BroadcastTab } from "@/components/central63/settings/broadcast-tab"
+import { getEnrichedUsersAction } from "@/app/actions/users"
 
 export default function ConfiguracoesPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -31,21 +32,24 @@ export default function ConfiguracoesPage() {
 
       const [profileRes, usersRes, configRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-        supabase.from('profiles').select('*').order('updated_at', { ascending: false }),
+        getEnrichedUsersAction(),
         supabase.from('company_settings').select('*')
       ])
 
       if (profileRes.data) {
         setProfile({
           id: user.id,
-          name: profileRes.data.full_name || "",
+          name: (profileRes.data.full_name && profileRes.data.full_name !== "Pendente") ? profileRes.data.full_name : (user.user_metadata?.full_name || user.user_metadata?.display_name || ""),
           email: profileRes.data.email || user.email || "",
           role: profileRes.data.role || "",
-          avatar_url: profileRes.data.avatar_url || ""
+          avatar_url: profileRes.data.avatar_url || user.user_metadata?.avatar_url || ""
         })
       }
 
-      setUsers(usersRes.data || [])
+      if (usersRes.success) {
+        setUsers(usersRes.data || [])
+      }
+      
       // Filtra para não exibir o broadcast nas integrações comuns
       setIntegrations(configRes.data?.filter(i => i.instance_name !== 'GLOBAL_BROADCAST') || [])
 

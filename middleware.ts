@@ -32,68 +32,86 @@ export async function middleware(request: NextRequest) {
   )
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/forgot-password')
   const isPublicFormRoute = path.startsWith('/forms/') && path !== '/forms'
+  const isPublicBioRoute = path.startsWith('/bio/')
 
-  // Proteção básica de rotas não logadas
-  if (!session && !isAuthRoute && !isPublicFormRoute) {
+  // 1. Proteção básica: Usuário não logado
+  if (!user && !isAuthRoute && !isPublicFormRoute && !isPublicBioRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (session) {
+  // 2. Proteção para usuários Logados
+  if (user) {
+    const isPendingRoute = path === '/auth/pending'
     const isRootRoute = path === '/'
-    
-    // Lista de rotas proibidas para corretores
-    const restrictedRoutes = [
-      '/services', 
-      '/homes', 
-      '/units', 
-      '/brokers',
-      '/admin', 
-      '/indicators', 
-      '/forms', 
-      '/spreadsheets', 
-      '/custom-dashboard', 
-      '/chat-support', 
-      '/support',
-      '/campaigns'
-    ]
 
-    const isRestrictedRoute = restrictedRoutes.some(route => path.startsWith(route))
-
-    // Só consulta o banco de dados se for acessar a Home, o Login ou uma Rota Restrita
-    // (Isso deixa o sistema mais rápido e evita bugs de Edge Runtime)
-    if (isRootRoute || isRestrictedRoute || path === '/login') {
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
-
-        const role = profile?.role
-        const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(role)
-
-        // Lógica para a página de Login
-        if (path === '/login') {
-          return NextResponse.redirect(new URL(isHighLevelUser ? '/' : '/brokers/my-card', request.url))
+    try {
+      // Cliente admin para checar status sem restrições de RLS
+      const supabaseAdmin = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { 
+          cookies: { 
+            getAll: () => request.cookies.getAll(), 
+            setAll: (cookiesToSet) => {
+              cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+            } 
+          } 
         }
+      )
 
-        // Lógica de TRAVA para a Home (/) e Rotas Restritas
-        if (!isHighLevelUser && (isRootRoute || (isRestrictedRoute && !isPublicFormRoute))) {
-          return NextResponse.redirect(new URL('/brokers/my-card', request.url))
-        }
-      } catch (error) {
-        console.error("Erro no middleware:", error)
-        // Se a consulta falhar, bloqueia por segurança
-        if (isRootRoute || isRestrictedRoute) {
-          return NextResponse.redirect(new URL('/brokers/my-card', request.url))
-        }
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role, status')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      // A. BLOQUEIO GLOBAL DE PENDENTES (Não acessa nada além de auth e pendência)
+      const isPending = !profile || profile.status === 'pendente'
+
+      if (isPending && !isPendingRoute && !isAuthRoute && !path.startsWith('/auth/callback')) {
+        return NextResponse.redirect(new URL('/auth/pending', request.url))
       }
+
+      // Se liberado, não pode ficar na página de pendência
+      if (!isPending && isPendingRoute) {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+
+      // B. REGRAS DE RBAC (Apenas se já estiver ativo)
+      const restrictedRoutes = [
+        '/services', '/homes', '/units', '/brokers', '/admin', 
+        '/indicators', '/forms', '/spreadsheets', '/custom-dashboard', 
+        '/chat-support', '/support', '/campaigns'
+      ]
+
+      const isBioAdminRoute = path.startsWith('/admin/bio')
+      
+      const isRestrictedRoute = 
+        restrictedRoutes.some(route => path.startsWith(route)) && 
+        !path.startsWith('/brokers/my-card') &&
+        !isBioAdminRoute
+
+      const role = profile?.role
+      const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(role || '')
+
+      // Redireciona logados que tentam ir para o login
+      if (path === '/login') {
+        return NextResponse.redirect(new URL(isHighLevelUser ? '/' : '/brokers/my-card', request.url))
+      }
+
+      // Trava para Home e Rotas Restritas (Corretores vão para my-card)
+      if (!isHighLevelUser && (isRootRoute || (isRestrictedRoute && !isPublicFormRoute))) {
+        return NextResponse.redirect(new URL('/brokers/my-card', request.url))
+      }
+
+    } catch (error) {
+      console.error("Erro crítico no middleware:", error)
     }
   }
 
@@ -102,13 +120,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public assets (images, etc)
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
