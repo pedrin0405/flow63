@@ -17,7 +17,8 @@ import {
   UtensilsCrossed,
   Wind,
   Trees,
-  Armchair
+  Armchair,
+  MessageCircle
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -36,13 +37,10 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<any>(null);
 
-  // Valor de movimento para controlar o arrasto manual
   const dragX = useMotionValue(0);
-
   const accentColor = tema.button_bg;
   const bgColor = tema.bg_color;
   const textColor = tema.text_color;
-
   const isDark = textColor === "#ffffff" || textColor === "#f8fafc";
 
   useEffect(() => {
@@ -72,41 +70,26 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
         setLoading(false);
       }
     }
-
     if (property) fetchPropertyData();
   }, [property]);
 
   const nextImage = () => {
-    if (currentImageIndex < images.length - 1) {
-      setCurrentImageIndex((prev) => prev + 1);
-    }
+    if (currentImageIndex < images.length - 1) setCurrentImageIndex((prev) => prev + 1);
   };
 
   const prevImage = () => {
-    if (currentImageIndex > 0) {
-      setCurrentImageIndex((prev) => prev - 1);
-    }
+    if (currentImageIndex > 0) setCurrentImageIndex((prev) => prev - 1);
   };
 
   const handleDragEnd = (event: any, info: any) => {
     const swipeThreshold = 50;
     const { offset, velocity } = info;
-
-    if (offset.x < -swipeThreshold || velocity.x < -500) {
-      nextImage();
-    } else if (offset.x > swipeThreshold || velocity.x > 500) {
-      prevImage();
-    }
-    // Reseta o dragX para que a animação baseada no Index assuma o controle
+    if (offset.x < -swipeThreshold || velocity.x < -500) nextImage();
+    else if (offset.x > swipeThreshold || velocity.x > 500) prevImage();
     dragX.set(0);
   };
 
-  const transitionSettings = {
-    type: "spring",
-    damping: 30,
-    stiffness: 300,
-    mass: 0.8
-  };
+  const transitionSettings = { type: "spring", damping: 30, stiffness: 300, mass: 0.8 };
 
   if (!property) return null;
 
@@ -132,7 +115,7 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1000] flex items-end md:items-center justify-center p-0 md:p-10 backdrop-blur-md bg-black/40"
+      className="fixed inset-0 z-[1000] flex items-end md:items-center justify-center p-0 md:p-6 lg:p-10 backdrop-blur-md bg-black/60"
       onClick={onClose}
     >
       <motion.div 
@@ -140,163 +123,178 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: "100%", opacity: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="relative w-full max-w-5xl h-[95vh] md:h-auto md:max-h-[90vh] rounded-t-[2.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col md:flex-row border-t md:border border-white/20 backdrop-blur-3xl"
+        className="relative w-full max-w-6xl h-[92vh] md:h-[90vh] rounded-t-[2.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col md:flex-row border-t md:border border-white/20 backdrop-blur-3xl"
         style={{ 
           backgroundColor: isDark 
-            ? (bgColor.startsWith('#') ? `${bgColor}F2` : bgColor)
-            : "rgba(255, 255, 255, 0.95)",
+            ? (bgColor.startsWith('#') ? `${bgColor}FA` : bgColor)
+            : "rgba(255, 255, 255, 0.98)",
           color: textColor 
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* INDICADOR DE DRAG MOBILE */}
-        <div className="md:hidden absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-black/20 rounded-full z-[60]" />
-        
+        {/* BOTÃO FECHAR */}
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 md:top-6 md:right-6 z-50 p-2.5 rounded-full bg-black/10 hover:bg-black/20 text-current backdrop-blur-md transition-all border border-black/5"
+          className="absolute top-4 right-4 md:top-6 md:right-6 z-[70] p-2.5 rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-xl transition-all border border-white/10"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* GALERIA DE IMAGENS - CARROSSEL FLUIDO */}
-        <div className="relative w-full md:w-3/5 h-[40vh] md:h-auto bg-black shrink-0 overflow-hidden group">
+        {/* GALERIA DE IMAGENS */}
+        <div className="relative w-full md:w-[55%] h-[35vh] sm:h-[45vh] md:h-full bg-neutral-900 shrink-0 overflow-hidden group">
           <motion.div
             className="flex h-full w-full cursor-grab active:cursor-grabbing"
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             style={{ x: dragX }}
             onDragEnd={handleDragEnd}
-            animate={{ 
-              x: `calc(-${currentImageIndex * 100}%)` 
-            }}
+            animate={{ x: `calc(-${currentImageIndex * 100}%)` }}
             transition={transitionSettings}
           >
             {images.map((src, index) => (
               <div key={index} className="w-full h-full flex-shrink-0">
                 <img 
                   src={src} 
-                  alt={`Imagem ${index + 1}`}
+                  alt={`Foto ${index + 1}`}
                   className="w-full h-full object-cover pointer-events-none select-none" 
                 />
               </div>
             ))}
           </motion.div>
 
-          <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-white text-[10px] font-bold z-10">
+          {/* INDICADORES */}
+          <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[12px] font-bold z-10 border border-white/10">
             {currentImageIndex + 1} / {images.length}
           </div>
 
           {images.length > 1 && (
             <>
               <button 
-                onClick={(e) => { e.stopPropagation(); prevImage(); }}
-                disabled={currentImageIndex === 0}
-                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all z-10 disabled:opacity-30"
+                onClick={(e) => { e.stopPropagation(); prevImage(); }} 
+                disabled={currentImageIndex === 0} 
+                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-20 disabled:opacity-0"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
               <button 
-                onClick={(e) => { e.stopPropagation(); nextImage(); }}
-                disabled={currentImageIndex === images.length - 1}
-                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all z-10 disabled:opacity-30"
+                onClick={(e) => { e.stopPropagation(); nextImage(); }} 
+                disabled={currentImageIndex === images.length - 1} 
+                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-20 disabled:opacity-0"
               >
                 <ChevronRight className="w-6 h-6" />
               </button>
-
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5 pointer-events-none z-10">
+              
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
                 {images.map((_, idx) => (
-                  <div 
-                    key={idx} 
-                    className={cn(
-                      "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                      idx === currentImageIndex ? "bg-white w-5" : "bg-white/40"
-                    )} 
-                  />
+                  <div key={idx} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", idx === currentImageIndex ? "bg-white w-6" : "bg-white/30")} />
                 ))}
               </div>
             </>
           )}
         </div>
 
-        {/* INFORMAÇÕES */}
-        <div className="flex-1 p-6 md:p-12 overflow-y-auto custom-scrollbar flex flex-col">
-          <div className="space-y-2 mb-6">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-lg" style={{ backgroundColor: accentColor }}>
-                {details?.tipo || "Imóvel"}
-              </span>
-              <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest opacity-60" style={{ backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)" }}>
-                {details?.situacao || "Venda"}
-              </span>
+        {/* ÁREA DE CONTEÚDO */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+          
+          {/* Scroll container (Removido o pb gigante que falhava em alguns casos) */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 lg:p-12 space-y-8">
+            
+            {/* TÍTULO E PREÇO */}
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1 rounded-lg text-[12px] font-black uppercase tracking-[1.5px] text-white" style={{ backgroundColor: accentColor }}>
+                  {details?.tipo || "Imóvel"}
+                </span>
+                <span className="px-3 py-1 rounded-lg text-[12px] font-black uppercase tracking-[1.5px] border border-current opacity-60">
+                  {details?.situacao || "Venda"}
+                </span>
+              </div>
+              <h2 className="text-2xl md:text-4xl font-black tracking-tighter leading-[1.1]">
+                {details?.titulo || property.titulo}
+              </h2>
+              <div className="flex items-center gap-2 text-sm font-medium opacity-50">
+                <MapPin className="w-4 h-4 text-rose-500" />
+                {details?.bairro}, {details?.cidade}
+              </div>
+              <div className="text-3xl md:text-4xl font-black tracking-tight pt-2" style={{ color: accentColor }}>
+                {details?.valor || property.preco}
+              </div>
             </div>
-            <h2 className="text-xl md:text-3xl font-black tracking-tighter leading-tight mt-2">
-              {details?.titulo || property.titulo}
-            </h2>
-            <p className="flex items-center gap-1.5 text-xs font-bold opacity-40">
-              <MapPin className="w-3.5 h-3.5" />
-              {details?.bairro}, {details?.cidade}
-            </p>
+
+            {/* FEATURES */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {features.map((f, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex flex-col gap-2 p-4 rounded-3xl border"
+                  style={{ 
+                    backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", 
+                    borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" 
+                  }}
+                >
+                  <f.icon className="w-5 h-5 opacity-40" />
+                  <div>
+                    <p className="text-[12px] font-bold uppercase opacity-40 tracking-widest">{f.label}</p>
+                    <p className="text-sm font-black tracking-tight">{f.value}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* AMENITIES */}
+            {amenities.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-[12px] font-black uppercase tracking-[3px] opacity-30">Infraestrutura</h3>
+                <div className="flex flex-wrap gap-2">
+                  {amenities.map((a, idx) => (
+                    <div 
+                      key={idx} 
+                      className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-current/5 border border-current/10"
+                    >
+                      <a.icon className="w-4 h-4" style={{ color: accentColor }} />
+                      <span className="text-[12px] font-bold uppercase tracking-wider">{a.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* DESCRIÇÃO */}
+            <div className="space-y-4">
+              <h3 className="text-[12px] font-black uppercase tracking-[3px] opacity-30">Sobre este imóvel</h3>
+              <p className="text-[15px] font-medium leading-relaxed opacity-70 whitespace-pre-wrap">
+                {details?.descricao || "Sem descrição disponível."}
+              </p>
+            </div>
+
+            {/* Spacer vital EXCLUSIVO para mobile: Garante que o usuário consiga rolar
+                tudo até o fim sem a descrição ficar presa embaixo do absolute mobile */}
+            <div className="w-full h-28 md:hidden shrink-0 pointer-events-none" />
           </div>
 
-          <div className="text-2xl md:text-3xl font-black mb-8 tracking-tighter" style={{ color: accentColor }}>
-            {details?.valor || property.preco}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3 mb-8">
-            {features.map((f, idx) => (
-              <div 
-                key={idx} 
-                className="flex flex-col gap-1 p-3 md:p-4 rounded-2xl border"
-                style={{ 
-                  backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.4)", 
-                  borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)" 
+          {/* RODAPÉ FIXO 
+              Ajuste Chave: Passou de 'absolute' para 'md:relative' - no Desktop ele 
+              entra no fluxo normal do layout, impossibilitando totalmente a sobreposição! 
+          */}
+          <div className="absolute md:relative bottom-0 left-0 w-full p-6 md:p-10 pt-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent md:from-inherit md:via-inherit md:bg-inherit border-t-0 md:border-t border-white/5 md:backdrop-blur-2xl z-20 shrink-0 pointer-events-none md:pointer-events-auto">
+            
+            {/* O wrapper volta com pointer-events-auto para o botão funcionar,
+                mas mantém o gradiente transparente "clicável" / scrollável no mobile */}
+            <div className="pointer-events-auto w-full">
+              <Button 
+                className="w-full h-16 rounded-2xl font-black text-xs uppercase tracking-[3px] shadow-2xl flex items-center justify-center gap-3 hover:scale-[1.01] active:scale-95 transition-all"
+                style={{ backgroundColor: accentColor, color: "#ffffff" }}
+                onClick={() => {
+                  const message = `Olá! Tenho interesse no imóvel: ${details?.titulo || property.titulo}, código ${details?.codigo || property.id}.`;
+                  const phone = whatsappNumber?.replace(/\D/g, "") || "";
+                  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
                 }}
               >
-                <f.icon className="w-4 h-4 opacity-30 mb-1" />
-                <span className="text-[9px] font-bold opacity-40 uppercase tracking-widest leading-none">{f.label}</span>
-                <span className="text-[14px] font-black leading-tight">{f.value}</span>
-              </div>
-            ))}
-          </div>
-
-          {amenities.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-[9px] font-black uppercase tracking-[2px] opacity-30 mb-4">Diferenciais</h3>
-              <div className="flex flex-wrap gap-2">
-                {amenities.map((a, idx) => (
-                  <div 
-                    key={idx} 
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-white/5"
-                    style={{ borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.03)" }}
-                  >
-                    <a.icon className="w-3 h-3" style={{ color: accentColor }} />
-                    <span className="text-[9px] font-bold uppercase tracking-wider opacity-70">{a.label}</span>
-                  </div>
-                ))}
-              </div>
+                <MessageCircle className="w-5 h-5 fill-current" />
+                Falar com o Corretor
+              </Button>
             </div>
-          )}
-
-          <div className="space-y-3 mb-20 md:mb-0">
-            <h3 className="text-[9px] font-black uppercase tracking-[2px] opacity-30">Descrição Completa</h3>
-            <p className="text-sm font-medium leading-relaxed opacity-70 whitespace-pre-wrap">
-              {details?.descricao || "Sem descrição disponível."}
-            </p>
-          </div>
-
-          <div className="sticky md:relative bottom-0 left-0 w-full pt-4 pb-2 md:pt-12 md:pb-0 mt-auto bg-inherit">
-            <Button 
-              className="w-full h-14 rounded-2xl font-black text-[11px] uppercase tracking-[3px] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all"
-              style={{ backgroundColor: accentColor, color: "#ffffff" }}
-              onClick={() => {
-                const message = `Olá! Tenho interesse no imóvel: ${details?.titulo || property.titulo}, código ${details?.codigo || property.id}.`;
-                const phone = whatsappNumber?.replace(/\D/g, "") || "";
-                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
-              }}
-            >
-              Falar com o Corretor
-            </Button>
+            
           </div>
         </div>
       </motion.div>
