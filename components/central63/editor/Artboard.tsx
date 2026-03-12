@@ -31,70 +31,94 @@ export const Artboard = ({
   const methods = useFabricEditor();
   const { canvasRef, fabricCanvas, loadFromJson, selectedObject, canUndo, canRedo, changeCount, isDisposed } = methods;
   const isInitialized = useRef(false);
+  const loadingRef = useRef(false);
 
   // Initialize with data if provided or if canvas is empty
   useEffect(() => {
     let isMounted = true;
+    let retryCount = 0;
     
     const initCanvas = async () => {
+      if (!isMounted || isDisposed.current) return;
+
       // Verifica se o fabricCanvas.current já existe
-      if (!fabricCanvas.current) {
-        if (isMounted) setTimeout(initCanvas, 50);
+      const canvas = fabricCanvas.current;
+      if (!canvas) {
+        if (isMounted && retryCount < 20) {
+          retryCount++;
+          setTimeout(initCanvas, 50);
+        }
         return;
       }
 
       // Verifica se o canvas está realmente pronto (possui contexto)
-      if (!fabricCanvas.current.getContext()) {
-        if (isMounted) setTimeout(initCanvas, 50);
+      // Em Fabric 6/7, getContext() retorna o contextContainer
+      if (!canvas.getContext()) {
+        if (isMounted && retryCount < 20) {
+          retryCount++;
+          setTimeout(initCanvas, 50);
+        }
         return;
       }
 
       // Carrega dados se for a primeira vez OU se o canvas estiver vazio mas tivermos dados iniciais
-      // Isso protege contra o caso em que o canvas foi reiniciado pelo hook
-      const objects = fabricCanvas.current.getObjects();
-      if (initialData && (objects.length === 0 || !isInitialized.current)) {
-        if (!isMounted || isDisposed.current) return;
+      if (initialData && !isInitialized.current && !loadingRef.current) {
+        loadingRef.current = true;
         try {
-          await loadFromJson(initialData);
+          // Double check before loading
+          if (isMounted && !isDisposed.current && fabricCanvas.current === canvas) {
+            await loadFromJson(initialData);
+            isInitialized.current = true;
+          }
         } catch (err) {
           console.error("Erro ao carregar JSON na prancheta:", err);
+        } finally {
+          loadingRef.current = false;
         }
+      } else if (!initialData) {
+        isInitialized.current = true;
       }
       
-      if (isMounted) {
-        if (!isInitialized.current) {
-          isInitialized.current = true;
-          onMethodsReady(id, methods);
-        }
+      if (isMounted && isInitialized.current) {
+        onMethodsReady(id, methods);
       }
     };
 
-    initCanvas();
+    // Pequeno delay inicial para permitir que o useFabricEditor inicialize o canvas
+    const startTimer = setTimeout(initCanvas, 20);
     
     return () => {
       isMounted = false;
+      clearTimeout(startTimer);
     };
-  }, [fabricCanvas.current, initialData, id]);
+  }, [fabricCanvas.current, initialData, id, isDisposed]);
 
   // Update dimensions when size changes
   useEffect(() => {
-    if (fabricCanvas.current) {
-      fabricCanvas.current.setDimensions({ width, height });
-      fabricCanvas.current.renderAll();
+    if (fabricCanvas.current && !isDisposed.current) {
+      try {
+        fabricCanvas.current.setDimensions({ width, height });
+        fabricCanvas.current.renderAll();
+      } catch (e) {
+        // Silently handle errors if canvas is in a weird state during resize
+      }
     }
-  }, [width, height]);
+  }, [width, height, isDisposed]);
 
   // Notify parent about state changes if active or if context menu is requested
-  // Usamos um useEffect separado para não disparar o onSelect no loop de renderização
   useEffect(() => {
+    if (isDisposed.current) return;
+    
     if (isActive || methods.contextMenuInfo.visible) {
       // Pequeno delay para garantir que o estado do editor está estável
       const timer = setTimeout(() => {
-        onSelect(id, methods);
+        if (!isDisposed.current) {
+          onSelect(id, methods);
+        }
       }, 10);
       return () => clearTimeout(timer);
     }
-  }, [selectedObject, canUndo, canRedo, changeCount, isActive, id, methods.contextMenuInfo.visible]);
+  }, [selectedObject, canUndo, canRedo, changeCount, isActive, id, methods.contextMenuInfo.visible, isDisposed]);
 
   return (
     <div className="flex flex-col gap-3 mb-16 last:mb-0 items-center">

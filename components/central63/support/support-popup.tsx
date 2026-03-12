@@ -12,8 +12,6 @@ import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { usePathname } from 'next/navigation'
 
-import { usePathname } from 'next/navigation'
-
 const ATENDENTES = [
   { id: 'marketing_1', nome: 'Equipe Marketing', cargo: 'Marketing' },
   { id: 'gestor_1', nome: 'Gestor de Suporte', cargo: 'Gestão' },
@@ -22,20 +20,9 @@ const ATENDENTES = [
 export function SuportePopup() {
   const pathname = usePathname()
   const { toast } = useToast()
-  const pathname = usePathname()
+  
   const [mounted, setMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
-  
-  // Ocultar suporte em páginas de bio públicas
-  const isBioPage = pathname?.startsWith('/bio/')
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (pathname.startsWith('/editor')) return null;
-
-  // ... rest of state ...
   const [mensagem, setMensagem] = useState("")
   const [mensagens, setMensagens] = useState<any[]>([])
   const [chamadoId, setChamadoId] = useState<string | null>(null)
@@ -50,8 +37,15 @@ export function SuportePopup() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  // Ocultar suporte em páginas de bio públicas
+  const isBioPage = pathname?.startsWith('/bio/')
+  const isEditorPage = pathname?.startsWith('/editor')
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const idSalvo = localStorage.getItem('flow63_chamado_id')
@@ -343,7 +337,7 @@ export function SuportePopup() {
     }
   }
 
-  if (!mounted || isBioPage) return null;
+  if (!mounted || isBioPage || isEditorPage) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
