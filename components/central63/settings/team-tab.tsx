@@ -265,7 +265,13 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
 
   const handleOpenAuthorize = (user: any) => {
     setAuthorizingUser(user);
-    setAuthFormData({ name: (user.full_name && user.full_name !== "Pendente") ? user.full_name : "", role: user.role || "Corretor", password: "", avatar_url: user.avatar_url || "" });
+    // Forçar o cargo padrão como "Corretor" ao abrir o diálogo de autorização
+    setAuthFormData({ 
+      name: (user.full_name && user.full_name !== "Pendente") ? user.full_name : "", 
+      role: "Corretor", 
+      password: "", 
+      avatar_url: user.avatar_url || "" 
+    });
     setIsAuthorizeDialogOpen(true);
   };
 
@@ -281,15 +287,26 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
       const { data: { publicUrl } } = supabase.storage.from('user-uploads').getPublicUrl(filePath);
       setAuthFormData(prev => ({ ...prev, avatar_url: publicUrl }));
       toast.success("Foto carregada!");
-    } catch (error: any) { toast.error("Erro no upload: " + error.message); }
+    } catch (error: any) { toast.error("Foto: " + error.message); }
   };
 
   const handleAuthorizeUser = async () => {
-    if (!authFormData.name || authFormData.password.length < 6) return toast.error("Nome e senha (mín. 6 caracteres) são obrigatórios.");
+    // Agora apenas o nome é obrigatório. A senha é opcional.
+    if (!authFormData.name) return toast.error("O nome é obrigatório.");
     setIsAuthorizing(true);
     try {
-      await adminUpdateUserPassword(authorizingUser.id, authFormData.password);
-      const { error } = await supabase.from('profiles').update({ full_name: authFormData.name, role: authFormData.role, avatar_url: authFormData.avatar_url, status: 'ativo' }).eq('id', authorizingUser.id);
+      // Se houver senha preenchida, atualiza. Caso contrário, ignora a atualização da senha.
+      if (authFormData.password && authFormData.password.length >= 6) {
+        await adminUpdateUserPassword(authorizingUser.id, authFormData.password);
+      }
+      
+      const { error } = await supabase.from('profiles').update({ 
+        full_name: authFormData.name, 
+        role: authFormData.role, 
+        avatar_url: authFormData.avatar_url, 
+        status: 'ativo' 
+      }).eq('id', authorizingUser.id);
+      
       if (error) throw error;
       toast.success("Acesso autorizado com sucesso!"); setIsAuthorizeDialogOpen(false); onRefresh();
     } catch (error: any) { toast.error("Erro na autorização: " + error.message); }
