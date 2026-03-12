@@ -443,6 +443,9 @@ export default function BioAdminPage() {
                               <button onClick={(e) => handleCopyAction(page.id, page.slug, e)} className="flex-1 flex items-center justify-center gap-2 py-3 bg-white/40 dark:bg-white/5 hover:bg-primary/5 hover:text-primary text-muted-foreground/60 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all border border-black/[0.04] dark:border-white/[0.04] active:scale-95">
                                 <LinkIcon size={12} className={cn(copiedId === page.id && "text-green-500")} /> {copiedId === page.id ? 'Pronto' : 'Link'}
                               </button>
+                              <button onClick={(e) => { e.stopPropagation(); router.push(`/admin/bio/insights/${page.id}`); }} className="flex-1 flex items-center justify-center gap-2 py-3 bg-white/40 dark:bg-white/5 hover:bg-amber-500/5 hover:text-amber-500 text-muted-foreground/60 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all border border-black/[0.04] dark:border-white/[0.04] active:scale-95">
+                                <Activity size={12} /> Insights
+                              </button>
                               <button onClick={() => window.open(`/bio/${page.slug}`, '_blank')} className="flex-1 flex items-center justify-center gap-2 py-3 bg-white/40 dark:bg-white/5 hover:bg-blue-500/5 hover:text-blue-500 text-muted-foreground/60 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all border border-black/[0.04] dark:border-white/[0.04] active:scale-95">
                                 <ArrowUpRight size={12} /> Visitar
                               </button>
