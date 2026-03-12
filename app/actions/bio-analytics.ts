@@ -8,6 +8,13 @@ const supabaseAdmin = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
+function getDeviceType(userAgent: string = "") {
+  const ua = userAgent.toLowerCase();
+  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return "Tablet";
+  if (/Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(userAgent)) return "Celular";
+  return "Desktop";
+}
+
 export async function trackBioView(bioId: string) {
   if (!bioId) return;
   try { await supabaseAdmin.rpc('increment_bio_views', { bio_id: bioId }); } 
@@ -42,7 +49,7 @@ export async function getBioInsights(bioId: string, days: number = 30) {
 
     if (!events || events.length === 0) {
       const { data: bio } = await supabaseAdmin.from('bio_pages').select('views_count').eq('id', bioId).single();
-      return { total_views: bio?.views_count || 0, unique_visitors: 0, total_clicks: 0, ctr: 0, bounce_rate: 0, avg_duration: 0, avg_scroll: 0, conversion_rate: 0, avg_lcp: 0, history: [], periods: [], clicks_by_button: [], referrers: [] };
+      return { total_views: bio?.views_count || 0, unique_visitors: 0, total_clicks: 0, ctr: 0, bounce_rate: 0, avg_duration: 0, avg_scroll: 0, conversion_rate: 0, avg_lcp: 0, history: [], periods: [], clicks_by_button: [], referrers: [], devices: [] };
     }
 
     const viewEvents = events.filter(e => e.tipo === 'view' && !e.device_info?.is_final);
@@ -53,9 +60,7 @@ export async function getBioInsights(bioId: string, days: number = 30) {
     const totalClicks = clickEvents.length;
     const uniqueSessions = new Set(events.map(e => e.device_info?.session_id || e.id)).size;
 
-    // Métricas restauradas e corrigidas
     const ctr = (totalClicks / totalViews) * 100;
-
     const sessionsWithClicks = new Set(clickEvents.map(e => e.device_info?.session_id));
     const allSessionIds = Array.from(new Set(events.map(e => e.device_info?.session_id)));
     const bounceSessions = allSessionIds.filter(sid => !sessionsWithClicks.has(sid)).length;
@@ -64,13 +69,7 @@ export async function getBioInsights(bioId: string, days: number = 30) {
     const avgDuration = finalEvents.length > 0 ? finalEvents.reduce((acc, e) => acc + (e.device_info?.duration || 0), 0) / finalEvents.length : 0;
     const avgScroll = finalEvents.length > 0 ? finalEvents.reduce((acc, e) => acc + (e.device_info?.max_scroll || 0), 0) / finalEvents.length : 0;
 
-    // CONVERSÃO: WhatsApp (através de link_url ou link_title)
-    const conversionClicks = clickEvents.filter(e => 
-      e.link_url?.includes('wa.me') || 
-      e.link_url?.includes('whatsapp') || 
-      e.device_info?.link_title?.toLowerCase().includes('whatsapp') ||
-      e.device_info?.is_conversion
-    ).length;
+    const conversionClicks = clickEvents.filter(e => e.link_url?.includes('wa.me') || e.link_url?.includes('whatsapp') || e.device_info?.is_conversion).length;
     const conversionRate = (conversionClicks / totalViews) * 100;
 
     const lcpEvents = events.filter(e => e.device_info?.lcp);
@@ -78,6 +77,7 @@ export async function getBioInsights(bioId: string, days: number = 30) {
 
     const historyMap: Record<string, any> = {};
     const periodsMap = { 'Madrugada': 0, 'Manhã': 0, 'Tarde': 0, 'Noite': 0 };
+    const devicesMap = { 'Celular': 0, 'Desktop': 0, 'Tablet': 0 };
 
     events.forEach(e => {
       const dateObj = new Date(e.created_at);
@@ -91,6 +91,10 @@ export async function getBioInsights(bioId: string, days: number = 30) {
         else if (hour >= 6 && hour < 12) periodsMap['Manhã']++;
         else if (hour >= 12 && hour < 18) periodsMap['Tarde']++;
         else periodsMap['Noite']++;
+
+        // Processar dispositivo
+        const devType = getDeviceType(e.device_info?.user_agent);
+        devicesMap[devType as keyof typeof devicesMap]++;
       }
       
       if (e.tipo === 'click') {
@@ -111,14 +115,12 @@ export async function getBioInsights(bioId: string, days: number = 30) {
       avg_lcp: parseFloat(avgLcp.toFixed(2)),
       history: Object.values(historyMap).slice(-20),
       periods: Object.entries(periodsMap).map(([name, value]) => ({ name, value })),
-      clicks_by_button: Object.entries(
-        clickEvents.reduce((acc: any, e) => {
-          // Usa o título amigável (ex: Portfólio: Casa de Praia) ou a URL
+      devices: Object.entries(devicesMap).map(([name, value]) => ({ name, value })),
+      clicks_by_button: Object.entries(clickEvents.reduce((acc: any, e) => {
           const key = e.device_info?.link_title || e.link_url || 'Outros';
           acc[key] = (acc[key] || 0) + 1;
           return acc;
-        }, {})
-      ).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value),
+        }, {})).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value),
       referrers: Object.entries(viewEvents.reduce((acc: any, e) => {
           const ref = e.device_info?.referrer || 'Direto';
           try { const domain = ref.includes('http') ? new URL(ref).hostname.replace('www.', '') : ref; acc[domain] = (acc[domain] || 0) + 1; } 
