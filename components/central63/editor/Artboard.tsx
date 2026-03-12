@@ -29,7 +29,7 @@ export const Artboard = ({
   zoomLevel
 }: ArtboardProps) => {
   const methods = useFabricEditor();
-  const { canvasRef, fabricCanvas, loadFromJson, selectedObject, canUndo, canRedo, changeCount } = methods;
+  const { canvasRef, fabricCanvas, loadFromJson, selectedObject, canUndo, canRedo, changeCount, isDisposed } = methods;
   const isInitialized = useRef(false);
 
   // Initialize with data if provided or if canvas is empty
@@ -53,7 +53,12 @@ export const Artboard = ({
       // Isso protege contra o caso em que o canvas foi reiniciado pelo hook
       const objects = fabricCanvas.current.getObjects();
       if (initialData && (objects.length === 0 || !isInitialized.current)) {
-        await loadFromJson(initialData);
+        if (!isMounted || isDisposed.current) return;
+        try {
+          await loadFromJson(initialData);
+        } catch (err) {
+          console.error("Erro ao carregar JSON na prancheta:", err);
+        }
       }
       
       if (isMounted) {

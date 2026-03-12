@@ -11,12 +11,15 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
+import { usePathname } from 'next/navigation'
+
 const ATENDENTES = [
   { id: 'marketing_1', nome: 'Equipe Marketing', cargo: 'Marketing' },
   { id: 'gestor_1', nome: 'Gestor de Suporte', cargo: 'Gestão' },
 ]
 
 export function SuportePopup() {
+  const pathname = usePathname()
   const { toast } = useToast()
   const [mounted, setMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
@@ -24,6 +27,8 @@ export function SuportePopup() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  if (pathname.startsWith('/editor')) return null;
 
   // ... rest of state ...
   const [mensagem, setMensagem] = useState("")

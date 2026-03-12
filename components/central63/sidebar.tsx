@@ -479,7 +479,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
-            {canAccessChat && (
+            {canAccessChat && pathname !== '/editor' && (
               <SidebarItem 
                 icon={MessageCircle} 
                 label="Chat de Suporte" 
@@ -500,7 +500,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             />
 
             {/* Restrito */}
-            {isHighLevelUser && (
+            {isHighLevelUser && pathname !== '/editor' && (
               <SidebarItem 
                 icon={HelpCircle} 
                 label="Suporte" 

@@ -877,7 +877,7 @@ export const useFabricEditor = () => {
     isPanMode, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop,
     changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient,
     undo, redo, canUndo: undoStack.current.length > 1, canRedo: redoStack.current.length > 0, setCanvasProperty, changeCount: updateTrigger,
-    toggleObjectVisibility, toggleObjectLock, deleteObject, moveObject, renameObject
+    toggleObjectVisibility, toggleObjectLock, deleteObject, moveObject, renameObject, isDisposed
   }), [selectedObject, contextMenuInfo, isPanMode, updateTrigger, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas, deleteSelected, setCornerRadii, toggleFlipX, toggleFlipY, setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop, changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient, undo, redo, setCanvasProperty, toggleObjectVisibility, toggleObjectLock, deleteObject, moveObject, renameObject]);
 
   return memoizedMethods;
