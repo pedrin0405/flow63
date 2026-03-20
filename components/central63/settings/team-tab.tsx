@@ -540,7 +540,7 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
                       <SelectTrigger className="h-11 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.08] font-semibold">
                         <div className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary/40" /><SelectValue /></div>
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl border-border/40">
+                      <SelectContent className="rounded-xl border-border/40 z-[1200]">
                         {["Secretária", "Corretor", "Gestor", "Diretor", "Marketing"].map(r => <SelectItem key={r} value={r} className="rounded-lg">{r}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -609,7 +609,7 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
                       <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Cargo</Label>
                       <Select value={authFormData.role} onValueChange={val => setAuthFormData({ ...authFormData, role: val })}>
                         <SelectTrigger className="h-11 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.08] font-semibold"><SelectValue /></SelectTrigger>
-                        <SelectContent className="rounded-xl border-border/40">
+                        <SelectContent className="rounded-xl border-border/40 z-[1200]">
                           {["Corretor", "Secretária", "Gestor", "Diretor", "Marketing"].map(r => <SelectItem key={r} value={r} className="rounded-lg">{r}</SelectItem>)}
                         </SelectContent>
                       </Select>
@@ -674,7 +674,7 @@ export function TeamTab({ users, currentUserId, onRefresh }: TeamTabProps) {
                 <SelectTrigger className="h-11 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.08] font-semibold">
                   <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary/40" /><SelectValue /></div>
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-border/40">
+                <SelectContent className="rounded-xl border-border/40 z-[1200]">
                   {["Corretor", "Secretária", "Gestor", "Diretor", "Marketing"].map(r => <SelectItem key={r} value={r} className="rounded-lg">{r}</SelectItem>)}
                 </SelectContent>
               </Select>
