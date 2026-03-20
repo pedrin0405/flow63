@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   UserPlus, 
@@ -48,6 +48,18 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
       fetchFolders();
     }
   }, [data.id]);
+
+  // In editor/create preview, use in-memory folders instantly.
+  useEffect(() => {
+    if (Array.isArray(data._previewFolders)) {
+      setPropertyFolders(data._previewFolders);
+      if (data._previewSelectedFolderId) {
+        setSelectedFolderId(data._previewSelectedFolderId);
+      } else if (data._previewFolders.length > 0) {
+        setSelectedFolderId(data._previewFolders[0].id);
+      }
+    }
+  }, [data._previewFolders, data._previewSelectedFolderId]);
 
   const { socialLinks, regularLinks } = useMemo(() => processLinks(visibleLinks), [visibleLinks]);
 
@@ -197,62 +209,69 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
               </div>
 
               {propertyFolders.length > 0 && (
-                <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 px-2">
-                  {propertyFolders.map((folder) => {
-                    const folderItemCount = data.featured_properties.items?.filter((item: any) => item.folder_id === folder.id).length || 0;
-                    const isSelected = selectedFolderId === folder.id;
-                    return (
-                      <motion.button
-                        key={folder.id}
-                        whileHover={{ y: -4, scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setSelectedFolderId(folder.id)}
-                        className={cn(
-                          "relative p-4 rounded-[1.5rem] transition-all group",
-                          "flex flex-col items-center text-center gap-2",
-                          "border-2",
-                          isSelected
-                            ? "shadow-md ring-2"
-                            : "shadow hover:shadow-md"
-                        )}
-                        style={{
-                          backgroundColor: isSelected ? `${folder.color}20` : `${folder.color}08`,
-                          borderColor: isSelected ? folder.color : `${folder.color}30`
-                        }}
-                      >
-                        {/* Folder Icon - Large */}
-                        <div className={cn(
-                          "w-14 h-12 rounded-lg flex items-center justify-center transition-all",
-                          "relative overflow-hidden"
-                        )} style={{ backgroundColor: `${folder.color}15` }}>
-                          <span className="text-3xl">{isSelected ? "📂" : folder.icon}</span>
-                        </div>
+                <div className="mb-6 space-y-2">
+                  {isPreview && (
+                    <p className="px-1 text-[9px] font-black uppercase tracking-[0.12em] opacity-60" style={{ color: "var(--theme-text)" }}>
+                      Toque na pasta para ver os imóveis
+                    </p>
+                  )}
+                  <div className={cn(
+                    isPreview
+                      ? "flex gap-3 overflow-x-auto pb-2 px-2 snap-x snap-mandatory [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/40"
+                      : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 px-2"
+                  )}>
+                    {propertyFolders.map((folder) => {
+                      const folderItemCount = data.featured_properties.items?.filter((item: any) => item.folder_id === folder.id).length || 0;
+                      const isSelected = selectedFolderId === folder.id;
+                      return (
+                        <motion.button
+                          key={folder.id}
+                          whileHover={{ y: -4, scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setSelectedFolderId(folder.id)}
+                          className={cn(
+                            "relative p-3.5 rounded-[1.4rem] transition-all group border-2",
+                            "flex flex-col items-center text-center gap-2.5",
+                            isPreview && "min-w-[132px] snap-start",
+                            isSelected
+                              ? "shadow-md ring-2"
+                              : "shadow hover:shadow-md"
+                          )}
+                          style={{
+                            backgroundColor: isSelected ? `${folder.color}20` : `${folder.color}08`,
+                            borderColor: isSelected ? folder.color : `${folder.color}30`
+                          }}
+                        >
+                          <div className={cn(
+                            "rounded-lg flex items-center justify-center transition-all relative overflow-hidden",
+                            isPreview ? "w-16 h-12" : "w-14 h-12"
+                          )} style={{ backgroundColor: `${folder.color}15` }}>
+                            <span className={cn(isPreview ? "text-[30px]" : "text-3xl")}>{isSelected ? "📂" : (folder.icon || "📁")}</span>
+                          </div>
 
-                        {/* Folder Name */}
-                        <div className="min-w-0 w-full">
-                          <p className="text-[10px] font-black uppercase tracking-wider truncate" style={{ color: isSelected ? folder.color : "inherit" }}>
-                            {folder.name}
-                          </p>
-                        </div>
+                          <div className="min-w-0 w-full">
+                            <p className={cn("font-black uppercase tracking-wider truncate", isPreview ? "text-[9px]" : "text-[10px]")} style={{ color: isSelected ? folder.color : "inherit" }}>
+                              {folder.name}
+                            </p>
+                          </div>
 
-                        {/* Item Count Badge */}
-                        <div className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: folder.color }}>
-                          {folderItemCount} {folderItemCount === 1 ? "item" : "itens"}
-                        </div>
+                          <div className={cn("font-black uppercase tracking-wider rounded-full text-white", isPreview ? "text-[8px] px-2.5 py-1" : "text-[8px] px-2 py-0.5")} style={{ backgroundColor: folder.color }}>
+                            {folderItemCount} {folderItemCount === 1 ? "imóvel" : "imóveis"}
+                          </div>
 
-                        {/* Selection Indicator */}
-                        {isSelected && (
-                          <motion.div
-                            layoutId={`folder-indicator-${folder.id}`}
-                            className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-black"
-                            style={{ backgroundColor: folder.color }}
-                          >
-                            ✓
-                          </motion.div>
-                        )}
-                      </motion.button>
-                    );
-                  })}
+                          {isSelected && (
+                            <motion.div
+                              layoutId={`folder-indicator-${folder.id}`}
+                              className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-black"
+                              style={{ backgroundColor: folder.color }}
+                            >
+                              ✓
+                            </motion.div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -359,7 +378,8 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
             property={selectedProperty} 
             onClose={() => setSelectedProperty(null)} 
             tema={tema} 
-            whatsappNumber={data.whatsapp?.number} 
+            whatsappNumber={data.whatsapp?.number}
+            isPreview={isPreview}
           /> 
         )}
       </AnimatePresence>

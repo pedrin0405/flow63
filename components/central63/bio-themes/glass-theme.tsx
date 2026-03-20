@@ -61,6 +61,18 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
     }
   }, [data.id]);
 
+  // In editor/create preview, use in-memory folders instantly.
+  useEffect(() => {
+    if (Array.isArray(data._previewFolders)) {
+      setPropertyFolders(data._previewFolders);
+      if (data._previewSelectedFolderId) {
+        setSelectedFolderId(data._previewSelectedFolderId);
+      } else if (data._previewFolders.length > 0) {
+        setSelectedFolderId(data._previewFolders[0].id);
+      }
+    }
+  }, [data._previewFolders, data._previewSelectedFolderId]);
+
   const { socialLinks, regularLinks } = useMemo(() => processLinks(visibleLinks), [visibleLinks]);
 
   const tema = data.tema || { bg_color: "#050505", text_color: "#ffffff", button_bg: "#3b82f6", button_text: "#ffffff" };
@@ -253,64 +265,70 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
               </div>
 
               {propertyFolders.length > 0 && (
-                <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 px-1">
-                  {propertyFolders.map((folder) => {
-                    const folderItemCount = data.featured_properties.items?.filter((item: any) => item.folder_id === folder.id).length || 0;
-                    const isSelected = selectedFolderId === folder.id;
-                    return (
-                      <motion.button
-                        key={folder.id}
-                        whileHover={{ y: -4, scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setSelectedFolderId(folder.id)}
-                        className={cn(
-                          "relative p-4 rounded-[1.5rem] transition-all group",
-                          "flex flex-col items-center text-center gap-2",
-                          "border-2 backdrop-blur-xl",
-                          isSelected
-                            ? "shadow-2xl ring-2"
-                            : "shadow-lg hover:shadow-xl"
-                        )}
-                        style={{
-                          backgroundColor: isSelected ? `${folder.color}25` : `${folder.color}12`,
-                          borderColor: isSelected ? folder.color : `${folder.color}40`
-                        }}
-                      >
-                        {/* Folder Icon - Large */}
-                        <div className={cn(
-                          "w-14 h-12 rounded-lg flex items-center justify-center transition-all",
-                          "relative overflow-hidden"
-                        )} style={{ backgroundColor: `${folder.color}30` }}>
-                          <span className="text-3xl">{isSelected ? "📂" : folder.icon}</span>
-                          {/* Shine effect */}
-                          <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent rounded-lg" />
-                        </div>
+                <div className="mb-6 space-y-2">
+                  {isPreview && (
+                    <p className="px-1 text-[9px] font-black uppercase tracking-[0.12em] opacity-60" style={{ color: "var(--theme-text)" }}>
+                      Toque na pasta para ver os imóveis
+                    </p>
+                  )}
+                  <div className={cn(
+                    isPreview
+                      ? "flex gap-3 overflow-x-auto pb-2 px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/25"
+                      : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 px-1"
+                  )}>
+                    {propertyFolders.map((folder) => {
+                      const folderItemCount = data.featured_properties.items?.filter((item: any) => item.folder_id === folder.id).length || 0;
+                      const isSelected = selectedFolderId === folder.id;
+                      return (
+                        <motion.button
+                          key={folder.id}
+                          whileHover={{ y: -4, scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setSelectedFolderId(folder.id)}
+                          className={cn(
+                            "relative p-3.5 rounded-[1.4rem] transition-all group border-2 backdrop-blur-xl",
+                            "flex flex-col items-center text-center gap-2.5",
+                            isPreview && "min-w-[132px] snap-start",
+                            isSelected
+                              ? "shadow-2xl ring-2"
+                              : "shadow-lg hover:shadow-xl"
+                          )}
+                          style={{
+                            backgroundColor: isSelected ? `${folder.color}25` : `${folder.color}12`,
+                            borderColor: isSelected ? folder.color : `${folder.color}40`
+                          }}
+                        >
+                          <div className={cn(
+                            "rounded-lg flex items-center justify-center transition-all relative overflow-hidden",
+                            isPreview ? "w-16 h-12" : "w-14 h-12"
+                          )} style={{ backgroundColor: `${folder.color}30` }}>
+                            <span className={cn(isPreview ? "text-[30px]" : "text-3xl")}>{isSelected ? "📂" : (folder.icon || "📁")}</span>
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent rounded-lg" />
+                          </div>
 
-                        {/* Folder Name */}
-                        <div className="min-w-0 w-full">
-                          <p className="text-[10px] font-black uppercase tracking-wider truncate" style={{ color: folder.color }}>
-                            {folder.name}
-                          </p>
-                        </div>
+                          <div className="min-w-0 w-full">
+                            <p className={cn("font-black uppercase tracking-wider truncate", isPreview ? "text-[9px]" : "text-[10px]")} style={{ color: folder.color }}>
+                              {folder.name}
+                            </p>
+                          </div>
 
-                        {/* Item Count Badge */}
-                        <div className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full text-white" style={{ backgroundColor: folder.color }}>
-                          {folderItemCount} {folderItemCount === 1 ? "item" : "itens"}
-                        </div>
+                          <div className={cn("font-black uppercase tracking-wider rounded-full text-white", isPreview ? "text-[8px] px-2.5 py-1" : "text-[9px] px-2 py-1")} style={{ backgroundColor: folder.color }}>
+                            {folderItemCount} {folderItemCount === 1 ? "imóvel" : "imóveis"}
+                          </div>
 
-                        {/* Selection Indicator */}
-                        {isSelected && (
-                          <motion.div
-                            layoutId={`folder-indicator-${folder.id}`}
-                            className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-black"
-                            style={{ backgroundColor: folder.color }}
-                          >
-                            ✓
-                          </motion.div>
-                        )}
-                      </motion.button>
-                    );
-                  })}
+                          {isSelected && (
+                            <motion.div
+                              layoutId={`folder-indicator-${folder.id}`}
+                              className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-black"
+                              style={{ backgroundColor: folder.color }}
+                            >
+                              ✓
+                            </motion.div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -415,7 +433,8 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
             property={selectedProperty} 
             onClose={() => setSelectedProperty(null)} 
             tema={tema} 
-            whatsappNumber={data.whatsapp?.number} 
+            whatsappNumber={data.whatsapp?.number}
+            isPreview={isPreview}
           /> 
         )}
       </AnimatePresence>

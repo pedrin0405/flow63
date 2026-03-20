@@ -132,6 +132,14 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
   const [loadingFolders, setLoadingFolders] = useState(false);
 
+  // Edit folder states
+  const [editingFolder, setEditingFolder] = useState<any>(null);
+  const [editFolderName, setEditFolderName] = useState("");
+  const [editFolderColor, setEditFolderColor] = useState("#3b82f6");
+  const [editFolderIcon, setEditFolderIcon] = useState("📁");
+  const [showEditFolderDialog, setShowEditFolderDialog] = useState(false);
+  const folderIconSuggestions = ["📁", "🏠", "🏢", "🏘️", "🌇", "🏖️", "🔑", "⭐"];
+
   // Load Property Folders
   useEffect(() => {
     if (!id) return;
@@ -429,6 +437,47 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
     }
   };
 
+  const updatePropertyFolder = async () => {
+    if (!editingFolder || !editFolderName.trim()) {
+      toast.error("Nome da pasta é obrigatório");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('bio_property_folders')
+        .update({
+          name: editFolderName,
+          color: editFolderColor,
+          icon: editFolderIcon
+        })
+        .eq('id', editingFolder.id);
+
+      if (error) throw error;
+
+      setPropertyFolders(propertyFolders.map(f => 
+        f.id === editingFolder.id 
+          ? { ...f, name: editFolderName, color: editFolderColor, icon: editFolderIcon }
+          : f
+      ));
+
+      toast.success("Pasta atualizada!");
+      setShowEditFolderDialog(false);
+      setEditingFolder(null);
+    } catch (error: any) {
+      console.error('Error updating property folder:', error);
+      toast.error('Erro ao atualizar pasta');
+    }
+  };
+
+  const openEditFolderDialog = (folder: any) => {
+    setEditingFolder(folder);
+    setEditFolderName(folder.name);
+    setEditFolderColor(folder.color);
+    setEditFolderIcon(folder.icon);
+    setShowEditFolderDialog(true);
+  };
+
   const getAnimationProps = (type: string) => {
     switch (type) {
       case "pulse": return { animate: { scale: [1, 1.05, 1] }, transition: { repeat: Infinity, duration: 2 } };
@@ -573,9 +622,9 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
         }}
       >
         <AnimatePresence mode="wait">
-          {formData.tema.preset === "glass" && (<motion.div key="preview-glass" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="min-h-full"> <GlassTheme data={formData} visibleLinks={visibleLinks} handleLinkClick={() => { }} getAnimationProps={getAnimationProps} isPreview={true} /> </motion.div>)}
-          {formData.tema.preset === "minimalist" && (<motion.div key="preview-mini" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="min-h-full"> <MinimalistTheme data={formData} visibleLinks={visibleLinks} handleLinkClick={() => { }} getAnimationProps={getAnimationProps} isPreview={true} /> </motion.div>)}
-          {formData.tema.preset === "modern" && (<motion.div key="preview-modern" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="min-h-full"> <ModernTheme data={formData} visibleLinks={visibleLinks} handleLinkClick={() => { }} getAnimationProps={getAnimationProps} isPreview={true} /> </motion.div>)}
+          {formData.tema.preset === "glass" && (<motion.div key="preview-glass" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="min-h-full"> <GlassTheme data={{ ...formData, _previewFolders: propertyFolders, _previewSelectedFolderId: selectedFolderId }} visibleLinks={visibleLinks} handleLinkClick={() => { }} getAnimationProps={getAnimationProps} isPreview={true} /> </motion.div>)}
+          {formData.tema.preset === "minimalist" && (<motion.div key="preview-mini" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="min-h-full"> <MinimalistTheme data={{ ...formData, _previewFolders: propertyFolders, _previewSelectedFolderId: selectedFolderId }} visibleLinks={visibleLinks} handleLinkClick={() => { }} getAnimationProps={getAnimationProps} isPreview={true} /> </motion.div>)}
+          {formData.tema.preset === "modern" && (<motion.div key="preview-modern" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="min-h-full"> <ModernTheme data={{ ...formData, _previewFolders: propertyFolders, _previewSelectedFolderId: selectedFolderId }} visibleLinks={visibleLinks} handleLinkClick={() => { }} getAnimationProps={getAnimationProps} isPreview={true} /> </motion.div>)}
         </AnimatePresence>
       </div>
     </div>
@@ -1039,28 +1088,43 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                             </div>
                             <button
                               onClick={() => setShowNewFolderDialog(!showNewFolderDialog)}
-                              className="text-[8px] font-black text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 px-3 py-1.5 rounded-full transition-all hover:text-purple-700 dark:hover:text-purple-300 flex items-center gap-1.5"
+                              className="h-9 px-4 rounded-full font-black text-[10px] text-purple-700 dark:text-purple-300 bg-purple-500/15 hover:bg-purple-500/25 transition-all hover:text-purple-800 dark:hover:text-purple-200 flex items-center gap-2"
                             >
-                              <Plus className="w-3 h-3" /> Nova Pasta
+                              <Plus className="w-4 h-4" /> Criar Pasta
                             </button>
                           </div>
+                          <p className="text-[10px] font-semibold text-purple-700/80 dark:text-purple-300/80">
+                            Toque na pasta para filtrar imóveis. Use os botões Editar e Excluir para gerenciar com facilidade.
+                          </p>
 
                           {showNewFolderDialog && (
-                            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-white/60 dark:bg-white/5 rounded-2xl border border-purple-500/20 space-y-3">
+                            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-white/70 dark:bg-white/5 rounded-2xl border border-purple-500/30 space-y-4">
                               {!id && (
                                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2 mb-2">
                                   <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                                   <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400">Salve a bio primeiro para criar pastas</span>
                                 </div>
                               )}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase tracking-[0.12em] text-purple-700/80 dark:text-purple-300/80">Nome da pasta</Label>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <input
                                   type="text"
-                                  placeholder="Nome da pasta..."
+                                  placeholder="Ex: Alto Padrão"
                                   value={newFolderName}
                                   onChange={(e) => setNewFolderName(e.target.value)}
                                   disabled={!id}
-                                  className="col-span-1 md:col-span-2 px-4 py-2.5 rounded-xl bg-white/60 dark:bg-black/20 border border-white/40 dark:border-white/10 focus:ring-2 focus:ring-purple-500 text-sm font-bold placeholder:text-muted-foreground/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="col-span-1 md:col-span-2 h-11 px-4 rounded-xl bg-white/70 dark:bg-black/20 border border-white/50 dark:border-white/10 focus:ring-2 focus:ring-purple-500 text-sm font-bold placeholder:text-muted-foreground/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="📁"
+                                  value={newFolderIcon}
+                                  onChange={(e) => setNewFolderIcon(e.target.value || "📁")}
+                                  disabled={!id}
+                                  maxLength={2}
+                                  className="w-full h-11 px-3 rounded-xl bg-white/70 dark:bg-black/20 border border-white/50 dark:border-white/10 focus:ring-2 focus:ring-purple-500 text-sm font-black text-center disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                                 <input
                                   type="color"
@@ -1070,17 +1134,35 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                                   className="w-full h-11 rounded-xl cursor-pointer border border-white/40 dark:border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                               </div>
+                              <div className="flex flex-wrap gap-2">
+                                {folderIconSuggestions.map((icon) => (
+                                  <button
+                                    key={`new-icon-${icon}`}
+                                    type="button"
+                                    onClick={() => setNewFolderIcon(icon)}
+                                    disabled={!id}
+                                    className={cn(
+                                      "h-9 w-9 rounded-lg border flex items-center justify-center text-lg transition-all",
+                                      newFolderIcon === icon
+                                        ? "border-purple-500 bg-purple-500/20"
+                                        : "border-white/50 dark:border-white/10 bg-white/60 dark:bg-white/5 hover:bg-white"
+                                    )}
+                                  >
+                                    {icon}
+                                  </button>
+                                ))}
+                              </div>
                               <div className="flex gap-2">
                                 <button
                                   onClick={createPropertyFolder}
                                   disabled={!id || !newFolderName.trim()}
-                                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="flex-1 h-11 px-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-black text-[11px] hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   Criar Pasta
                                 </button>
                                 <button
                                   onClick={() => setShowNewFolderDialog(false)}
-                                  className="flex-1 px-4 py-2.5 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/80 dark:hover:bg-white/10 transition-all"
+                                  className="flex-1 h-11 px-4 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10 rounded-xl font-black text-[11px] hover:bg-white/80 dark:hover:bg-white/10 transition-all"
                                 >
                                   Cancelar
                                 </button>
@@ -1103,7 +1185,7 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                                     className={cn(
                                       "relative cursor-pointer group transition-all rounded-[1.2rem] overflow-hidden",
                                       "bg-white/60 dark:bg-white/5 backdrop-blur-xl border-2",
-                                      "p-4 flex flex-col items-center text-center gap-2.5",
+                                      "p-4 min-h-[172px] flex flex-col items-center text-center gap-2.5 justify-between",
                                       "hover:shadow-lg active:shadow-none",
                                       isSelected
                                         ? "border-2 shadow-lg shadow-blue-500/40 ring-2 ring-blue-500/30"
@@ -1127,7 +1209,8 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                                     </div>
 
                                     {/* Folder Name */}
-                                    <div className="min-w-0 w-full">
+                                    <div className="min-w-0 w-full flex items-center justify-center gap-1.5">
+                                      <span className="text-xs" aria-hidden="true">{folder.icon || "📁"}</span>
                                       <h4 className="text-[11px] font-black truncate text-foreground">{folder.name}</h4>
                                     </div>
 
@@ -1139,16 +1222,30 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                                       {folderItemCount} {folderItemCount === 1 ? "imóvel" : "imóveis"}
                                     </div>
 
-                                    {/* Delete Button */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        deletePropertyFolder(folder.id);
-                                      }}
-                                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md text-rose-500 flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white hover:scale-110"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
+                                    <p className="text-[9px] font-semibold text-muted-foreground/80">
+                                      Toque para abrir
+                                    </p>
+
+                                    <div className="w-full grid grid-cols-2 gap-2">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openEditFolderDialog(folder);
+                                        }}
+                                        className="h-9 rounded-lg bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 font-black text-[10px] transition-all hover:bg-blue-500/25"
+                                      >
+                                        Editar
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deletePropertyFolder(folder.id);
+                                        }}
+                                        className="h-9 rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-black text-[10px] transition-all hover:bg-rose-500/25"
+                                      >
+                                        Excluir
+                                      </button>
+                                    </div>
 
                                     {/* Selection Indicator */}
                                     {isSelected && (
@@ -1170,6 +1267,85 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                               </div>
                             )}
                           </div>
+
+                          {/* EDIT FOLDER DIALOG */}
+                          {showEditFolderDialog && editingFolder && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="p-4 rounded-xl border border-blue-500/50 bg-blue-500/10 dark:bg-blue-500/10 backdrop-blur-sm space-y-4 mt-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Settings2 className="w-4 h-4 text-blue-500" />
+                                <span className="text-[11px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-300">Personalizar Pasta</span>
+                              </div>
+                              {!id && (
+                                <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/20 border border-amber-500/50">
+                                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                  <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400">Salve a bio primeiro para editar pastas</span>
+                                </div>
+                              )}
+                              <p className="text-[10px] font-semibold text-blue-700/80 dark:text-blue-300/80">Atualize nome, ícone e cor da pasta.</p>
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <input
+                                  type="text"
+                                  placeholder="Ex: Investimento"
+                                  value={editFolderName}
+                                  onChange={(e) => setEditFolderName(e.target.value)}
+                                  disabled={!id}
+                                  className="col-span-1 md:col-span-2 h-11 px-4 rounded-xl bg-white/70 dark:bg-black/20 border border-white/50 dark:border-white/10 focus:ring-2 focus:ring-blue-500 text-sm font-bold placeholder:text-muted-foreground/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="📁"
+                                  value={editFolderIcon}
+                                  onChange={(e) => setEditFolderIcon(e.target.value || "📁")}
+                                  disabled={!id}
+                                  maxLength={2}
+                                  className="w-full h-11 px-3 rounded-xl bg-white/70 dark:bg-black/20 border border-white/50 dark:border-white/10 focus:ring-2 focus:ring-blue-500 text-sm font-black text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                                <input
+                                  type="color"
+                                  value={editFolderColor}
+                                  onChange={(e) => setEditFolderColor(e.target.value)}
+                                  disabled={!id}
+                                  className="w-full h-11 rounded-xl cursor-pointer border border-white/40 dark:border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {folderIconSuggestions.map((icon) => (
+                                  <button
+                                    key={`edit-icon-${icon}`}
+                                    type="button"
+                                    onClick={() => setEditFolderIcon(icon)}
+                                    disabled={!id}
+                                    className={cn(
+                                      "h-9 w-9 rounded-lg border flex items-center justify-center text-lg transition-all",
+                                      editFolderIcon === icon
+                                        ? "border-blue-500 bg-blue-500/20"
+                                        : "border-white/50 dark:border-white/10 bg-white/60 dark:bg-white/5 hover:bg-white"
+                                    )}
+                                  >
+                                    {icon}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={updatePropertyFolder}
+                                  disabled={!id || !editFolderName.trim()}
+                                  className="flex-1 h-11 px-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-black text-[11px] hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Salvar Alterações
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setShowEditFolderDialog(false);
+                                    setEditingFolder(null);
+                                  }}
+                                  className="flex-1 h-11 px-4 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10 rounded-xl font-black text-[11px] hover:bg-white/80 dark:hover:bg-white/10 transition-all"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
                         </div>
 
                         {/* BUSCADOR MAGIC FILL IMÓVEIS */}
