@@ -44,13 +44,6 @@ export function SuportePopup() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
-  // Ocultar suporte em páginas de bio públicas
-  const isBioPage = pathname?.startsWith('/bio/')
-  const isEditorPage = pathname?.startsWith('/editor')
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
     const idSalvo = localStorage.getItem('flow63_chamado_id')
