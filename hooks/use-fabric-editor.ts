@@ -627,13 +627,24 @@ export const useFabricEditor = () => {
   const saveToJson = useCallback(() => fabricCanvas.current ? JSON.stringify((fabricCanvas.current as any).toObject(['variableId', 'isFrame', 'frameType', 'customRadii', 'locked', 'isCropped', 'customName', '_origFrameW', '_origFrameH', '_origFrameScaleX', '_origFrameScaleY'])) : '', []);
 
   const loadFromJson = useCallback(async (json: any) => {
-    if (!fabricCanvas.current || !fabricCanvas.current.getContext() || isDisposed.current) return;
+    if (!fabricCanvas.current || isDisposed.current) return;
+    
+    // Verifica se o contexto ainda é válido
+    const ctx = fabricCanvas.current.getContext();
+    if (!ctx) return;
+
     isHistoryProcessing.current = true;
     try {
       const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+      
       // Certifica-se que o canvas ainda está ativo antes de carregar
-      if (fabricCanvas.current && !isDisposed.current) {
-        await fabricCanvas.current.loadFromJSON(parsed);
+      if (fabricCanvas.current && !isDisposed.current && fabricCanvas.current.getContext()) {
+        try {
+          await fabricCanvas.current.loadFromJSON(parsed);
+        } catch (loadErr) {
+          console.warn("Erro ao carregar JSON no Fabric:", loadErr);
+          return;
+        }
       } else {
         return;
       }
@@ -871,14 +882,43 @@ export const useFabricEditor = () => {
   const setImageOpacity = useCallback((v: number) => { if (selectedObject && !isDisposed.current) { selectedObject.set('opacity', v); fabricCanvas.current?.renderAll(); saveHistory(); forceUpdate(); } }, [selectedObject, saveHistory, forceUpdate]);
   const setCanvasProperty = useCallback((k: string, v: any) => { if (selectedObject && !isDisposed.current) { selectedObject.set(k as any, v); fabricCanvas.current?.renderAll(); saveHistory(); forceUpdate(); } }, [selectedObject, saveHistory, forceUpdate]);
 
+  const toggleOutlineOnly = useCallback(() => {
+    if (!selectedObject || !fabricCanvas.current || isDisposed.current) return;
+    if (selectedObject.type === 'image' || selectedObject.type === 'i-text' || selectedObject.type === 'text') return;
+
+    const hasFill = selectedObject.fill && selectedObject.fill !== 'transparent';
+    
+    if (hasFill) {
+      // Ativa apenas contorno: transfere a cor do preenchimento para o contorno
+      const currentColor = typeof selectedObject.fill === 'string' ? selectedObject.fill : '#94a3b8';
+      selectedObject.set({
+        fill: 'transparent',
+        stroke: currentColor,
+        strokeWidth: selectedObject.strokeWidth || 2
+      });
+    } else {
+      // Ativa preenchimento: transfere a cor do contorno para o preenchimento
+      const currentColor = typeof selectedObject.stroke === 'string' ? selectedObject.stroke : '#94a3b8';
+      selectedObject.set({
+        fill: currentColor,
+        stroke: null,
+        strokeWidth: 0
+      });
+    }
+    
+    fabricCanvas.current.renderAll();
+    saveHistory();
+    forceUpdate();
+  }, [selectedObject, saveHistory, forceUpdate]);
+
   const memoizedMethods = useMemo(() => ({ 
     canvasRef, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas, deleteSelected,
     setCornerRadii, toggleFlipX, toggleFlipY, setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, selectedObject, fabricCanvas, contextMenuInfo, setContextMenuInfo,
     isPanMode, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop,
     changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient,
     undo, redo, canUndo: undoStack.current.length > 1, canRedo: redoStack.current.length > 0, setCanvasProperty, changeCount: updateTrigger,
-    toggleObjectVisibility, toggleObjectLock, deleteObject, moveObject, renameObject, isDisposed
-  }), [selectedObject, contextMenuInfo, isPanMode, updateTrigger, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas, deleteSelected, setCornerRadii, toggleFlipX, toggleFlipY, setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop, changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient, undo, redo, setCanvasProperty, toggleObjectVisibility, toggleObjectLock, deleteObject, moveObject, renameObject]);
+    toggleObjectVisibility, toggleObjectLock, deleteObject, moveObject, renameObject, isDisposed, toggleOutlineOnly
+  }), [selectedObject, contextMenuInfo, isPanMode, updateTrigger, addText, addImage, addShape, addFrame, detachImageFromFrame, exportToImage, saveToJson, loadFromJson, clearCanvas, deleteSelected, setCornerRadii, toggleFlipX, toggleFlipY, setImageOpacity, centerObject, bringToFront, sendToBack, toggleLock, togglePanMode, cropBox, startCrop, applyCrop, cancelCrop, removeCrop, changeTextColor, toggleBold, toggleItalic, toggleUnderline, toggleLinethrough, setFontSize, setTextAlignment, toggleList, setLineHeight, setTextIndent, applyGradient, undo, redo, setCanvasProperty, toggleObjectVisibility, toggleObjectLock, deleteObject, moveObject, renameObject, toggleOutlineOnly]);
 
   return memoizedMethods;
 };

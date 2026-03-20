@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -278,7 +279,8 @@ function SupportContent() {
     toggleObjectLock = (o: any) => {},
     deleteObject = (o: any) => {},
     moveObject = (o: any, d: any) => {},
-    renameObject = (o: any, n: any) => {}
+    renameObject = (o: any, n: any) => {},
+    toggleOutlineOnly = () => {}
   } = activeEditor || {};
 
   const handleRegisterMethods = useCallback((id: string, methods: any) => {
@@ -1045,7 +1047,7 @@ function SupportContent() {
           min-width: 0px !important;
           padding: 0px !important;
           margin: 0px !important;
-          border: none !important;
+          border: none !important;  
           outline: none !important;
           resize: none !important;
           background: transparent !important;
@@ -2148,52 +2150,57 @@ function SupportContent() {
                         <div className="space-y-6">
                           <div className="space-y-3">
                             <Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Cor da Forma</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full h-10 flex gap-3 px-3 border-slate-200 dark:border-zinc-800 rounded-lg justify-start items-center bg-transparent">
-                                  <div 
-                                    className="w-5 h-5 rounded-sm border" 
-                                    style={{ backgroundColor: typeof (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) === 'string' ? (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string : '#94a3b8' }} 
-                                  />
-                                  <span className="text-xs font-medium text-slate-600 dark:text-zinc-400">Escolher Cor / Degradê</span>
-                                  <Paintbrush className="w-3 h-3 ml-auto text-slate-400" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64 p-4 bg-white dark:bg-zinc-900 shadow-xl rounded-xl border-slate-200 dark:border-zinc-800">
-                                <Tabs defaultValue="solid">
-                                  <TabsList className="grid grid-cols-2 mb-4">
-                                    <TabsTrigger value="solid">Sólido</TabsTrigger>
-                                    <TabsTrigger value="gradient">Degradê</TabsTrigger>
-                                  </TabsList>
-                                  <TabsContent value="solid" className="space-y-3">
-                                    <Label className="text-[10px] font-bold uppercase text-slate-400">Cor Sólida</Label>
-                                    <Input 
-                                      type="color" 
-                                      className="h-10 p-1 cursor-pointer bg-transparent"
-                                      value={typeof (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) === 'string' ? (selectedObject.type === 'line' ? selectedObject.stroke : selectedObject.fill) as string : '#94a3b8'}
-                                      onChange={(e) => updateProperty(selectedObject.type === 'line' ? 'stroke' : 'fill', e.target.value)}
-                                    />
-                                  </TabsContent>
-                                  <TabsContent value="gradient" className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] dark:text-zinc-400">Cor 1</Label>
-                                        <Input type="color" value={gradColor1} onChange={(e) => setGradColor1(e.target.value)} className="h-8 p-1 bg-transparent" />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] dark:text-zinc-400">Cor 2</Label>
-                                        <Input type="color" value={gradColor2} onChange={(e) => setGradColor2(e.target.value)} className="h-8 p-1 bg-transparent" />
-                                      </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <Button size="sm" variant="outline" className="text-[10px] h-7 dark:border-zinc-800" onClick={() => applyGradient(gradColor1, gradColor2, 'horizontal')}>Horizontal</Button>
-                                      <Button size="sm" variant="outline" className="text-[10px] h-7 dark:border-zinc-800" onClick={() => applyGradient(gradColor1, gradColor2, 'vertical')}>Vertical</Button>
-                                    </div>
-                                  </TabsContent>
-                                </Tabs>
-                              </PopoverContent>
-                            </Popover>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                {(() => {
+                                  const isOutlineOnly = selectedObject.fill === 'transparent' || !selectedObject.fill;
+                                  const colorProp = (selectedObject.type === 'line' || isOutlineOnly) ? 'stroke' : 'fill';
+                                  const currentColor = typeof selectedObject[colorProp] === 'string' ? selectedObject[colorProp] as string : '#94a3b8';
+                                  
+                                  return (
+                                    <>
+                                      <div 
+                                        className="absolute left-3 top-2.5 w-4 h-4 rounded-full border border-slate-200 dark:border-zinc-700 pointer-events-none z-10"
+                                        style={{ backgroundColor: currentColor }}
+                                      />
+                                      <Input 
+                                        type="color" 
+                                        className="w-full h-9 pl-9 pr-2 cursor-pointer bg-transparent border-slate-200 dark:border-zinc-800 rounded-xl"
+                                        value={currentColor.startsWith('#') ? currentColor : '#94a3b8'}
+                                        onChange={(e) => updateProperty(colorProp, e.target.value)}
+                                      />
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
                           </div>
+
+                          <div className="flex items-center justify-between bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-slate-100 dark:border-zinc-800">
+                            <div className="space-y-0.5">
+                              <Label className="text-xs font-bold text-slate-800 dark:text-zinc-200">Apenas Contorno</Label>
+                              <p className="text-[10px] text-slate-500 dark:text-zinc-500">Remove o preenchimento da forma</p>
+                            </div>
+                            <Switch 
+                              checked={selectedObject.fill === 'transparent' || !selectedObject.fill}
+                              onCheckedChange={toggleOutlineOnly}
+                            />
+                          </div>
+
+                          {(selectedObject.type === 'line' || selectedObject.fill === 'transparent' || !selectedObject.fill) && (
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Espessura do Contorno</Label>
+                                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{selectedObject.strokeWidth || 0}px</span>
+                              </div>
+                              <Slider 
+                                min={0} max={50} step={1} 
+                                value={[selectedObject.strokeWidth || 0]} 
+                                onValueChange={(v) => updateProperty('strokeWidth', v[0])} 
+                                className="py-2"
+                              />
+                            </div>
+                          )}
 
                           {selectedObject.type !== 'circle' && selectedObject.type !== 'line' && (
                             <div className="space-y-3">
