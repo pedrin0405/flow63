@@ -35,7 +35,8 @@ export default function LeafletMapInner({
   onPropertyClick,
   center,
   zoom = 13,
-  showPopups = true
+  showPopups = true,
+  featuredCodes = []
 }: any) {
   useEffect(() => {
     fixLeafletIcons()
@@ -43,7 +44,7 @@ export default function LeafletMapInner({
 
   const defaultCenter: [number, number] = center || [-10.1837, -48.3337]
 
-  const createIcon = (type: string, isSelected: boolean) => {
+  const createIcon = (type: string, isSelected: boolean, isFeatured: boolean) => {
     const t = type.toLowerCase()
     let color = "#3b82f6" // azul (Casa)
     if (t.includes("apartamento") || t.includes("predio") || t.includes("prédio")) color = "#ef4444" // vermelho
@@ -55,9 +56,22 @@ export default function LeafletMapInner({
     const border = isSelected ? '3px solid white' : '2px solid white'
     const shadow = isSelected ? '0 0 15px rgba(0,0,0,0.6)' : '0 2px 4px rgba(0,0,0,0.3)'
 
+    const starHtml = isFeatured ? `
+      <div style="position: absolute; top: -8px; right: -8px; background: #f59e0b; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10;">
+        <svg viewBox="0 0 24 24" width="8" height="8" fill="white" stroke="white" stroke-width="2">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+        </svg>
+      </div>
+    ` : ''
+
     return new L.DivIcon({
       className: 'custom-div-icon',
-      html: `<div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${border}; box-shadow: ${shadow}; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);"></div>`,
+      html: `
+        <div style="position: relative;">
+          <div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${border}; box-shadow: ${shadow}; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+          ${starHtml}
+        </div>
+      `,
       iconSize: [size, size],
       iconAnchor: [size/2, size/2]
     })
@@ -93,7 +107,8 @@ export default function LeafletMapInner({
         const lat = prop.latitude
         const lng = prop.longitude
         const isSelected = selectedProperty?.code === prop.code
-        const icon = createIcon(prop.type, isSelected)
+        const isFeatured = featuredCodes.includes(prop.code)
+        const icon = createIcon(prop.type, isSelected, isFeatured)
 
         return (
           <Marker 

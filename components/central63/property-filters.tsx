@@ -1,9 +1,12 @@
 "use client"
 
-import { Search, X } from "lucide-react"
+import { Search, X, Star } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
 
 interface FiltersProps {
   filters: any
@@ -69,28 +72,44 @@ export function PropertyFilters({ filters, onFilterChange, cities, types }: Filt
         </div>
       </div>
 
-      {/* Linha de Preço (Opcional) */}
-      <div className="flex items-center gap-2 text-sm">
-         <span className="text-muted-foreground font-medium">Faixa de Preço:</span>
-         <Input 
-            type="number" placeholder="Mín" className="w-24 h-8 text-xs" 
-            value={filters.minPrice} onChange={(e) => onFilterChange("minPrice", e.target.value)}
-         />
-         <span className="text-muted-foreground">-</span>
-         <Input 
-            type="number" placeholder="Máx" className="w-24 h-8 text-xs" 
-            value={filters.maxPrice} onChange={(e) => onFilterChange("maxPrice", e.target.value)}
-         />
-         {(filters.minPrice || filters.maxPrice || filters.search || filters.neighborhood) && (
-             <Button variant="ghost" size="sm" onClick={() => {
-                 onFilterChange("minPrice", "")
-                 onFilterChange("maxPrice", "")
-                 onFilterChange("search", "")
-                 onFilterChange("neighborhood", "")
-             }} className="h-8 ml-2 text-red-500 hover:text-red-600 hover:bg-red-50">
-                <X size={12} className="mr-1"/> Limpar
-             </Button>
-         )}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* Linha de Preço (Opcional) */}
+        <div className="flex items-center gap-2 text-sm">
+           <span className="text-muted-foreground font-medium whitespace-nowrap">Faixa de Preço:</span>
+           <Input 
+              type="number" placeholder="Mín" className="w-24 h-8 text-xs bg-card" 
+              value={filters.minPrice} onChange={(e) => onFilterChange("minPrice", e.target.value)}
+           />
+           <span className="text-muted-foreground">-</span>
+           <Input 
+              type="number" placeholder="Máx" className="w-24 h-8 text-xs bg-card" 
+              value={filters.maxPrice} onChange={(e) => onFilterChange("maxPrice", e.target.value)}
+           />
+           {(filters.minPrice || filters.maxPrice || filters.search || filters.neighborhood || filters.onlyFeatured) && (
+               <Button variant="ghost" size="sm" onClick={() => {
+                   onFilterChange("minPrice", "")
+                   onFilterChange("maxPrice", "")
+                   onFilterChange("search", "")
+                   onFilterChange("neighborhood", "")
+                   onFilterChange("onlyFeatured", false)
+               }} className="h-8 ml-2 text-red-500 hover:text-red-600 hover:bg-red-50">
+                  <X size={12} className="mr-1"/> Limpar Filtros
+               </Button>
+           )}
+        </div>
+
+        {/* Filtro de Destaques */}
+        <div className="flex items-center gap-3 bg-amber-500/5 border border-amber-500/10 px-4 py-2 rounded-2xl">
+          <div className="flex items-center gap-2">
+            <Star className={cn("h-4 w-4", filters.onlyFeatured ? "text-amber-500 fill-amber-500" : "text-muted-foreground")} />
+            <Label htmlFor="only-featured" className="text-xs font-bold cursor-pointer whitespace-nowrap">Apenas Destaques</Label>
+          </div>
+          <Switch 
+            id="only-featured"
+            checked={filters.onlyFeatured}
+            onCheckedChange={(val) => onFilterChange("onlyFeatured", val)}
+          />
+        </div>
       </div>
     </div>
   )

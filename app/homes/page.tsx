@@ -7,6 +7,7 @@ import { StatCard } from "@/components/central63/services/stat-card"
 import { PropertyFilters } from "@/components/central63/property-filters"
 import { PropertyCard } from "@/components/central63/property-card"
 import { Pagination } from "@/components/central63/services/pagination"
+import { FeaturedPropertiesTicker } from "@/components/central63/homes/featured-properties-ticker"
 import { PropertyDetailsContent } from "@/components/central63/property-details-content"
 import { PropertyMap } from "@/components/central63/property-map"
 import { useToast } from "@/hooks/use-toast"
@@ -33,6 +34,7 @@ export default function ImoveisPage() {
   const [totalItems, setTotalItems] = useState(0) 
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
+  const [featuredCodes, setFeaturedCodes] = useState<string[]>([])
   const itemsPerPage = 12 
 
   // Filtros
@@ -44,6 +46,7 @@ export default function ImoveisPage() {
     neighborhood: "", 
     status: "Vago/Disponível", 
     search: "",
+    onlyFeatured: false
   })
 
   const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -74,6 +77,15 @@ export default function ImoveisPage() {
       const isPmw = !filters.city || filters.city === "Palmas"
       const tableName = isPmw ? "imovel_pmw" : "imovel_aux"
 
+      // Buscar códigos em destaque
+      const { data: featuredData } = await supabase
+        .from('featured_properties')
+        .select('property_code')
+        .eq('city', filters.city || 'Palmas')
+      
+      const currentFeaturedCodes = featuredData?.map(f => f.property_code) || []
+      setFeaturedCodes(currentFeaturedCodes)
+
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
@@ -92,6 +104,17 @@ export default function ImoveisPage() {
       }
       if (filters.neighborhood) {
         query = query.ilike('bairro', `%${filters.neighborhood}%`);
+      }
+      
+      // FILTRO CORRIGIDO: Se o switch estiver ativo, filtramos pelos códigos.
+      // Se não houver códigos destacados, forçamos um resultado vazio.
+      if (filters.onlyFeatured) {
+        if (currentFeaturedCodes.length > 0) {
+          query = query.in('codigo', currentFeaturedCodes);
+        } else {
+          // Garante que não retorne nada se não houver destaques marcados
+          query = query.eq('codigo', '00000000-0000-0000-0000-000000000000'); 
+        }
       }
       
       const { data, count, error } = await query.range(from, to).order('created_at', { ascending: false });
@@ -139,7 +162,7 @@ export default function ImoveisPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [filters.city, filters.status, filters.type, filters.neighborhood, debouncedSearch, currentPage, itemsPerPage, toast])
+  }, [filters.city, filters.status, filters.type, filters.neighborhood, filters.onlyFeatured, debouncedSearch, currentPage, itemsPerPage, toast])
 
   useEffect(() => {
     fetchProperties()
@@ -148,7 +171,7 @@ export default function ImoveisPage() {
   const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
   const formatCompact = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(value)
   
-  const handleFilterChange = (key: string, value: string) => { 
+  const handleFilterChange = (key: string, value: any) => { 
     setFilters(prev => ({ ...prev, [key]: value })); 
     setCurrentPage(1); 
   }
@@ -195,6 +218,7 @@ export default function ImoveisPage() {
                             formatCurrency={formatCurrency}
                             showPopups={false}
                             className="w-full h-full"
+                            featuredCodes={featuredCodes}
                         />
                         <div className="absolute top-4 left-4 z-[1000] bg-white/90 backdrop-blur shadow-xl p-4 rounded-2xl border flex items-center gap-3">
                              <div className="p-2 bg-primary/10 rounded-lg"><MapPin className="text-primary" size={16}/></div>
@@ -224,6 +248,12 @@ export default function ImoveisPage() {
                             <StatCard title="Ticket Médio (Tela)" value={formatCompact(propertiesData.length > 0 ? (propertiesData.reduce((acc, curr) => acc + curr.value, 0) / propertiesData.length) : 0)} icon={MapPin} trend="Média" color="bg-purple-500" />
                         </div>
 
+                        {/* Letreiro de Destaques */}
+                        <FeaturedPropertiesTicker 
+                            onPropertyClick={setSelectedProperty}
+                            formatCurrency={formatCurrency}
+                        />
+
                         {/* Filtros */}
                         <PropertyFilters 
                             filters={filters} 
@@ -245,6 +275,7 @@ export default function ImoveisPage() {
                                                 property={prop}
                                                 formatCurrency={formatCurrency}
                                                 onClick={() => setSelectedProperty(prop)}
+                                                isFeatured={featuredCodes.includes(prop.code)}
                                             />
                                         ))}
                                     </div>
@@ -282,6 +313,7 @@ export default function ImoveisPage() {
                                     formatCurrency={formatCurrency}
                                     onPropertyClick={setSelectedProperty}
                                     className="w-full h-full"
+                                    featuredCodes={featuredCodes}
                                 />
                                 
                                 {/* Legenda Flutuante (dentro do mapa) */}

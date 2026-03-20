@@ -1,18 +1,23 @@
 "use client"
 
-import { MapPin, Expand, TrendingUp } from "lucide-react"
+import { MapPin, Expand, TrendingUp, Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 interface PropertyCardProps {
   property: any
   formatCurrency: (val: number) => string
   onClick: () => void
+  isFeatured?: boolean
 }
 
-export function PropertyCard({ property, formatCurrency, onClick }: PropertyCardProps) {
+export function PropertyCard({ property, formatCurrency, onClick, isFeatured = false }: PropertyCardProps) {
   return (
     <div 
-      className="bg-card rounded-xl border border-border overflow-hidden cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+      className={cn(
+        "bg-card rounded-xl border border-border overflow-hidden cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group relative",
+        isFeatured && "border-amber-500/30 shadow-md shadow-amber-500/5"
+      )}
       onClick={onClick}
     >
       {/* Imagem + Badge Status */}
@@ -22,8 +27,17 @@ export function PropertyCard({ property, formatCurrency, onClick }: PropertyCard
             alt="Imóvel" 
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
+        
+        {isFeatured && (
+          <div className="absolute top-3 left-3 z-30 animate-in fade-in zoom-in duration-500">
+            <div className="bg-amber-500/90 text-white p-1 rounded-lg backdrop-blur-sm border border-amber-400/50 shadow-lg shadow-amber-500/20">
+              <Star className="h-3 w-3 fill-white" />
+            </div>
+          </div>
+        )}
+
         <div>
-             <Badge variant={property.status.includes("Desativado") ? "destructive" : "default"} className="shadow-sm absolute top-3 left-3 z-20 animate-in fade-in zoom-in duration-300">
+             <Badge variant={property.status.includes("Desativado") ? "destructive" : "default"} className={cn("shadow-sm absolute top-3 z-20 animate-in fade-in zoom-in duration-300", isFeatured ? "left-10" : "left-3")}>
                 {property.status}
              </Badge>
              <Badge variant="outline" className="text-[12px] bg-muted/100 absolute top-3 right-3">

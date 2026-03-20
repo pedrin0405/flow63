@@ -1,8 +1,12 @@
 "use client"
 
-import { MapPin, Home, Ruler, DollarSign, Calendar } from "lucide-react"
+import { useState, useEffect } from "react"
+import { MapPin, Home, Ruler, DollarSign, Calendar, Star, Loader2 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 interface PropertyDetailsContentProps {
   property: any
@@ -12,7 +16,75 @@ interface PropertyDetailsContentProps {
 }
 
 export function PropertyDetailsContent({ property, formatCurrency, onClose, isInline = false }: PropertyDetailsContentProps) {
+  const { toast } = useToast()
+  const [isFeatured, setIsFeatured] = useState(false)
+  const [isFeatureLoading, setIsFeatureLoading] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    const checkRoleAndFeatured = async () => {
+      if (!property) return
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        setUserRole(profile?.role || null)
+      }
+
+      // Verifica se o imóvel já está em destaque
+      const { data } = await supabase
+        .from('featured_properties')
+        .select('*')
+        .eq('property_code', property.code)
+        .eq('city', property.city || 'Palmas')
+        .maybeSingle()
+      
+      setIsFeatured(!!data)
+    }
+
+    checkRoleAndFeatured()
+  }, [property])
+
+  const toggleFeatured = async () => {
+    setIsFeatureLoading(true)
+    try {
+      if (isFeatured) {
+        const { error } = await supabase
+          .from('featured_properties')
+          .delete()
+          .eq('property_code', property.code)
+          .eq('city', property.city || 'Palmas')
+        
+        if (error) throw error
+        setIsFeatured(false)
+        toast({ title: "Removido", description: "Imóvel removido dos destaques." })
+      } else {
+        const { error } = await supabase
+          .from('featured_properties')
+          .insert({
+            property_code: property.code,
+            city: property.city || 'Palmas'
+          })
+        
+        if (error) throw error
+        setIsFeatured(true)
+        toast({ title: "Destaque", description: "Imóvel adicionado aos destaques com sucesso!" })
+      }
+    } catch (error: any) {
+      console.error("Erro ao gerenciar destaque:", error)
+      toast({ title: "Erro", description: "Falha ao processar o destaque.", variant: "destructive" })
+    } finally {
+      setIsFeatureLoading(false)
+    }
+  }
+
   if (!property) return null
+
+  const canManageFeatured = ['Diretor', 'Gestor', 'Admin'].includes(userRole || '')
 
   return (
     <div className="flex flex-col h-full bg-card">
@@ -26,6 +98,32 @@ export function PropertyDetailsContent({ property, formatCurrency, onClose, isIn
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+            <div className="absolute top-4 right-4 flex gap-2">
+                {canManageFeatured && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={toggleFeatured}
+                        disabled={isFeatureLoading}
+                        className={cn(
+                            "h-12 w-12 rounded-2xl backdrop-blur-xl border-2 transition-all duration-500 group/star",
+                            isFeatured 
+                              ? "bg-amber-500 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.4)] scale-110" 
+                              : "bg-black/40 border-white/20 text-white/70 hover:bg-black/60 hover:scale-105"
+                        )}
+                        title={isFeatured ? "Remover dos Destaques" : "Adicionar aos Destaques"}
+                    >
+                        {isFeatureLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Star className={cn(
+                            "h-6 w-6 transition-transform duration-500", 
+                            isFeatured ? "fill-white animate-pulse scale-110" : "group-hover/star:scale-125"
+                          )} />
+                        )}
+                    </Button>
+                )}
+            </div>
             <div className="absolute bottom-6 left-6 right-6">
               <Badge className="bg-primary text-white border-none mb-2">{property.type}</Badge>
               <h2 className="text-white text-3xl font-black tracking-tight drop-shadow-md">
