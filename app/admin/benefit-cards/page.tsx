@@ -38,12 +38,11 @@ import {
   getBenefitCards, 
   getBenefits, 
   saveBenefitCard, 
-  getAllUsers, 
+  createBenefitCardsInBulk,
   deleteBenefitCard,
   deleteBenefit,
   saveBenefit,
   getCardBenefitsIds,
-  BenefitCard, 
   Benefit 
 } from "@/app/actions/benefit-cards"
 import * as XLSX from 'xlsx'
@@ -461,8 +460,10 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [autoApplyLevelBenefits, setAutoApplyLevelBenefits] = useState(true)
   const [formData, setFormData] = useState({
     user_id: "",
+    selected_user_ids: [] as string[],
     nivel_beneficio: 1,
     data_validade: "",
     status: "ativo",
@@ -472,42 +473,118 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
   })
   const [users, setUsers] = useState<any[]>([])
   const [userSearch, setUserSearch] = useState("")
-  const [isUserListOpen, setIsUserUserListOpen] = useState(false)
+  const isEditMode = Boolean(card?.id)
+
+  const getBenefitsByLevel = useCallback((level: number) => {
+    const normalizedLevel = Number.isFinite(level) && level > 0 ? level : 1
+    return benefits
+      .filter((benefit: Benefit) => benefit.ativo && benefit.nivel_minimo <= normalizedLevel)
+      .map((benefit: Benefit) => benefit.id)
+  }, [benefits])
+
+  const syncBenefitsByLevel = useCallback((level: number) => {
+    const defaults = getBenefitsByLevel(level)
+    setFormData(prev => {
+      const hasSameLength = prev.benefitIds.length === defaults.length
+      const hasSameItems = hasSameLength && prev.benefitIds.every(id => defaults.includes(id))
+      if (hasSameItems) return prev
+      return { ...prev, benefitIds: defaults }
+    })
+  }, [getBenefitsByLevel])
 
   useEffect(() => {
-    if (isOpen) {
-      setFormData({
-        user_id: card?.user_id || "",
-        nivel_beneficio: card?.nivel_beneficio || 1,
-        data_validade: card?.data_validade ? new Date(card.data_validade).toISOString().split('T')[0] : "",
-        status: card?.status || "ativo",
-        card_image_url: card?.card_image_url || "",
-        card_display_name: card?.card_display_name || "",
-        benefitIds: []
+    if (!isOpen) {
+      setUserSearch("")
+      return
+    }
+
+    setFormData({
+      user_id: card?.user_id || "",
+      selected_user_ids: card?.user_id ? [card.user_id] : [],
+      nivel_beneficio: card?.nivel_beneficio || 1,
+      data_validade: card?.data_validade ? new Date(card.data_validade).toISOString().split('T')[0] : "",
+      status: card?.status || "ativo",
+      card_image_url: card?.card_image_url || "",
+      card_display_name: card?.card_display_name || "",
+      benefitIds: []
+    })
+
+    setAutoApplyLevelBenefits(!card)
+    if (card?.id) {
+      getCardBenefitsIds(card.id).then(res => {
+        if (res.success) setFormData(p => ({ ...p, benefitIds: res.data || [] }))
       })
-      
-      if (card?.id) {
-        getCardBenefitsIds(card.id).then(res => {
-          if (res.success) setFormData(p => ({ ...p, benefitIds: res.data || [] }))
-        })
-      }
     }
   }, [isOpen, card])
 
   useEffect(() => {
+    if (!isOpen || isEditMode || !autoApplyLevelBenefits) return
+    syncBenefitsByLevel(formData.nivel_beneficio)
+  }, [isOpen, isEditMode, autoApplyLevelBenefits, formData.nivel_beneficio, syncBenefitsByLevel])
+
+  useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase.from('profiles').select('id, full_name, role, avatar_url').order('full_name')
-      setUsers(data || [])
+      const [profilesRes, cardsRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, full_name, role, avatar_url, email')
+          .order('full_name'),
+        supabase
+          .from('benefit_cards')
+          .select('user_id')
+      ])
+
+      if (profilesRes.error) {
+        toast({ title: "Erro", description: "Falha ao carregar colaboradores.", variant: "destructive" })
+        return
+      }
+
+      if (cardsRes.error) {
+        toast({ title: "Erro", description: "Falha ao verificar cartões existentes.", variant: "destructive" })
+        return
+      }
+
+      const usersWithCard = new Set((cardsRes.data || []).map((item: { user_id: string }) => item.user_id))
+      const availableUsers = (profilesRes.data || []).filter((profile: any) => {
+        if (card?.user_id && profile.id === card.user_id) return true
+        return !usersWithCard.has(profile.id)
+      })
+
+      setUsers(availableUsers)
     }
+
     if (isOpen) fetchUsers()
-  }, [isOpen])
+  }, [isOpen, card?.user_id, toast])
 
   const filteredUsers = useMemo(() => {
-    if (!userSearch) return users;
-    return users.filter(u => u.full_name?.toLowerCase().includes(userSearch.toLowerCase()));
+    const normalizedSearch = userSearch.trim().toLowerCase()
+    if (!normalizedSearch) return users
+    return users.filter(u => (u.full_name || u.email || "").toLowerCase().includes(normalizedSearch))
   }, [users, userSearch]);
 
-  const selectedUser = useMemo(() => users.find(u => u.id === formData.user_id), [users, formData.user_id]);
+  const selectedUsers = useMemo(
+    () => users.filter(u => formData.selected_user_ids.includes(u.id)),
+    [users, formData.selected_user_ids]
+  )
+
+  const selectedUser = useMemo(() => users.find(u => u.id === formData.user_id), [users, formData.user_id])
+
+  const previewUser = isEditMode ? selectedUser : selectedUsers[0]
+
+  const toggleUserSelection = (userId: string) => {
+    setFormData(prev => {
+      const alreadySelected = prev.selected_user_ids.includes(userId)
+      const selected_user_ids = alreadySelected
+        ? prev.selected_user_ids.filter(id => id !== userId)
+        : [...prev.selected_user_ids, userId]
+
+      return {
+        ...prev,
+        selected_user_ids,
+        user_id: selected_user_ids[0] || ""
+      }
+    })
+  }
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -539,19 +616,91 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
   }
 
   const handleSave = async () => {
-    if (!formData.user_id || !formData.data_validade) {
+    const selectedUserIds = isEditMode
+      ? [formData.user_id].filter(Boolean)
+      : formData.selected_user_ids
+
+    if (selectedUserIds.length === 0 || !formData.data_validade) {
       toast({ title: "Atenção", description: "Campos obrigatórios faltando.", variant: "destructive" })
       return
     }
+
     setLoading(true)
     try {
-      const serial = card?.apple_pass_serial || `BC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
-      const result = await saveBenefitCard({ ...formData, apple_pass_serial: serial, id: card?.id }, formData.benefitIds)
-      if (result.success) {
-        toast({ title: "Sucesso", description: "Cartão atualizado." })
-        onSave()
+      if (isEditMode) {
+        const serial = card?.apple_pass_serial || `BC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+        const cardPayload = {
+          id: card?.id,
+          user_id: selectedUserIds[0],
+          nivel_beneficio: formData.nivel_beneficio,
+          data_validade: formData.data_validade,
+          status: formData.status,
+          card_image_url: formData.card_image_url,
+          card_display_name: formData.card_display_name,
+          apple_pass_serial: serial
+        }
+
+        const result = await saveBenefitCard(
+          cardPayload,
+          formData.benefitIds
+        )
+
+        if (result.success) {
+          toast({ title: "Sucesso", description: "Cartão atualizado." })
+          onSave()
+        } else {
+          toast({ title: "Erro", description: result.error, variant: "destructive" })
+        }
       } else {
-        toast({ title: "Erro", description: result.error, variant: "destructive" })
+        const result = await createBenefitCardsInBulk({
+          userIds: selectedUserIds,
+          template: {
+            nivel_beneficio: formData.nivel_beneficio,
+            data_validade: formData.data_validade,
+            status: formData.status,
+            card_image_url: formData.card_image_url,
+            card_display_name: formData.card_display_name
+          },
+          benefitIds: formData.benefitIds
+        })
+
+        if (!result.success) {
+          toast({ title: "Erro", description: result.error, variant: "destructive" })
+          return
+        }
+
+        const createdCount = result.data?.createdCount || 0
+        const skippedCount = result.data?.skippedCount || 0
+        const failedCount = result.data?.failed?.length || 0
+
+        if (createdCount > 0) {
+          toast({
+            title: "Sucesso",
+            description: `${createdCount} cartão(ões) criado(s) com os benefícios do nível.`
+          })
+          onSave()
+        } else {
+          toast({
+            title: "Nenhum cartão criado",
+            description: "Todos os colaboradores selecionados já possuem cartão.",
+            variant: "destructive"
+          })
+        }
+
+        if (skippedCount > 0) {
+          toast({
+            title: "Colaboradores ignorados",
+            description: `${skippedCount} colaborador(es) já possuíam cartão.`
+          })
+        }
+
+        if (failedCount > 0) {
+          toast({
+            title: "Falhas na emissão",
+            description: `${failedCount} colaborador(es) não puderam ser processados.`,
+            variant: "destructive"
+          })
+        }
       }
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" })
@@ -561,6 +710,7 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
   }
 
   const toggleBenefit = (id: string) => {
+    if (!isEditMode) setAutoApplyLevelBenefits(false)
     setFormData(prev => ({
       ...prev,
       benefitIds: prev.benefitIds.includes(id) 
@@ -570,12 +720,18 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
   }
 
   const selectedUserName = useMemo(() => {
-    if (formData.card_display_name) return formData.card_display_name;
-    if (!selectedUser) return "NOME DO MEMBRO";
-    return selectedUser.full_name && selectedUser.full_name !== "Pendente" 
-      ? selectedUser.full_name 
-      : selectedUser.email?.split('@')[0] || "NOME DO MEMBRO";
-  }, [formData.card_display_name, selectedUser]);
+    if (formData.card_display_name) return formData.card_display_name
+
+    if (!previewUser) {
+      return formData.selected_user_ids.length > 1
+        ? `${formData.selected_user_ids.length} MEMBROS`
+        : "NOME DO MEMBRO"
+    }
+
+    return previewUser.full_name && previewUser.full_name !== "Pendente"
+      ? previewUser.full_name
+      : previewUser.email?.split('@')[0] || "NOME DO MEMBRO"
+  }, [formData.card_display_name, previewUser, formData.selected_user_ids.length])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -651,14 +807,16 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                     <div className="space-y-1.5 relative">
                       <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <User size={10} className="text-[#e91c74]" /> Colaborador
+                          <User size={10} className="text-[#e91c74]" /> {isEditMode ? 'Colaborador' : 'Colaboradores'}
                         </div>
-                        {formData.user_id && !card && (
-                          <button onClick={() => setFormData(p => ({ ...p, user_id: "" }))} className="text-[#e91c74] hover:underline lowercase font-bold">Trocar</button>
+                        {!isEditMode && formData.selected_user_ids.length > 0 && (
+                          <Badge className="bg-[#e91c74]/10 text-[#e91c74] border-[#e91c74]/20 rounded-full text-[9px] font-black px-2.5">
+                            {formData.selected_user_ids.length} selecionado(s)
+                          </Badge>
                         )}
                       </label>
                       
-                      {!formData.user_id && !card ? (
+                      {!isEditMode ? (
                         <div className="space-y-2">
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
@@ -671,30 +829,52 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                           </div>
                           <div className="max-h-[200px] overflow-y-auto rounded-xl border border-white/40 bg-white/40 shadow-inner custom-scrollbar">
                             {filteredUsers.length > 0 ? (
-                              filteredUsers.map(u => (
+                              filteredUsers.map(u => {
+                                const isSelected = formData.selected_user_ids.includes(u.id)
+                                const displayName = (u.full_name && u.full_name !== "Pendente")
+                                  ? u.full_name
+                                  : u.email?.split('@')[0] || "Usuário"
+
+                                return (
                                 <div 
                                   key={u.id}
-                                  onClick={() => setFormData(p => ({ ...p, user_id: u.id }))}
-                                  className="flex items-center gap-3 p-3 hover:bg-[#e91c74]/10 cursor-pointer transition-all border-b border-white/10 last:border-0 group"
+                                  onClick={() => toggleUserSelection(u.id)}
+                                  className={`flex items-center gap-3 p-3 cursor-pointer transition-all border-b border-white/10 last:border-0 group ${isSelected ? 'bg-[#e91c74]/10' : 'hover:bg-[#e91c74]/10'}`}
                                 >
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-[#e91c74] border-[#e91c74]' : 'border-slate-300 bg-white'}`}>
+                                    {isSelected && <CheckCircle className="text-white w-3 h-3" />}
+                                  </div>
                                   <Avatar className="h-8 w-8 rounded-full shadow-sm border border-white/40">
                                     <AvatarImage src={u.avatar_url} className="object-cover rounded-full" />
-                                    <AvatarFallback className="text-[10px] font-black bg-white text-slate-700 flex items-center justify-center w-8 h-8 rounded-full">{u.full_name?.charAt(0)}</AvatarFallback>
+                                    <AvatarFallback className="text-[10px] font-black bg-white text-slate-700 flex items-center justify-center w-8 h-8 rounded-full">{displayName.charAt(0)}</AvatarFallback>
                                   </Avatar>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-slate-700 truncate group-hover:text-[#e91c74] transition-colors">{u.full_name}</p>
+                                    <p className="text-xs font-bold text-slate-700 truncate group-hover:text-[#e91c74] transition-colors">{displayName}</p>
                                     <p className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">{u.role}</p>
                                   </div>
-                                  <ChevronRight size={14} className="text-slate-300 group-hover:text-[#e91c74] group-hover:translate-x-1 transition-all" />
+                                  <ChevronRight size={14} className={`transition-all ${isSelected ? 'text-[#e91c74] translate-x-1' : 'text-slate-300 group-hover:text-[#e91c74] group-hover:translate-x-1'}`} />
                                 </div>
-                              ))
+                                )
+                              })
                             ) : (
                               <div className="p-8 text-center opacity-40">
                                 <Search size={24} className="mx-auto mb-2" />
-                                <p className="text-[10px] font-bold uppercase">Nenhum membro encontrado</p>
+                                <p className="text-[10px] font-bold uppercase">Nenhum colaborador disponível</p>
                               </div>
                             )}
                           </div>
+
+                          <p className="text-[9px] text-slate-400 font-bold px-1">Somente colaboradores sem cartão aparecem na lista.</p>
+
+                          {selectedUsers.length > 0 && (
+                            <div className="rounded-xl bg-white/50 border border-white/40 p-3 space-y-1">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Selecionados</p>
+                              <p className="text-[10px] font-bold text-slate-700 truncate">
+                                {selectedUsers.slice(0, 3).map(u => u.full_name || u.email?.split('@')[0] || "Usuário").join(', ')}
+                                {selectedUsers.length > 3 ? ` +${selectedUsers.length - 3}` : ''}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/60 border border-white/40 shadow-inner">
@@ -721,7 +901,19 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Nível</label>
-                        <Input type="number" className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner text-center font-black text-[#e91c74]" value={formData.nivel_beneficio} onChange={(e) => setFormData(p => ({ ...p, nivel_beneficio: parseInt(e.target.value) }))} />
+                        <Input
+                          type="number"
+                          min={1}
+                          className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner text-center font-black text-[#e91c74]"
+                          value={formData.nivel_beneficio}
+                          onChange={(e) => {
+                            const parsedLevel = Number.parseInt(e.target.value, 10)
+                            setFormData(p => ({
+                              ...p,
+                              nivel_beneficio: Number.isFinite(parsedLevel) && parsedLevel > 0 ? parsedLevel : 1
+                            }))
+                          }}
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Status</label>
@@ -771,10 +963,35 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e91c74] flex items-center gap-2">
                     <ListChecks size={14} /> Atribuição de Benefícios
                   </h4>
-                  <Badge variant="secondary" className="bg-white/60 backdrop-blur-md text-slate-500 border border-white/40 font-bold rounded-full text-[10px] shadow-sm">
-                    {benefits.filter(b => b.ativo).length} Disponíveis
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {!isEditMode && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setAutoApplyLevelBenefits(true)
+                          syncBenefitsByLevel(formData.nivel_beneficio)
+                        }}
+                        className="h-8 rounded-full text-[9px] font-black uppercase tracking-wider border-[#e91c74]/30 text-[#e91c74] bg-white/70 hover:bg-[#e91c74]/10"
+                      >
+                        Reaplicar nível
+                      </Button>
+                    )}
+
+                    <Badge variant="secondary" className="bg-white/60 backdrop-blur-md text-slate-500 border border-white/40 font-bold rounded-full text-[10px] shadow-sm">
+                      {formData.benefitIds.length} selecionado(s)
+                    </Badge>
+                  </div>
                 </div>
+
+                {!isEditMode && (
+                  <p className="px-2 mb-4 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                    {autoApplyLevelBenefits
+                      ? 'Padrão automático ativo: benefícios elegíveis do nível já estão marcados.'
+                      : 'Seleção manual ativa: você personalizou os benefícios deste lote.'}
+                  </p>
+                )}
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-8 pb-12">
@@ -805,7 +1022,11 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                   <Button variant="ghost" className="flex-1 rounded-2xl h-14 font-black uppercase tracking-widest text-[10px] text-slate-400 hover:text-slate-900 hover:bg-white/40 hover:shadow-sm transition-all" onClick={onClose}>Descartar</Button>
                   <Button className="flex-[2.5] rounded-2xl h-14 font-black uppercase tracking-widest text-[10px] bg-[#e91c74] hover:bg-[#d11a68] shadow-[0_10px_25px_rgba(233,28,116,0.4)] hover:shadow-[0_15px_30px_rgba(233,28,116,0.5)] gap-3 transition-all transform active:scale-95 text-white" onClick={handleSave} disabled={loading || uploading}>
                     {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <ShieldCheck size={20} />}
-                    {card ? "Salvar Alterações" : "Emitir Cartão Digital"}
+                    {isEditMode
+                      ? "Salvar Alterações"
+                      : formData.selected_user_ids.length > 1
+                        ? `Emitir ${formData.selected_user_ids.length} Cartões`
+                        : "Emitir Cartão Digital"}
                   </Button>
                 </div>
               </div>

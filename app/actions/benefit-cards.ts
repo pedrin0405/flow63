@@ -58,6 +58,22 @@ export type BenefitCard = {
   updated_at: string
 }
 
+async function getDefaultBenefitIdsByLevel(supabase: any, level: number) {
+  const normalizedLevel = Number.isFinite(level) && level > 0 ? level : 1
+
+  const { data, error } = await supabase
+    .from('benefits')
+    .select('id')
+    .eq('ativo', true)
+    .lte('nivel_minimo', normalizedLevel)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data || []).map((benefit: { id: string }) => benefit.id)
+}
+
 export async function getBenefits() {
   try {
     const supabase = await getSupabase()
@@ -126,9 +142,33 @@ export async function getBenefitCards(filters?: { status?: string; search?: stri
 export async function saveBenefitCard(card: any, benefitIds?: string[]) {
   try {
     const supabase = await getSupabase()
+    const isCreate = !card?.id
 
     // Limpeza de dados para a tabela benefit_cards
-    const { benefitIds: _b, profiles, card_benefits, ...cardData } = card
+    const {
+      benefitIds: _b,
+      profiles,
+      card_benefits,
+      selected_user_ids: _selectedUserIds,
+      ...cardData
+    } = card
+
+    if (isCreate && cardData.user_id) {
+      const { data: existingCard, error: existingCardError } = await supabase
+        .from('benefit_cards')
+        .select('id')
+        .eq('user_id', cardData.user_id)
+        .limit(1)
+        .maybeSingle()
+
+      if (existingCardError && existingCardError.code !== 'PGRST116') {
+        return { success: false, error: existingCardError.message }
+      }
+
+      if (existingCard) {
+        return { success: false, error: 'Este colaborador já possui cartão.' }
+      }
+    }
 
     // Remove ID vazio para evitar erro de UUID malformatado no upsert
     if (!cardData.id) delete cardData.id
@@ -152,7 +192,14 @@ export async function saveBenefitCard(card: any, benefitIds?: string[]) {
       return { success: false, error: 'Não foi possível recuperar o cartão salvo.' }
     }
 
-    const finalBenefitIds = benefitIds || _b
+    const providedBenefitIds = benefitIds ?? _b
+    let finalBenefitIds = Array.isArray(providedBenefitIds) ? providedBenefitIds : []
+
+    if (isCreate && finalBenefitIds.length === 0) {
+      finalBenefitIds = await getDefaultBenefitIdsByLevel(supabase, Number(cardData.nivel_beneficio))
+    }
+
+    finalBenefitIds = [...new Set(finalBenefitIds)]
 
     if (finalBenefitIds && Array.isArray(finalBenefitIds)) {
       // Deleta vínculos antigos
@@ -178,6 +225,133 @@ export async function saveBenefitCard(card: any, benefitIds?: string[]) {
   } catch (err: any) {
     console.error('Erro inesperado:', err)
     return { success: false, error: err.message || 'Erro interno no servidor' }
+  }
+}
+
+export async function createBenefitCardsInBulk(payload: {
+  userIds: string[]
+  template: any
+  benefitIds?: string[]
+}) {
+  try {
+    const supabase = await getSupabase()
+    const uniqueUserIds = [...new Set((payload.userIds || []).filter(Boolean))]
+
+    if (uniqueUserIds.length === 0) {
+      return { success: false, error: 'Selecione ao menos um colaborador.' }
+    }
+
+    const { data: existingCards, error: existingCardsError } = await supabase
+      .from('benefit_cards')
+      .select('user_id')
+      .in('user_id', uniqueUserIds)
+
+    if (existingCardsError) {
+      return { success: false, error: existingCardsError.message }
+    }
+
+    const existingUserIds = new Set((existingCards || []).map((item: { user_id: string }) => item.user_id))
+    const usersToCreate = uniqueUserIds.filter(userId => !existingUserIds.has(userId))
+    const skippedUserIds = uniqueUserIds.filter(userId => existingUserIds.has(userId))
+
+    if (usersToCreate.length === 0) {
+      return {
+        success: true,
+        data: {
+          createdCount: 0,
+          skippedCount: skippedUserIds.length,
+          skippedUserIds,
+          failed: [] as Array<{ userId: string; error: string }>
+        }
+      }
+    }
+
+    const {
+      benefitIds: _ignoredBenefitIds,
+      user_id: _ignoredUserId,
+      id: _ignoredId,
+      profiles: _ignoredProfiles,
+      card_benefits: _ignoredCardBenefits,
+      selected_user_ids: _ignoredSelectedUserIds,
+      ...templateData
+    } = payload.template || {}
+
+    delete templateData.created_at
+    delete templateData.updated_at
+    delete templateData.apple_pass_serial
+
+    const normalizedLevel = Number(templateData.nivel_beneficio) || 1
+
+    let finalBenefitIds = Array.isArray(payload.benefitIds) ? payload.benefitIds : []
+    if (finalBenefitIds.length === 0) {
+      finalBenefitIds = await getDefaultBenefitIdsByLevel(supabase, normalizedLevel)
+    }
+    finalBenefitIds = [...new Set(finalBenefitIds)]
+
+    const createdCards: Array<{ id: string; user_id: string }> = []
+    const failed: Array<{ userId: string; error: string }> = []
+
+    for (const userId of usersToCreate) {
+      const serial = `BC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+
+      const { data: createdCard, error: createCardError } = await supabase
+        .from('benefit_cards')
+        .insert({
+          ...templateData,
+          user_id: userId,
+          nivel_beneficio: normalizedLevel,
+          apple_pass_serial: serial
+        })
+        .select('id, user_id')
+        .single()
+
+      if (createCardError || !createdCard) {
+        failed.push({ userId, error: createCardError?.message || 'Erro ao criar cartão.' })
+        continue
+      }
+
+      createdCards.push(createdCard as { id: string; user_id: string })
+    }
+
+    if (createdCards.length > 0 && finalBenefitIds.length > 0) {
+      const relationRows = createdCards.flatMap(card =>
+        finalBenefitIds.map(benefitId => ({
+          card_id: card.id,
+          benefit_id: benefitId
+        }))
+      )
+
+      const { error: relationError } = await supabase
+        .from('card_benefits')
+        .insert(relationRows)
+
+      if (relationError) {
+        return {
+          success: false,
+          error: 'Cartões criados, mas houve erro ao associar benefícios.',
+          data: {
+            createdCount: createdCards.length,
+            skippedCount: skippedUserIds.length,
+            skippedUserIds,
+            failed
+          }
+        }
+      }
+    }
+
+    revalidatePath('/admin/benefit-cards')
+
+    return {
+      success: true,
+      data: {
+        createdCount: createdCards.length,
+        skippedCount: skippedUserIds.length,
+        skippedUserIds,
+        failed
+      }
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro inesperado ao criar cartões em massa.' }
   }
 }
 
