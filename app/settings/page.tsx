@@ -13,6 +13,7 @@ import { ProfileTab } from "@/components/central63/settings/profile-tab"
 import { TeamTab } from "@/components/central63/settings/team-tab"
 import { IntegrationsTab } from "@/components/central63/settings/integrations-tab"
 import { BroadcastTab } from "@/components/central63/settings/broadcast-tab"
+import { AccessControlTab } from "@/components/central63/settings/access-control-tab"
 import { getEnrichedUsersAction } from "@/app/actions/users"
 
 export default function ConfiguracoesPage() {
@@ -64,6 +65,7 @@ export default function ConfiguracoesPage() {
 
   const canManageSystem = profile.role === 'Diretor' || profile.role === 'Gestor' || profile.role === 'Admin'
   const canManageBroadcast = canManageSystem || profile.role === 'Marketing'
+  const isDiretor = profile.role === 'Diretor'
 
   if (loading && !profile.id) return (
     <div className="flex h-screen items-center justify-center bg-background">
@@ -102,6 +104,9 @@ export default function ConfiguracoesPage() {
               {canManageBroadcast && (
                 <TabsTrigger value="comunicados">Comunicados</TabsTrigger>
               )}
+              {isDiretor && (
+                <TabsTrigger value="acessos">Acessos</TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="perfil">
@@ -134,6 +139,12 @@ export default function ConfiguracoesPage() {
             {canManageBroadcast && (
               <TabsContent value="comunicados">
                 <BroadcastTab />
+              </TabsContent>
+            )}
+
+            {isDiretor && (
+              <TabsContent value="acessos">
+                <AccessControlTab />
               </TabsContent>
             )}
           </Tabs>

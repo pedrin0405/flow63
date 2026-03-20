@@ -12,8 +12,6 @@ import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { usePathname } from 'next/navigation'
 
-import { usePathname } from 'next/navigation'
-
 const ATENDENTES = [
   { id: 'marketing_1', nome: 'Equipe Marketing', cargo: 'Marketing' },
   { id: 'gestor_1', nome: 'Gestor de Suporte', cargo: 'Gestão' },
@@ -22,18 +20,12 @@ const ATENDENTES = [
 export function SuportePopup() {
   const pathname = usePathname()
   const { toast } = useToast()
-  const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   
-  // Ocultar suporte em páginas de bio públicas
-  const isBioPage = pathname?.startsWith('/bio/')
-
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  if (pathname.startsWith('/editor')) return null;
 
   // ... rest of state ...
   const [mensagem, setMensagem] = useState("")
@@ -343,7 +335,9 @@ export function SuportePopup() {
     }
   }
 
-  if (!mounted || isBioPage) return null;
+  // Ocultar suporte em páginas específicas (deve ficar após TODOS os hooks)
+  const isBioPage = pathname?.startsWith('/bio/')
+  if (!mounted || isBioPage || pathname?.startsWith('/editor')) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50">

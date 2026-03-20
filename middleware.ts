@@ -83,30 +83,43 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/', request.url))
       }
 
-      // B. REGRAS DE RBAC (Apenas se já estiver ativo)
-      const restrictedRoutes = [
-        '/services', '/homes', '/units', '/brokers', '/admin', 
-        '/indicators', '/forms', '/spreadsheets', '/custom-dashboard', 
-        '/chat-support', '/support', '/campaigns'
-      ]
+      // B. REGRAS DE RBAC (Dinâmicas via Banco de Dados)
+      const { data: permissions } = await supabaseAdmin
+        .from('role_permissions')
+        .select('route')
+        .eq('role', profile?.role || '')
 
-      const isBioAdminRoute = path.startsWith('/admin/bio')
+      const allowedRoutes = permissions?.map(p => p.route) || []
       
-      const isRestrictedRoute = 
-        restrictedRoutes.some(route => path.startsWith(route)) && 
-        !path.startsWith('/brokers/my-card') &&
-        !isBioAdminRoute
-
-      const role = profile?.role
-      const isHighLevelUser = ['Diretor', 'Gestor', 'Marketing', 'Secretária', 'Admin'].includes(role || '')
+      // Rotas que são sempre permitidas se autenticado
+      const alwaysAllowed = ['/auth/callback', '/auth/pending', '/login']
+      if (alwaysAllowed.some(r => path.startsWith(r))) {
+        return response
+      }
 
       // Redireciona logados que tentam ir para o login
       if (path === '/login') {
-        return NextResponse.redirect(new URL(isHighLevelUser ? '/' : '/brokers/my-card', request.url))
+        const canAccessHome = allowedRoutes.includes('/')
+        return NextResponse.redirect(new URL(canAccessHome ? '/' : '/brokers/my-card', request.url))
       }
 
-      // Trava para Home e Rotas Restritas (Corretores vão para my-card)
-      if (!isHighLevelUser && (isRootRoute || (isRestrictedRoute && !isPublicFormRoute))) {
+      // Verifica se a rota atual ou um prefixo dela está permitida
+      // Exceção: Rotas de formulários públicos e bio já foram tratadas acima
+      const isAllowed = allowedRoutes.some(route => {
+        if (route === '/') return path === '/'
+        return path.startsWith(route)
+      })
+
+      // Se não for permitido e for uma rota que deveria ser protegida
+      const restrictedPrefixes = [
+        '/services', '/homes', '/units', '/brokers', '/admin', 
+        '/indicators', '/forms', '/spreadsheets', '/custom-dashboard', 
+        '/chat-support', '/support', '/campaigns', '/editor'
+      ]
+
+      const isRestrictedPath = restrictedPrefixes.some(p => path.startsWith(p)) || path === '/'
+
+      if (isRestrictedPath && !isAllowed && !isPublicFormRoute && !isPublicBioRoute) {
         return NextResponse.redirect(new URL('/brokers/my-card', request.url))
       }
 

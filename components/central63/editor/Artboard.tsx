@@ -31,37 +31,53 @@ export const Artboard = ({
   const methods = useFabricEditor();
   const { canvasRef, fabricCanvas, loadFromJson, selectedObject, canUndo, canRedo, changeCount, isDisposed } = methods;
   const isInitialized = useRef(false);
+  const isLoadingJson = useRef(false);
 
   // Initialize with data if provided or if canvas is empty
   useEffect(() => {
     let isMounted = true;
+    let retryCount = 0;
     
     const initCanvas = async () => {
+      if (!isMounted) return;
+
       // Verifica se o fabricCanvas.current já existe
       if (!fabricCanvas.current) {
-        if (isMounted) setTimeout(initCanvas, 50);
+        if (isMounted && retryCount < 20) {
+          retryCount++;
+          setTimeout(initCanvas, 50);
+        }
         return;
       }
 
       // Verifica se o canvas está realmente pronto (possui contexto)
-      if (!fabricCanvas.current.getContext()) {
-        if (isMounted) setTimeout(initCanvas, 50);
+      if (!fabricCanvas.current.getContext() || isDisposed.current) {
+        if (isMounted && retryCount < 20) {
+          retryCount++;
+          setTimeout(initCanvas, 50);
+        }
         return;
       }
 
       // Carrega dados se for a primeira vez OU se o canvas estiver vazio mas tivermos dados iniciais
-      // Isso protege contra o caso em que o canvas foi reiniciado pelo hook
       const objects = fabricCanvas.current.getObjects();
-      if (initialData && (objects.length === 0 || !isInitialized.current)) {
+      if (initialData && (objects.length === 0 || !isInitialized.current) && !isLoadingJson.current) {
         if (!isMounted || isDisposed.current) return;
+        
+        isLoadingJson.current = true;
         try {
-          await loadFromJson(initialData);
+          // Verifica novamente antes de chamar
+          if (fabricCanvas.current && fabricCanvas.current.getContext() && !isDisposed.current) {
+            await loadFromJson(initialData);
+          }
         } catch (err) {
           console.error("Erro ao carregar JSON na prancheta:", err);
+        } finally {
+          isLoadingJson.current = false;
         }
       }
       
-      if (isMounted) {
+      if (isMounted && !isDisposed.current) {
         if (!isInitialized.current) {
           isInitialized.current = true;
           onMethodsReady(id, methods);
@@ -74,7 +90,7 @@ export const Artboard = ({
     return () => {
       isMounted = false;
     };
-  }, [fabricCanvas.current, initialData, id]);
+  }, [fabricCanvas.current, initialData, id, isDisposed]);
 
   // Update dimensions when size changes
   useEffect(() => {

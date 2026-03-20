@@ -117,15 +117,27 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [userData, setUserData] = useState<{ name: string; email: string; initial: string; avatarUrl?: string; role?: string } | null>(null)
   const [unreadSupportCount, setUnreadSupportCount] = useState(0)
+  const [allowedRoutes, setAllowedRoutes] = useState<string[]>([])
   const router = useRouter()
   const pathname = usePathname()
 
-  // Lógica de permissão
-  const canAccessChat = userData?.role === 'Marketing' || userData?.role === 'Gestor' || userData?.role === 'Diretor' || userData?.role === 'Admin';
-  
+  // Lógica de permissão dinâmica
+  const canAccessRoute = (route: string) => {
+    if (route === '/') return allowedRoutes.includes('/')
+    if (route === '/admin/bio' && allowedRoutes.includes('/admin/bio')) return true
+    return allowedRoutes.some(r => {
+      if (r === '/') return false
+      return route.startsWith(r)
+    })
+  }
+
   // Variáveis auxiliares para facilitar o entendimento e manutenção das permissões
+  const canAccessChat = canAccessRoute('/chat-support')
   const isHighLevelUser = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Secretária' || userData?.role === 'Admin';
   const isManagerOrAbove = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Admin';
+
+  const hasAccessToMainMenu = canAccessRoute('/') || canAccessRoute('/services') || canAccessRoute('/homes') || canAccessRoute('/brokers') || canAccessRoute('/units')
+  const hasAccessToMetrics = canAccessRoute('/campaigns') || canAccessRoute('/indicators') || canAccessRoute('/forms') || canAccessRoute('/spreadsheets') || canAccessRoute('/custom-dashboard')
 
   // Atualiza o título da aba com a contagem de mensagens não lidas
   useEffect(() => {
@@ -222,6 +234,16 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
           avatarUrl: profileData?.avatar_url,
           role: profileData?.role 
         })
+
+        // Buscar permissões dinâmicas
+        const { data: permissions } = await supabase
+          .from('role_permissions')
+          .select('route')
+          .eq('role', profileData?.role || '')
+        
+        if (permissions) {
+          setAllowedRoutes(permissions.map(p => p.route))
+        }
       }
     }
     getUserData()
@@ -326,58 +348,68 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
 
           <nav className="flex-1 py-6 space-y-1 overflow-y-auto overflow-x-hidden px-3">
             
-            {/* Bloco: Menu Principal (Apenas para perfis mais altos) */}
-            {isHighLevelUser && (
+            {/* Bloco: Menu Principal */}
+            {hasAccessToMainMenu && (
               <>
                 {!isCollapsed && (
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 px-4 whitespace-nowrap">
                     Menu Principal
                   </div>
                 )}
-                <SidebarItem 
-                  icon={LayoutDashboard}
-                  label="Home" 
-                  active={isActive("dashboard") && pathname === "/"} 
-                  onClick={() => handleNavigation("dashboard")}
-                  badge={atendimentosCount}
-                  collapsed={isCollapsed}
-                />
+                {canAccessRoute('/') && (
+                  <SidebarItem 
+                    icon={LayoutDashboard}
+                    label="Home" 
+                    active={isActive("dashboard") && pathname === "/"} 
+                    onClick={() => handleNavigation("dashboard")}
+                    badge={atendimentosCount}
+                    collapsed={isCollapsed}
+                  />
+                )}
                 
-                <SidebarItem 
-                  icon={Users} 
-                  label="Atendimentos" 
-                  active={isActive("atendimentos", "/services")} 
-                  onClick={() => handleNavigation("atendimentos", "/services")} 
-                  collapsed={isCollapsed}
-                />
+                {canAccessRoute('/services') && (
+                  <SidebarItem 
+                    icon={Users} 
+                    label="Atendimentos" 
+                    active={isActive("atendimentos", "/services")} 
+                    onClick={() => handleNavigation("atendimentos", "/services")} 
+                    collapsed={isCollapsed}
+                  />
+                )}
                 
-                <SidebarItem 
-                  icon={Building2} 
-                  label="Imóveis" 
-                  active={isActive("imoveis", "/homes")} 
-                  onClick={() => handleNavigation("imoveis", "/homes")} 
-                  collapsed={isCollapsed}
-                />
+                {canAccessRoute('/homes') && (
+                  <SidebarItem 
+                    icon={Building2} 
+                    label="Imóveis" 
+                    active={isActive("imoveis", "/homes")} 
+                    onClick={() => handleNavigation("imoveis", "/homes")} 
+                    collapsed={isCollapsed}
+                  />
+                )}
                 
-                <SidebarItem 
-                  icon={UserCog} 
-                  label="Corretores" 
-                  active={isActive("corretores", "/brokers")} 
-                  onClick={() => handleNavigation("corretores", "/brokers")}
-                  collapsed={isCollapsed}
-                />
+                {canAccessRoute('/brokers') && (
+                  <SidebarItem 
+                    icon={UserCog} 
+                    label="Corretores" 
+                    active={isActive("corretores", "/brokers")} 
+                    onClick={() => handleNavigation("corretores", "/brokers")}
+                    collapsed={isCollapsed}
+                  />
+                )}
                 
-                <SidebarItem 
-                  icon={House} 
-                  label="Unidades" 
-                  active={isActive("unidades", "/units")} 
-                  onClick={() => handleNavigation("unidades", "/units")}
-                  collapsed={isCollapsed}
-                />
+                {canAccessRoute('/units') && (
+                  <SidebarItem 
+                    icon={House} 
+                    label="Unidades" 
+                    active={isActive("unidades", "/units")} 
+                    onClick={() => handleNavigation("unidades", "/units")}
+                    collapsed={isCollapsed}
+                  />
+                )}
               </>
             )}
 
-            {/* Bloco: Club Casa63+ (Todos veem o título, mas as opções dependem da role) */}
+            {/* Bloco: Ferramentas */}
             {!isCollapsed && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
                 Ferramentas
@@ -385,46 +417,49 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
             )}
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
-            {isManagerOrAbove && (
-              <>
-                <SidebarItem 
-                  icon={Wallet} 
-                  label="Gestão de Cartões" 
-                  active={isActive("benefit-cards-admin", "/admin/benefit-cards")} 
-                  onClick={() => handleNavigation("benefit-cards-admin", "/admin/benefit-cards")}
-                  collapsed={isCollapsed}
-                />
-              </>
+            {canAccessRoute('/admin/benefit-cards') && (
+              <SidebarItem 
+                icon={Wallet} 
+                label="Gestão de Cartões" 
+                active={isActive("benefit-cards-admin", "/admin/benefit-cards")} 
+                onClick={() => handleNavigation("benefit-cards-admin", "/admin/benefit-cards")}
+                collapsed={isCollapsed}
+              />
             )}  
 
-            {/* Item liberado para todos (Corretores e Alta gestão) */}
-            <SidebarItem 
-              icon={CreditCard} 
-              label="Meu Cartão" 
-              active={isActive("my-benefit-card", "/brokers/my-card")} 
-              onClick={() => handleNavigation("my-benefit-card", "/brokers/my-card")}
+            {/* Item liberado para todos (Geralmente) */}
+            {canAccessRoute('/brokers/my-card') && (
+              <SidebarItem 
+                icon={CreditCard} 
+                label="Meu Cartão" 
+                active={isActive("my-benefit-card", "/brokers/my-card")} 
+                onClick={() => handleNavigation("my-benefit-card", "/brokers/my-card")}
+                collapsed={isCollapsed}
+              />
+            )}
+
+            {canAccessRoute('/admin/bio') && (
+              <SidebarItem 
+              icon={LinkIcon} 
+              label="Links na Bio" 
+              active={isActive("bio-admin", "/admin/bio")} 
+              onClick={() => handleNavigation("bio-admin", "/admin/bio")}
               collapsed={isCollapsed}
-            />
+              />
+            )}
 
-            <SidebarItem 
-            icon={LinkIcon} 
-            label="Links na Bio" 
-            active={isActive("bio-admin", "/admin/bio")} 
-            onClick={() => handleNavigation("bio-admin", "/admin/bio")}
-            collapsed={isCollapsed}
-            />
+            {canAccessRoute('/editor') && (
+              <SidebarItem 
+                icon={Palette} 
+                label="Flow Design" 
+                active={isActive("editor-arte", "/editor")} 
+                onClick={() => handleNavigation("editor-arte", "/editor")}
+                collapsed={isCollapsed}
+              />
+            )}
 
-            
-            <SidebarItem 
-              icon={Palette} 
-              label="Flow Design" 
-              active={isActive("editor-arte", "/editor")} 
-              onClick={() => handleNavigation("editor-arte", "/editor")}
-              collapsed={isCollapsed}
-            />
-
-            {/* Bloco: Documentos & Métricas (Título só aparece se houver itens liberados, ou seja, se for Gestão. Se for corretor, o Flow Design sobe sem título ou usa o título base) */}
-            {!isCollapsed && isHighLevelUser && (
+            {/* Bloco: Documentos & Métricas */}
+            {!isCollapsed && hasAccessToMetrics && (
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-8 mb-4 px-4 whitespace-nowrap">
                 Documentos & Métricas
               </div>
@@ -432,50 +467,54 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
 
             {isCollapsed && <div className="my-4 border-t border-border mx-2" />}
 
-            {/* Itens restritos */}
-            {isHighLevelUser && (
-              <>
-                <SidebarItem 
-                  icon={Megaphone} 
-                  label="Camapanhas" 
-                  active={isActive("camapanhas", "/campaigns")} 
-                  onClick={() => handleNavigation("camapanhas", "/campaigns")}
-                  collapsed={isCollapsed}
-                />
+            {canAccessRoute('/campaigns') && (
+              <SidebarItem 
+                icon={Megaphone} 
+                label="Camapanhas" 
+                active={isActive("camapanhas", "/campaigns")} 
+                onClick={() => handleNavigation("camapanhas", "/campaigns")}
+                collapsed={isCollapsed}
+              />
+            )}
 
-                <SidebarItem 
-                  icon={ChartPie} 
-                  label="Indicadores" 
-                  active={isActive("indicadores", "/indicators")} 
-                  onClick={() => handleNavigation("indicadores", "/indicators")}
-                  collapsed={isCollapsed}
-                />
-                
+            {canAccessRoute('/indicators') && (
+              <SidebarItem 
+                icon={ChartPie} 
+                label="Indicadores" 
+                active={isActive("indicadores", "/indicators")} 
+                onClick={() => handleNavigation("indicadores", "/indicators")}
+                collapsed={isCollapsed}
+              />
+            )}
+            
+            {canAccessRoute('/forms') && (
+              <SidebarItem 
+                icon={Library} 
+                label="Formulários" 
+                active={isActive("formularios", "/forms")} 
+                onClick={() => handleNavigation("formularios", "/forms")}
+                collapsed={isCollapsed}
+              />
+            )}
 
-                <SidebarItem 
-                  icon={Library} 
-                  label="Formulários" 
-                  active={isActive("formularios", "/forms")} 
-                  onClick={() => handleNavigation("formularios", "/forms")}
-                  collapsed={isCollapsed}
-                />
+            {canAccessRoute('/spreadsheets') && (
+              <SidebarItem 
+                icon={FileSpreadsheet} 
+                label="Planilhas" 
+                active={isActive("planilhas", "/spreadsheets")} 
+                onClick={() => handleNavigation("planilhas", "/spreadsheets")}
+                collapsed={isCollapsed}
+              />
+            )}
 
-                <SidebarItem 
-                  icon={FileSpreadsheet} 
-                  label="Planilhas" 
-                  active={isActive("planilhas", "/spreadsheets")} 
-                  onClick={() => handleNavigation("planilhas", "/spreadsheets")}
-                  collapsed={isCollapsed}
-                />
-
-                <SidebarItem 
-                  icon={ChartSpline} 
-                  label="Dashboard" 
-                  active={isActive("dashboard-customizavel", "/custom-dashboard")} 
-                  onClick={() => handleNavigation("dashboard-customizavel", "/custom-dashboard")}
-                  collapsed={isCollapsed}
-                />
-              </>
+            {canAccessRoute('/custom-dashboard') && (
+              <SidebarItem 
+                icon={ChartSpline} 
+                label="Dashboard" 
+                active={isActive("dashboard-customizavel", "/custom-dashboard")} 
+                onClick={() => handleNavigation("dashboard-customizavel", "/custom-dashboard")}
+                collapsed={isCollapsed}
+              />
             )}
 
             {/* Bloco: Sistema */}
@@ -497,17 +536,17 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
               />
             )}
 
-            {/* Liberado para todos */}
-            <SidebarItem 
-              icon={Settings} 
-              label="Configurações" 
-              active={isActive("config", "/settings")} 
-              onClick={() => handleNavigation("config", "/settings")}
-              collapsed={isCollapsed}
-            />
+            {canAccessRoute('/settings') && (
+              <SidebarItem 
+                icon={Settings} 
+                label="Configurações" 
+                active={isActive("config", "/settings")} 
+                onClick={() => handleNavigation("config", "/settings")}
+                collapsed={isCollapsed}
+              />
+            )}
 
-            {/* Restrito */}
-            {isHighLevelUser && pathname !== '/editor' && (
+            {canAccessRoute('/support') && pathname !== '/editor' && (
               <SidebarItem 
                 icon={HelpCircle} 
                 label="Suporte" 
