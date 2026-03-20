@@ -29,9 +29,10 @@ interface BioPropertyDetailsProps {
   onClose: () => void;
   tema: any;
   whatsappNumber?: string;
+  isPreview?: boolean;
 }
 
-export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: BioPropertyDetailsProps) {
+export function BioPropertyDetails({ property, onClose, tema, whatsappNumber, isPreview = false }: BioPropertyDetailsProps) {
   const [images, setImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -89,7 +90,7 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
     dragX.set(0);
   };
 
-  const transitionSettings = { type: "spring", damping: 30, stiffness: 300, mass: 0.8 };
+  const transitionSettings = { type: "spring" as const, damping: 30, stiffness: 300, mass: 0.8 };
 
   if (!property) return null;
 
@@ -115,7 +116,11 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1000] flex items-end md:items-center justify-center p-0 md:p-6 lg:p-10 backdrop-blur-md bg-black/60"
+      className={cn(
+        isPreview
+          ? "absolute inset-0 z-[300] flex items-end justify-center p-0 backdrop-blur-sm bg-black/70"
+          : "fixed inset-0 z-[1000] flex items-end md:items-center justify-center p-0 md:p-6 lg:p-10 backdrop-blur-md bg-black/60"
+      )}
       onClick={onClose}
     >
       <motion.div 
@@ -123,7 +128,12 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: "100%", opacity: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="relative w-full max-w-6xl h-[92vh] md:h-[90vh] rounded-t-[2.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col md:flex-row border-t md:border border-white/20 backdrop-blur-3xl"
+        className={cn(
+          "relative w-full overflow-hidden shadow-2xl border-white/20 backdrop-blur-3xl",
+          isPreview
+            ? "flex flex-col h-full rounded-none border-t"
+            : "flex flex-col md:flex-row max-w-6xl h-[92vh] md:h-[90vh] rounded-t-[2.5rem] md:rounded-[2.5rem] border-t md:border"
+        )}
         style={{ 
           backgroundColor: isDark 
             ? (bgColor.startsWith('#') ? `${bgColor}FA` : bgColor)
@@ -135,13 +145,19 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
         {/* BOTÃO FECHAR */}
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 md:top-6 md:right-6 z-[70] p-2.5 rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-xl transition-all border border-white/10"
+          className={cn(
+            "absolute z-[70] rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-xl transition-all border border-white/10",
+            isPreview ? "top-3 right-3 p-3" : "top-4 right-4 md:top-6 md:right-6 p-2.5"
+          )}
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* GALERIA DE IMAGENS */}
-        <div className="relative w-full md:w-[55%] h-[35vh] sm:h-[45vh] md:h-full bg-neutral-900 shrink-0 overflow-hidden group">
+        <div className={cn(
+          "relative bg-neutral-900 shrink-0 overflow-hidden group",
+          isPreview ? "w-full h-[36%] min-h-[220px]" : "w-full md:w-[55%] h-[35vh] sm:h-[45vh] md:h-full"
+        )}>
           <motion.div
             className="flex h-full w-full cursor-grab active:cursor-grabbing"
             drag="x"
@@ -172,14 +188,20 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
               <button 
                 onClick={(e) => { e.stopPropagation(); prevImage(); }} 
                 disabled={currentImageIndex === 0} 
-                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-20 disabled:opacity-0"
+                className={cn(
+                  "absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all z-20 disabled:opacity-0",
+                  isPreview ? "hidden" : "hidden md:flex opacity-0 group-hover:opacity-100"
+                )}
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
               <button 
                 onClick={(e) => { e.stopPropagation(); nextImage(); }} 
                 disabled={currentImageIndex === images.length - 1} 
-                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-20 disabled:opacity-0"
+                className={cn(
+                  "absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all z-20 disabled:opacity-0",
+                  isPreview ? "hidden" : "hidden md:flex opacity-0 group-hover:opacity-100"
+                )}
               >
                 <ChevronRight className="w-6 h-6" />
               </button>
@@ -197,7 +219,10 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
         <div className="flex-1 flex flex-col h-full overflow-hidden relative">
           
           {/* Scroll container (Removido o pb gigante que falhava em alguns casos) */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 lg:p-12 space-y-8">
+          <div className={cn(
+            "flex-1 overflow-y-auto custom-scrollbar",
+            isPreview ? "p-4 space-y-5" : "p-6 md:p-10 lg:p-12 space-y-8"
+          )}>
             
             {/* TÍTULO E PREÇO */}
             <div className="space-y-4">
@@ -209,20 +234,20 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
                   {details?.situacao || "Venda"}
                 </span>
               </div>
-              <h2 className="text-2xl md:text-4xl font-black tracking-tighter leading-[1.1]">
+              <h2 className={cn("font-black tracking-tighter leading-[1.1]", isPreview ? "text-[22px]" : "text-2xl md:text-4xl")}>
                 {details?.titulo || property.titulo}
               </h2>
               <div className="flex items-center gap-2 text-sm font-medium opacity-50">
                 <MapPin className="w-4 h-4 text-rose-500" />
                 {details?.bairro}, {details?.cidade}
               </div>
-              <div className="text-3xl md:text-4xl font-black tracking-tight pt-2" style={{ color: accentColor }}>
+              <div className={cn("font-black tracking-tight pt-2", isPreview ? "text-[26px]" : "text-3xl md:text-4xl")} style={{ color: accentColor }}>
                 {details?.valor || property.preco}
               </div>
             </div>
 
             {/* FEATURES */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className={cn("grid gap-3", isPreview ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3")}>
               {features.map((f, idx) => (
                 <div 
                   key={idx} 
@@ -269,20 +294,28 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber }: 
 
             {/* Spacer vital EXCLUSIVO para mobile: Garante que o usuário consiga rolar
                 tudo até o fim sem a descrição ficar presa embaixo do absolute mobile */}
-            <div className="w-full h-28 md:hidden shrink-0 pointer-events-none" />
+            {!isPreview && <div className="w-full h-28 md:hidden shrink-0 pointer-events-none" />}
           </div>
 
           {/* RODAPÉ FIXO 
               Ajuste Chave: Passou de 'absolute' para 'md:relative' - no Desktop ele 
               entra no fluxo normal do layout, impossibilitando totalmente a sobreposição! 
           */}
-          <div className="absolute md:relative bottom-0 left-0 w-full p-6 md:p-10 pt-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent md:from-inherit md:via-inherit md:bg-inherit border-t-0 md:border-t border-white/5 md:backdrop-blur-2xl z-20 shrink-0 pointer-events-none md:pointer-events-auto">
+          <div className={cn(
+            "left-0 w-full border-white/5 z-20 shrink-0",
+            isPreview
+              ? "relative p-4 pt-3 border-t bg-black/10"
+              : "absolute md:relative bottom-0 p-6 md:p-10 pt-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent md:from-inherit md:via-inherit md:bg-inherit border-t-0 md:border-t md:backdrop-blur-2xl pointer-events-none md:pointer-events-auto"
+          )}>
             
             {/* O wrapper volta com pointer-events-auto para o botão funcionar,
                 mas mantém o gradiente transparente "clicável" / scrollável no mobile */}
             <div className="pointer-events-auto w-full">
               <Button 
-                className="w-full h-16 rounded-2xl font-black text-xs uppercase tracking-[3px] shadow-2xl flex items-center justify-center gap-3 hover:scale-[1.01] active:scale-95 transition-all"
+                className={cn(
+                  "w-full rounded-2xl font-black uppercase shadow-2xl flex items-center justify-center gap-3 hover:scale-[1.01] active:scale-95 transition-all",
+                  isPreview ? "h-12 text-[10px] tracking-[2px]" : "h-16 text-xs tracking-[3px]"
+                )}
                 style={{ backgroundColor: accentColor, color: "#ffffff" }}
                 onClick={() => {
                   const message = `Olá! Tenho interesse no imóvel: ${details?.titulo || property.titulo}, código ${details?.codigo || property.id}.`;

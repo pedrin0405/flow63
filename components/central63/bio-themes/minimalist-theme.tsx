@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   UserPlus, 
@@ -21,6 +21,45 @@ import {
 
 export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: BioThemeProps) {
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [propertyFolders, setPropertyFolders] = useState<any[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+
+  // Fetch property folders when data changes
+  useMemo(() => {
+    if (data.id && typeof window !== 'undefined') {
+      const { supabase } = require("@/lib/supabase");
+      const fetchFolders = async () => {
+        try {
+          const { data: folders } = await supabase
+            .from('bio_property_folders')
+            .select('*')
+            .eq('bio_page_id', data.id)
+            .order('order_index', { ascending: true });
+          
+          if (folders && folders.length > 0) {
+            setPropertyFolders(folders);
+            setSelectedFolderId(folders[0].id);
+          }
+        } catch (error) {
+          console.error('Error fetching property folders:', error);
+        }
+      };
+      
+      fetchFolders();
+    }
+  }, [data.id]);
+
+  // In editor/create preview, use in-memory folders instantly.
+  useEffect(() => {
+    if (Array.isArray(data._previewFolders)) {
+      setPropertyFolders(data._previewFolders);
+      if (data._previewSelectedFolderId) {
+        setSelectedFolderId(data._previewSelectedFolderId);
+      } else if (data._previewFolders.length > 0) {
+        setSelectedFolderId(data._previewFolders[0].id);
+      }
+    }
+  }, [data._previewFolders, data._previewSelectedFolderId]);
 
   const { socialLinks, regularLinks } = useMemo(() => processLinks(visibleLinks), [visibleLinks]);
 
@@ -51,6 +90,29 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
   const handleWhatsAppClick = () => {
     handleLinkClick({ title: 'Botão WhatsApp', url: `https://wa.me/${data.whatsapp?.number}`, type: 'whatsapp' }, 0);
   };
+
+  // Group properties by folder
+  const groupedProperties = useMemo(() => {
+    if (!data.featured_properties?.items) return {};
+    
+    const grouped: Record<string, any[]> = {};
+    data.featured_properties.items.forEach((item: any) => {
+      const folderId = item.folder_id || 'unfolded';
+      if (!grouped[folderId]) {
+        grouped[folderId] = [];
+      }
+      grouped[folderId].push(item);
+    });
+    
+    return grouped;
+  }, [data.featured_properties?.items]);
+
+  const filteredProperties = useMemo(() => {
+    if (selectedFolderId && groupedProperties[selectedFolderId]) {
+      return groupedProperties[selectedFolderId];
+    }
+    return data.featured_properties?.items || [];
+  }, [selectedFolderId, groupedProperties, data.featured_properties?.items]);
 
   return (
     <div 
@@ -145,9 +207,77 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
               <div className="flex items-center justify-between mb-5 px-2">
                 <h3 className="text-[11px] font-bold uppercase tracking-[3px] opacity-60" style={{ color: "var(--theme-text)" }}>Portfólio</h3>
               </div>
+
+              {propertyFolders.length > 0 && (
+                <div className="mb-6 space-y-2">
+                  {isPreview && (
+                    <p className="px-1 text-[9px] font-black uppercase tracking-[0.12em] opacity-60" style={{ color: "var(--theme-text)" }}>
+                      Toque na pasta para ver os imóveis
+                    </p>
+                  )}
+                  <div className={cn(
+                    isPreview
+                      ? "flex gap-3 overflow-x-auto pb-2 px-2 snap-x snap-mandatory [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/40"
+                      : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 px-2"
+                  )}>
+                    {propertyFolders.map((folder) => {
+                      const folderItemCount = data.featured_properties.items?.filter((item: any) => item.folder_id === folder.id).length || 0;
+                      const isSelected = selectedFolderId === folder.id;
+                      return (
+                        <motion.button
+                          key={folder.id}
+                          whileHover={{ y: -4, scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setSelectedFolderId(folder.id)}
+                          className={cn(
+                            "relative p-3.5 rounded-[1.4rem] transition-all group border-2",
+                            "flex flex-col items-center text-center gap-2.5",
+                            isPreview && "min-w-[132px] snap-start",
+                            isSelected
+                              ? "shadow-md ring-2"
+                              : "shadow hover:shadow-md"
+                          )}
+                          style={{
+                            backgroundColor: isSelected ? `${folder.color}20` : `${folder.color}08`,
+                            borderColor: isSelected ? folder.color : `${folder.color}30`
+                          }}
+                        >
+                          <div className={cn(
+                            "rounded-lg flex items-center justify-center transition-all relative overflow-hidden",
+                            isPreview ? "w-16 h-12" : "w-14 h-12"
+                          )} style={{ backgroundColor: `${folder.color}15` }}>
+                            <span className={cn(isPreview ? "text-[30px]" : "text-3xl")}>{isSelected ? "📂" : (folder.icon || "📁")}</span>
+                          </div>
+
+                          <div className="min-w-0 w-full">
+                            <p className={cn("font-black uppercase tracking-wider truncate", isPreview ? "text-[9px]" : "text-[10px]")} style={{ color: isSelected ? folder.color : "inherit" }}>
+                              {folder.name}
+                            </p>
+                          </div>
+
+                          <div className={cn("font-black uppercase tracking-wider rounded-full text-white", isPreview ? "text-[8px] px-2.5 py-1" : "text-[8px] px-2 py-0.5")} style={{ backgroundColor: folder.color }}>
+                            {folderItemCount} {folderItemCount === 1 ? "imóvel" : "imóveis"}
+                          </div>
+
+                          {isSelected && (
+                            <motion.div
+                              layoutId={`folder-indicator-${folder.id}`}
+                              className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-black"
+                              style={{ backgroundColor: folder.color }}
+                            >
+                              ✓
+                            </motion.div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="w-full relative">
                 <div className={cn("flex pt-2 pb-6 snap-x snap-mandatory gap-4 overflow-x-auto", !isPreview && "lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0 lg:pt-0", "[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/40 [&::-webkit-scrollbar-thumb]:rounded-full", "[scrollbar-width:thin] [scrollbar-color:rgba(156,163,175,0.4)_transparent]")}>
-                  {data.featured_properties.items.map((imovel: any) => (
+                  {filteredProperties.map((imovel: any) => (
                     <motion.div 
                       key={imovel.id} 
                       whileHover={{ y: -4 }} 
@@ -248,7 +378,8 @@ export function MinimalistTheme({ data, visibleLinks, handleLinkClick, getAnimat
             property={selectedProperty} 
             onClose={() => setSelectedProperty(null)} 
             tema={tema} 
-            whatsappNumber={data.whatsapp?.number} 
+            whatsappNumber={data.whatsapp?.number}
+            isPreview={isPreview}
           /> 
         )}
       </AnimatePresence>

@@ -32,7 +32,46 @@ const FloatParticle = ({ delay = 0, color = "#fff" }) => (
 
 export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: BioThemeProps) {
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [propertyFolders, setPropertyFolders] = useState<any[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch property folders when data changes
+  useMemo(() => {
+    if (data.id && typeof window !== 'undefined') {
+      const { supabase } = require("@/lib/supabase");
+      const fetchFolders = async () => {
+        try {
+          const { data: folders } = await supabase
+            .from('bio_property_folders')
+            .select('*')
+            .eq('bio_page_id', data.id)
+            .order('order_index', { ascending: true });
+          
+          if (folders && folders.length > 0) {
+            setPropertyFolders(folders);
+            setSelectedFolderId(folders[0].id);
+          }
+        } catch (error) {
+          console.error('Error fetching property folders:', error);
+        }
+      };
+      
+      fetchFolders();
+    }
+  }, [data.id]);
+
+  // In editor/create preview, use in-memory folders instantly.
+  useEffect(() => {
+    if (Array.isArray(data._previewFolders)) {
+      setPropertyFolders(data._previewFolders);
+      if (data._previewSelectedFolderId) {
+        setSelectedFolderId(data._previewSelectedFolderId);
+      } else if (data._previewFolders.length > 0) {
+        setSelectedFolderId(data._previewFolders[0].id);
+      }
+    }
+  }, [data._previewFolders, data._previewSelectedFolderId]);
 
   const { socialLinks, regularLinks } = useMemo(() => processLinks(visibleLinks), [visibleLinks]);
 
@@ -86,6 +125,29 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
   const handleWhatsAppClick = () => {
     handleLinkClick({ title: 'Botão WhatsApp', url: `https://wa.me/${data.whatsapp?.number}`, type: 'whatsapp' }, 0);
   };
+
+  // Group properties by folder
+  const groupedProperties = useMemo(() => {
+    if (!data.featured_properties?.items) return {};
+    
+    const grouped: Record<string, any[]> = {};
+    data.featured_properties.items.forEach((item: any) => {
+      const folderId = item.folder_id || 'unfolded';
+      if (!grouped[folderId]) {
+        grouped[folderId] = [];
+      }
+      grouped[folderId].push(item);
+    });
+    
+    return grouped;
+  }, [data.featured_properties?.items]);
+
+  const filteredProperties = useMemo(() => {
+    if (selectedFolderId && groupedProperties[selectedFolderId]) {
+      return groupedProperties[selectedFolderId];
+    }
+    return data.featured_properties?.items || [];
+  }, [selectedFolderId, groupedProperties, data.featured_properties?.items]);
 
   return (
     <div 
@@ -201,9 +263,78 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
                   <Sparkles className="w-4 h-4 text-amber-300" />
                 </motion.div>
               </div>
+
+              {propertyFolders.length > 0 && (
+                <div className="mb-6 space-y-2">
+                  {isPreview && (
+                    <p className="px-1 text-[9px] font-black uppercase tracking-[0.12em] opacity-60" style={{ color: "var(--theme-text)" }}>
+                      Toque na pasta para ver os imóveis
+                    </p>
+                  )}
+                  <div className={cn(
+                    isPreview
+                      ? "flex gap-3 overflow-x-auto pb-2 px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/25"
+                      : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 px-1"
+                  )}>
+                    {propertyFolders.map((folder) => {
+                      const folderItemCount = data.featured_properties.items?.filter((item: any) => item.folder_id === folder.id).length || 0;
+                      const isSelected = selectedFolderId === folder.id;
+                      return (
+                        <motion.button
+                          key={folder.id}
+                          whileHover={{ y: -4, scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setSelectedFolderId(folder.id)}
+                          className={cn(
+                            "relative p-3.5 rounded-[1.4rem] transition-all group border-2 backdrop-blur-xl",
+                            "flex flex-col items-center text-center gap-2.5",
+                            isPreview && "min-w-[132px] snap-start",
+                            isSelected
+                              ? "shadow-2xl ring-2"
+                              : "shadow-lg hover:shadow-xl"
+                          )}
+                          style={{
+                            backgroundColor: isSelected ? `${folder.color}25` : `${folder.color}12`,
+                            borderColor: isSelected ? folder.color : `${folder.color}40`
+                          }}
+                        >
+                          <div className={cn(
+                            "rounded-lg flex items-center justify-center transition-all relative overflow-hidden",
+                            isPreview ? "w-16 h-12" : "w-14 h-12"
+                          )} style={{ backgroundColor: `${folder.color}30` }}>
+                            <span className={cn(isPreview ? "text-[30px]" : "text-3xl")}>{isSelected ? "📂" : (folder.icon || "📁")}</span>
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent rounded-lg" />
+                          </div>
+
+                          <div className="min-w-0 w-full">
+                            <p className={cn("font-black uppercase tracking-wider truncate", isPreview ? "text-[9px]" : "text-[10px]")} style={{ color: folder.color }}>
+                              {folder.name}
+                            </p>
+                          </div>
+
+                          <div className={cn("font-black uppercase tracking-wider rounded-full text-white", isPreview ? "text-[8px] px-2.5 py-1" : "text-[9px] px-2 py-1")} style={{ backgroundColor: folder.color }}>
+                            {folderItemCount} {folderItemCount === 1 ? "imóvel" : "imóveis"}
+                          </div>
+
+                          {isSelected && (
+                            <motion.div
+                              layoutId={`folder-indicator-${folder.id}`}
+                              className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-black"
+                              style={{ backgroundColor: folder.color }}
+                            >
+                              ✓
+                            </motion.div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="w-full relative">
                 <div className={cn("flex pt-2 pb-6 snap-x snap-mandatory gap-4 overflow-x-auto", !isPreview && "lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0 lg:pt-0")}>
-                  {data.featured_properties.items.map((imovel: any, idx: number) => (
+                  {filteredProperties.map((imovel: any, idx: number) => (
                     <motion.div 
                       key={imovel.id} 
                       initial={{ opacity: 0, y: 30 }} 
@@ -302,7 +433,8 @@ export function GlassTheme({ data, visibleLinks, handleLinkClick, getAnimationPr
             property={selectedProperty} 
             onClose={() => setSelectedProperty(null)} 
             tema={tema} 
-            whatsappNumber={data.whatsapp?.number} 
+            whatsappNumber={data.whatsapp?.number}
+            isPreview={isPreview}
           /> 
         )}
       </AnimatePresence>

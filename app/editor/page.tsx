@@ -40,7 +40,7 @@ import {
   CornerUpLeft, CornerUpRight, CornerDownLeft, CornerDownRight, Loader2, Share, Menu, Crop,
   ZoomIn, ZoomOut, Focus, LockOpen, Unlink, Move, Scissors, Check, X,
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ArrowRightToLine, Type, Paintbrush, Undo2, Redo2, Plus, Copy, ChevronUp, ChevronDown, Files, Edit3, FileDown,
+  List, ArrowRightToLine, Type, Paintbrush, Undo2, Redo2, Plus, Copy, ChevronUp, ChevronDown, ChevronRight, Files, Edit3, FileDown,
   Eye, EyeOff, Square, Circle, Triangle, Minus, Grab, MoreVertical, Home, GripVertical
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -106,14 +106,85 @@ const glassStyles = `
     transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
   }
   .design-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
     border-color: rgba(59, 130, 246, 0.3);
   }
 
   .glass-scroll::-webkit-scrollbar { width: 4px; }
   .glass-scroll::-webkit-scrollbar-track { background: transparent; }
   .glass-scroll::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.2); border-radius: 99px; }
+
+  .apple-glass-folder {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    transition: transform 260ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 260ms ease, border-color 260ms ease;
+  }
+
+  .apple-glass-folder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.06) 100%);
+    pointer-events: none;
+  }
+
+  .apple-glass-folder::after {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 38%);
+    pointer-events: none;
+  }
+
+  .apple-glass-folder:hover {
+    border-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  }
+
+  .dark .apple-glass-folder {
+    background: rgba(24, 24, 27, 0.58);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .dark .apple-glass-folder::before {
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.015) 100%);
+  }
+
+  .dark .apple-glass-folder::after {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 42%);
+  }
+
+  .dark .apple-glass-folder:hover {
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .apple-glass-popup {
+    background: rgba(255, 255, 255, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+  }
+
+  .dark .apple-glass-popup {
+    background: rgba(9, 9, 11, 0.62);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
 `;
 
 interface ArtboardData {
@@ -123,6 +194,322 @@ interface ArtboardData {
   height: number;
   data?: any;
 }
+
+const FOLDER_AVATAR_OPTIONS = ['📁', '🗂️', '📚', '💼', '🎨', '🚀', '⭐', '🧩'];
+const FOLDER_TEXTURE_OPTIONS = [
+  { value: 'soft', label: 'Suave' },
+  { value: 'diagonal', label: 'Diagonal' },
+  { value: 'grid', label: 'Grid' },
+] as const;
+
+type FolderTexture = (typeof FOLDER_TEXTURE_OPTIONS)[number]['value'];
+
+interface FolderMeta {
+  tag: string;
+  avatar: string;
+  accentColor: string;
+  texture: FolderTexture;
+}
+
+const DEFAULT_FOLDER_META: FolderMeta = {
+  tag: 'Sem etiqueta',
+  avatar: '📁',
+  accentColor: '#60a5fa',
+  texture: 'soft',
+};
+const FOLDER_EDITOR_ROLES = new Set([
+  'Marketing',
+  'Gestor',
+  'Secretária',
+  'Secretaria',
+  'Diretor',
+  'Diretores',
+]);
+
+const canManageFoldersByRole = (role?: string | null): boolean => {
+  if (!role) return false;
+  return FOLDER_EDITOR_ROLES.has(role);
+};
+
+const normalizeHexColor = (color?: string | null): string => {
+  if (!color) return '#3b82f6';
+  const value = color.trim();
+
+  const shortHexMatch = /^#([0-9a-fA-F]{3})$/.exec(value);
+  if (shortHexMatch) {
+    const [r, g, b] = shortHexMatch[1].split('');
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+
+  if (/^#([0-9a-fA-F]{6})$/.test(value)) return value.toLowerCase();
+  return '#3b82f6';
+};
+
+const withHexAlpha = (hex: string, alphaHex: string): string => `${normalizeHexColor(hex)}${alphaHex}`;
+
+const isFolderTexture = (value: unknown): value is FolderTexture => {
+  return typeof value === 'string' && FOLDER_TEXTURE_OPTIONS.some((option) => option.value === value);
+};
+
+const getFolderTextureOverlayStyle = (texture: FolderTexture): React.CSSProperties => {
+  switch (texture) {
+    case 'diagonal':
+      return {
+        backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 12px)',
+        opacity: 0.45,
+      };
+    case 'grid':
+      return {
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)',
+        backgroundSize: '16px 16px',
+        opacity: 0.38,
+      };
+    default:
+      return {
+        backgroundImage: 'radial-gradient(120% 120% at 0% 0%, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0) 64%)',
+        opacity: 0.56,
+      };
+  }
+};
+
+const getFolderMeta = (description?: string | null): FolderMeta => {
+  if (!description) return DEFAULT_FOLDER_META;
+
+  try {
+    const parsed = JSON.parse(description);
+    if (parsed && typeof parsed === 'object') {
+      const payload = parsed as Record<string, unknown>;
+      const tag = typeof payload.tag === 'string' && payload.tag.trim().length > 0
+        ? payload.tag.trim().slice(0, 24)
+        : DEFAULT_FOLDER_META.tag;
+      const avatar = typeof payload.avatar === 'string' && payload.avatar.trim().length > 0
+        ? payload.avatar.trim()
+        : DEFAULT_FOLDER_META.avatar;
+      const accentColor = typeof payload.accentColor === 'string'
+        ? normalizeHexColor(payload.accentColor)
+        : DEFAULT_FOLDER_META.accentColor;
+      const texture = isFolderTexture(payload.texture)
+        ? payload.texture
+        : DEFAULT_FOLDER_META.texture;
+
+      return { tag, avatar, accentColor, texture };
+    }
+  } catch {
+    // Fallback for plain text description from older records.
+  }
+
+  return {
+    ...DEFAULT_FOLDER_META,
+    tag: description.trim().length > 0 ? description.trim().slice(0, 24) : DEFAULT_FOLDER_META.tag,
+  };
+};
+
+const stringifyFolderMeta = (
+  tag: string,
+  avatar: string,
+  accentColor: string = DEFAULT_FOLDER_META.accentColor,
+  texture: FolderTexture = DEFAULT_FOLDER_META.texture
+): string => {
+  const safeTag = tag.trim().length > 0 ? tag.trim().slice(0, 24) : DEFAULT_FOLDER_META.tag;
+  const safeAvatar = avatar.trim().length > 0 ? avatar.trim() : DEFAULT_FOLDER_META.avatar;
+  const safeAccentColor = normalizeHexColor(accentColor);
+  return JSON.stringify({ tag: safeTag, avatar: safeAvatar, accentColor: safeAccentColor, texture });
+};
+
+interface SaveTemplateDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  templateName: string;
+  onNameChange: (name: string) => void;
+  templateFolders: any[];
+  selectedFolder: string | null;
+  onFolderChange: (folderId: string) => void;
+  onSave: () => void;
+  isSaving: boolean;
+}
+
+const SaveTemplateDialogComponent = React.memo(({
+  isOpen,
+  onOpenChange,
+  templateName,
+  onNameChange,
+  templateFolders,
+  selectedFolder,
+  onFolderChange,
+  onSave,
+  isSaving,
+}: SaveTemplateDialogProps) => (
+  <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <DialogContent className="rounded-[2rem] max-w-md p-8 glass-panel border-none shadow-2xl overflow-hidden glass-font">
+      <DialogHeader className="mb-4">
+        <DialogTitle className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Salvar como Template</DialogTitle>
+        <DialogDescription className="text-slate-500 dark:text-slate-400 font-medium">Escolha uma pasta e um nome para seu template.</DialogDescription>
+      </DialogHeader>
+      
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nome do Template</Label>
+          <Input 
+            placeholder="Ex: Banner Promoção Summer" 
+            value={templateName}
+            onChange={(e) => onNameChange(e.target.value)}
+            className="h-11 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:border-blue-500 font-medium"
+            autoFocus
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Pasta de Destino</Label>
+          {templateFolders.length === 0 ? (
+            <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 text-center">
+              <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">Nenhuma pasta criada. O template será salvo sem pasta.</p>
+            </div>
+          ) : (
+            <Select value={selectedFolder || ''} onValueChange={onFolderChange}>
+              <SelectTrigger className="h-11 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:border-blue-500">
+                <SelectValue placeholder="Selecione uma pasta" />
+              </SelectTrigger>
+              <SelectContent className="z-[240] rounded-xl shadow-2xl">
+                {templateFolders.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id} className="text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-2.5 h-2.5 rounded-full" 
+                        style={{ backgroundColor: normalizeHexColor(folder.color) }}
+                      />
+                      {folder.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <Button 
+            variant="outline"
+            className="flex-1 h-11 rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-200/50 dark:shadow-blue-900/20"
+            onClick={onSave}
+            disabled={isSaving || !templateName.trim()}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Template
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
+));
+
+SaveTemplateDialogComponent.displayName = 'SaveTemplateDialog';
+
+interface MoveTemplateDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  templateFolders: any[];
+  selectedFolder: string | null;
+  onFolderChange: (folderId: string | null) => void;
+  onMove: () => Promise<void>;
+  isMoving: boolean;
+}
+
+const MoveTemplateDialogComponent = React.memo(({
+  isOpen,
+  onOpenChange,
+  templateFolders,
+  selectedFolder,
+  onFolderChange,
+  onMove,
+  isMoving,
+}: MoveTemplateDialogProps) => (
+  <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <DialogContent className="rounded-[2rem] max-w-md p-8 glass-panel border-none shadow-2xl overflow-hidden glass-font">
+      <DialogHeader className="mb-4">
+        <DialogTitle className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Mover Template</DialogTitle>
+        <DialogDescription className="text-slate-500 dark:text-slate-400 font-medium">Escolha a pasta de destino.</DialogDescription>
+      </DialogHeader>
+      
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Pasta de Destino</Label>
+          {templateFolders.length === 0 ? (
+            <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 text-center">
+              <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">Nenhuma pasta disponível.</p>
+            </div>
+          ) : (
+            <Select value={selectedFolder || 'none'} onValueChange={(val) => onFolderChange(val === 'none' ? null : val)}>
+              <SelectTrigger className="h-11 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:border-blue-500">
+                <SelectValue placeholder="Selecione uma pasta" />
+              </SelectTrigger>
+              <SelectContent className="z-[240] rounded-xl shadow-2xl">
+                <SelectItem value="none" className="text-sm font-medium">
+                  Sem pasta
+                </SelectItem>
+                {templateFolders.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id} className="text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-2.5 h-2.5 rounded-full" 
+                        style={{ backgroundColor: folder.color || '#3b82f6' }}
+                      />
+                      {folder.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <Button 
+            variant="outline"
+            className="flex-1 h-11 rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+            onClick={() => onOpenChange(false)}
+            disabled={isMoving}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-200/50 dark:shadow-blue-900/20"
+            onClick={onMove}
+            disabled={isMoving}
+          >
+            {isMoving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Movendo...
+              </>
+            ) : (
+              <>
+                <Move className="w-4 h-4 mr-2" />
+                Mover
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
+));
+
+MoveTemplateDialogComponent.displayName = 'MoveTemplateDialog';
 
 function SupportContent() {
   const router = useRouter();
@@ -138,14 +525,59 @@ function SupportContent() {
 
   const [savedModels, setSavedModels] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [templateFolders, setTemplateFolders] = useState<any[]>([]);
+  const [canManageTemplateFolders, setCanManageTemplateFolders] = useState(false);
+  const [isCreatingTemplateFolder, setIsCreatingTemplateFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderColor, setNewFolderColor] = useState('#3b82f6');
+  const [newFolderAccentColor, setNewFolderAccentColor] = useState(DEFAULT_FOLDER_META.accentColor);
+  const [newFolderTexture, setNewFolderTexture] = useState<FolderTexture>(DEFAULT_FOLDER_META.texture);
+  const [newFolderTag, setNewFolderTag] = useState('Equipe');
+  const [newFolderAvatar, setNewFolderAvatar] = useState('📁');
+  const [newFolderIsPublic, setNewFolderIsPublic] = useState(false);
+  const [isSaveTemplateDialogOpen, setIsSaveTemplateDialogOpen] = useState(false);
+  const [templateSaveFolderSelection, setTemplateSaveFolderSelection] = useState<string | null>(null);
+  const [templateSaveName, setTemplateSaveName] = useState('');
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isMoveTemplateDialogOpen, setIsMoveTemplateDialogOpen] = useState(false);
+  const [moveTemplateId, setMoveTemplateId] = useState<string | null>(null);
+  const [moveTemplateSelectedFolder, setMoveTemplateSelectedFolder] = useState<string | null>(null);
+  const [isFolderTemplatesPopupOpen, setIsFolderTemplatesPopupOpen] = useState(false);
+  const [activeTemplateFolderId, setActiveTemplateFolderId] = useState<string | null>(null);
+  const [folderNameDraft, setFolderNameDraft] = useState('');
+  const [folderColorDraft, setFolderColorDraft] = useState('#3b82f6');
+  const [folderAccentColorDraft, setFolderAccentColorDraft] = useState(DEFAULT_FOLDER_META.accentColor);
+  const [folderTextureDraft, setFolderTextureDraft] = useState<FolderTexture>(DEFAULT_FOLDER_META.texture);
+  const [folderTagDraft, setFolderTagDraft] = useState('Sem etiqueta');
+  const [folderAvatarDraft, setFolderAvatarDraft] = useState('📁');
+  const [folderIsPublicDraft, setFolderIsPublicDraft] = useState(false);
 
   const [showLanding, setShowLanding] = useState(true);
   const [isNewDesignModalOpen, setIsNewDesignModalOpen] = useState(false);
 
   const [gradColor1, setGradColor1] = useState('#3b82f6');
   const [gradColor2, setGradColor2] = useState('#1d4ed8');
+
+  const resetNewFolderDraft = () => {
+    setNewFolderName('');
+    setNewFolderColor('#3b82f6');
+    setNewFolderAccentColor(DEFAULT_FOLDER_META.accentColor);
+    setNewFolderTexture(DEFAULT_FOLDER_META.texture);
+    setNewFolderTag('Equipe');
+    setNewFolderAvatar('📁');
+    setNewFolderIsPublic(false);
+  };
+
+  const activeTemplateFolder = useMemo(
+    () => templateFolders.find((folder: any) => folder.id === activeTemplateFolderId) || null,
+    [templateFolders, activeTemplateFolderId]
+  );
+
+  const activeTemplateFolderTemplates = useMemo(
+    () => templates.filter((template: any) => template.folder_id === activeTemplateFolderId),
+    [templates, activeTemplateFolderId]
+  );
 
   // Gatilho para forçar re-renderização da página quando o Fabric altera objetos
   const [, setUpdateTrigger] = useState(0);
@@ -167,18 +599,19 @@ function SupportContent() {
     isOpen: boolean;
     title: string;
     description: string;
-    onConfirm: () => void;
+    onConfirm: () => Promise<void>;
     variant?: 'default' | 'destructive';
   }>({
     isOpen: false,
     title: '',
     description: '',
-    onConfirm: () => {},
+    onConfirm: async () => {},
     variant: 'default'
   });
+  const [isConfirmingAction, setIsConfirmingAction] = useState(false);
 
-  const showConfirm = (title: string, description: string, onConfirm: () => void, variant: 'default' | 'destructive' = 'destructive') => {
-    setConfirmDialog({ isOpen: true, title, description, onConfirm, variant });
+  const showConfirm = (title: string, description: string, onConfirm: (() => void) | (() => Promise<void>), variant: 'default' | 'destructive' = 'destructive') => {
+    setConfirmDialog({ isOpen: true, title, description, onConfirm: async () => Promise.resolve(onConfirm()), variant });
   };
 
   const handleSelectItem = (artboardId: string, obj: any) => {
@@ -435,6 +868,14 @@ function SupportContent() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      setCanManageTemplateFolders(canManageFoldersByRole(profileData?.role));
+
       const { data, error } = await supabase
         .from('design_models')
         .select('*')
@@ -442,6 +883,17 @@ function SupportContent() {
         .order('created_at', { ascending: false });
       
       if (!error && data) setSavedModels(data);
+
+      // Carregar pastas de templates
+      const { data: foldersData, error: foldersError } = await supabase
+        .from('template_folders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+      
+      if (!foldersError && foldersData) setTemplateFolders(foldersData);
+    } else {
+      setCanManageTemplateFolders(false);
     }
 
     const { data: templatesData, error: templatesError } = await supabase
@@ -574,6 +1026,11 @@ function SupportContent() {
   };
 
   const handleSaveAsTemplate = async () => {
+    if (!templateSaveName.trim()) {
+      toast.error('Nome do template é obrigatório.');
+      return;
+    }
+
     try {
       setIsSaving(true);
       
@@ -606,15 +1063,19 @@ function SupportContent() {
 
       const payload = {
         user_id: user.id,
-        title: canvasTitle,
+        title: templateSaveName.trim(),
         data: { artboards: artboardsWithData },
+        ...(templateSaveFolderSelection && { folder_id: templateSaveFolderSelection }),
         ...(savedThumbnailUrl && { thumbnail_url: savedThumbnailUrl })
       };
 
       const { error: insertError } = await supabase.from('design_templates').insert(payload);
       if (insertError) throw insertError;
       
-      toast.success('Template base criado com sucesso!');
+      toast.success('Template salvo com sucesso!');
+      setIsSaveTemplateDialogOpen(false);
+      setTemplateSaveName('');
+      setTemplateSaveFolderSelection(null);
       fetchModels();
     } catch (error: any) {
       toast.error(error.message || "Falha ao criar template.");
@@ -651,6 +1112,151 @@ function SupportContent() {
     setShowLanding(false);
   };
 
+  const handleCreateTemplateFolder = async () => {
+    if (!canManageTemplateFolders) {
+      toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
+      return;
+    }
+
+    if (!newFolderName.trim()) {
+      toast.error('Nome da pasta é obrigatório.');
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado.');
+
+      const primaryColor = normalizeHexColor(newFolderColor);
+      const accentColor = normalizeHexColor(newFolderAccentColor);
+
+      const { error } = await supabase
+        .from('template_folders')
+        .insert({
+          user_id: user.id,
+          name: newFolderName.trim(),
+          color: primaryColor,
+          is_public: newFolderIsPublic,
+          description: stringifyFolderMeta(newFolderTag, newFolderAvatar, accentColor, newFolderTexture)
+        });
+
+      if (error) throw error;
+
+      toast.success('Pasta de templates criada com sucesso!');
+      resetNewFolderDraft();
+      setIsCreatingTemplateFolder(false);
+      fetchModels();
+    } catch (error: any) {
+      toast.error('Erro ao criar pasta: ' + error.message);
+    }
+  };
+
+  const handleUpdateTemplateFolderColor = async (folderId: string, color: string, silent = false) => {
+    if (!canManageTemplateFolders) {
+      if (!silent) {
+        toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
+      }
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('template_folders')
+        .update({ color })
+        .eq('id', folderId);
+
+      if (error) throw error;
+
+      setTemplateFolders((prev) => prev.map((folder: any) => (
+        folder.id === folderId ? { ...folder, color } : folder
+      )));
+      if (!silent) toast.success('Cor da pasta atualizada!');
+    } catch (error: any) {
+      toast.error('Erro ao atualizar cor da pasta: ' + error.message);
+    }
+  };
+
+  const handleUpdateTemplateFolderIdentity = async (
+    folderId: string,
+    name: string,
+    tag: string,
+    avatar: string,
+    primaryColor: string,
+    accentColor: string,
+    texture: FolderTexture,
+    isPublic: boolean,
+  ) => {
+    if (!canManageTemplateFolders) {
+      toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
+      return;
+    }
+
+    const safeName = name.trim();
+    if (!safeName) {
+      toast.error('Nome da pasta é obrigatório.');
+      return;
+    }
+
+    const safeColor = normalizeHexColor(primaryColor);
+    const safeAccentColor = normalizeHexColor(accentColor);
+    const description = stringifyFolderMeta(tag, avatar, safeAccentColor, texture);
+
+    try {
+      const { error } = await supabase
+        .from('template_folders')
+        .update({
+          name: safeName,
+          color: safeColor,
+          is_public: isPublic,
+          description,
+        })
+        .eq('id', folderId);
+
+      if (error) throw error;
+
+      setTemplateFolders((prev) => prev.map((folder: any) => (
+        folder.id === folderId
+          ? { ...folder, name: safeName, color: safeColor, is_public: isPublic, description }
+          : folder
+      )));
+
+      toast.success('Personalização da pasta atualizada!');
+    } catch (error: any) {
+      toast.error('Erro ao atualizar personalização da pasta: ' + error.message);
+    }
+  };
+
+  const handleDeleteTemplateFolder = async (folderId: string) => {
+    if (!canManageTemplateFolders) {
+      toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
+      return;
+    }
+
+    showConfirm(
+      'Deletar Pasta de Templates?',
+      'Tem certeza que deseja deletar esta pasta? Os templates dentro dela não serão deletados.',
+      async () => {
+        try {
+          const { error } = await supabase
+            .from('template_folders')
+            .delete()
+            .eq('id', folderId);
+
+          if (error) throw error;
+
+          toast.success('Pasta deletada com sucesso!');
+          if (activeTemplateFolderId === folderId) {
+            setActiveTemplateFolderId(null);
+            setIsFolderTemplatesPopupOpen(false);
+          }
+          fetchModels();
+        } catch (error: any) {
+          toast.error('Erro ao deletar pasta: ' + error.message);
+        }
+      }
+    );
+  };
+
   const handleDeleteModel = async (id: string, e: React.MouseEvent, table: 'design_models' | 'design_templates') => {
     e.stopPropagation(); 
     
@@ -672,6 +1278,25 @@ function SupportContent() {
         }
       }
     );
+  };
+
+  const handleMoveTemplate = async (templateId: string, newFolderId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('design_templates')
+        .update({ folder_id: newFolderId })
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      toast.success('Template movido com sucesso!');
+      setIsMoveTemplateDialogOpen(false);
+      setMoveTemplateId(null);
+      setMoveTemplateSelectedFolder(null);
+      fetchModels();
+    } catch (error: any) {
+      toast.error('Erro ao mover template: ' + error.message);
+    }
   };
 
   const [showDownloadSettings, setShowDownloadSettings] = useState(false);
@@ -881,6 +1506,8 @@ function SupportContent() {
     </Dialog>
   );
 
+
+
   if (showLanding) {
     return (
       <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground relative glass-font">
@@ -987,38 +1614,321 @@ function SupportContent() {
                   <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                     <LayoutTemplate className="w-5 h-5 text-blue-500" /> Modelos Base
                   </h2>
+                  <Button 
+                    onClick={() => setIsCreatingTemplateFolder(true)}
+                    disabled={!canManageTemplateFolders}
+                    className="text-xs font-semibold h-9 px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm"
+                    title={canManageTemplateFolders ? 'Criar pasta' : 'Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas'}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Nova Pasta
+                  </Button>
                 </div>
-                
-                {templates.length === 0 ? (
-                  <div className="glass-panel rounded-3xl p-8 text-center bg-blue-50/30 dark:bg-blue-900/5">
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">Nenhum template global disponível no momento.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {templates.map((template) => (
-                      <div 
-                        key={template.id} 
-                        onClick={() => handleLoadModel(template, true)}
-                        className="design-card rounded-2xl p-4 cursor-pointer group flex flex-col gap-3"
-                      >
-                        <div className="aspect-[4/3] rounded-xl bg-slate-50 dark:bg-white/5 overflow-hidden flex items-center justify-center relative">
-                          {template.thumbnail_url ? (
-                            <img src={template.thumbnail_url} alt={template.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                          ) : (
-                            <LayoutTemplate className="text-slate-300 dark:text-zinc-700 w-12 h-12" />
-                          )}
-                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="destructive" size="icon" className="w-8 h-8 rounded-xl bg-red-500/90 hover:bg-red-600 shadow-lg" onClick={(e) => handleDeleteModel(template.id, e, 'design_templates')}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+
+                {/* Dialog para criar pasta */}
+                {isCreatingTemplateFolder && canManageTemplateFolders && (
+                  <div className="apple-glass-folder rounded-3xl p-5 md:p-6 space-y-4 mb-6 border border-white/70 dark:border-white/10">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_auto_auto] gap-3">
+                        <Input
+                          placeholder="Nome da pasta..."
+                          value={newFolderName}
+                          onChange={(e) => setNewFolderName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCreateTemplateFolder()}
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                          autoFocus
+                        />
+                        <Input
+                          placeholder="Etiqueta (ex: Marketing)"
+                          value={newFolderTag}
+                          onChange={(e) => setNewFolderTag(e.target.value)}
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                        />
+                        <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-3 h-10">
+                          <Paintbrush className="w-4 h-4 text-slate-500" />
+                          <input
+                            type="color"
+                            value={newFolderColor}
+                            onChange={(e) => setNewFolderColor(normalizeHexColor(e.target.value))}
+                            className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                            title="Cor base"
+                          />
+                          <span className="text-[11px] font-semibold text-slate-500">Base</span>
                         </div>
-                        <div className="px-1">
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate">{template.title}</h4>
-                          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">Template Base</p>
+                        <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-3 h-10">
+                          <Sparkles className="w-4 h-4 text-slate-500" />
+                          <input
+                            type="color"
+                            value={newFolderAccentColor}
+                            onChange={(e) => setNewFolderAccentColor(normalizeHexColor(e.target.value))}
+                            className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                            title="Cor de acento"
+                          />
+                          <span className="text-[11px] font-semibold text-slate-500">Acento</span>
                         </div>
                       </div>
-                    ))}
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-2 h-10">
+                          {FOLDER_AVATAR_OPTIONS.slice(0, 6).map((avatar) => (
+                            <button
+                              key={avatar}
+                              type="button"
+                              onClick={() => setNewFolderAvatar(avatar)}
+                              className={cn(
+                                "w-7 h-7 rounded-lg text-sm transition-colors",
+                                newFolderAvatar === avatar
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white/60 dark:bg-zinc-800/70 hover:bg-slate-100 dark:hover:bg-zinc-700"
+                              )}
+                              title={`Avatar ${avatar}`}
+                            >
+                              {avatar}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-1 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-2 h-10">
+                          {FOLDER_TEXTURE_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setNewFolderTexture(option.value)}
+                              className={cn(
+                                'h-7 px-2 rounded-lg text-[11px] font-semibold transition-colors',
+                                newFolderTexture === option.value
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white/60 dark:bg-zinc-800/70 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700'
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setNewFolderIsPublic((prev) => !prev)}
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                        >
+                          {newFolderIsPublic ? (
+                            <><Eye className="w-4 h-4 mr-2" /> Pública</>
+                          ) : (
+                            <><EyeOff className="w-4 h-4 mr-2" /> Privada</>
+                          )}
+                        </Button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                          onClick={handleCreateTemplateFolder}
+                          className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl"
+                          disabled={!newFolderName.trim()}
+                        >
+                          Criar
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setIsCreatingTemplateFolder(false);
+                            resetNewFolderDraft();
+                          }}
+                          variant="outline"
+                          className="h-10 px-4 rounded-xl"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Estrutura escolhida: capa com cor base/acento, textura, visibilidade e identidade visual.
+                    </p>
+                  </div>
+                )}
+                
+                {templateFolders.length === 0 && templates.length === 0 ? (
+                  <div className="glass-panel rounded-3xl p-8 text-center bg-blue-50/30 dark:bg-blue-900/5">
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">Nenhum template disponível. Crie uma pasta e comece a adicionar modelos.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Pastas de Templates */}
+                    {templateFolders.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+                        {templateFolders.map((folder) => {
+                          const folderTemplates = templates.filter((t: any) => t.folder_id === folder.id);
+                          const folderPreview = folderTemplates.slice(0, 3);
+                          const folderColor = normalizeHexColor(folder.color);
+                          const folderMeta = getFolderMeta(folder.description);
+                          const folderAccentColor = normalizeHexColor(folderMeta.accentColor);
+                          const folderTextureOverlay = getFolderTextureOverlayStyle(folderMeta.texture);
+
+                          return (
+                            <div
+                              key={folder.id}
+                              onClick={() => {
+                                setActiveTemplateFolderId(folder.id);
+                                setFolderNameDraft(folder.name || '');
+                                setFolderColorDraft(folderColor);
+                                setFolderAccentColorDraft(folderAccentColor);
+                                setFolderTextureDraft(folderMeta.texture);
+                                setFolderTagDraft(folderMeta.tag);
+                                setFolderAvatarDraft(folderMeta.avatar);
+                                setFolderIsPublicDraft(Boolean(folder.is_public));
+                                setIsFolderTemplatesPopupOpen(true);
+                              }}
+                              className="group relative cursor-pointer w-full min-w-0"
+                            >
+
+                              <div className="apple-glass-folder relative rounded-[2rem] p-5 transition-all duration-500 group-hover:-translate-y-1">
+                                <div className="relative z-10 flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <h3 className="text-base md:text-[17px] font-black text-slate-800 dark:text-white truncate tracking-tight">{folder.name}</h3>
+                                    <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-200/70 dark:border-blue-700/40">
+                                        {folderMeta.tag}
+                                      </span>
+                                      <span className={cn(
+                                        'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
+                                        folder.is_public
+                                          ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/85 dark:bg-emerald-900/30 border-emerald-200/80 dark:border-emerald-700/40'
+                                          : 'text-slate-700 dark:text-slate-300 bg-slate-100/85 dark:bg-slate-800/70 border-slate-200/80 dark:border-slate-700/50'
+                                      )}>
+                                        {folder.is_public ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                        {folder.is_public ? 'Pública' : 'Privada'}
+                                      </span>
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300 bg-violet-100/85 dark:bg-violet-900/30 px-2 py-0.5 rounded-full border border-violet-200/80 dark:border-violet-700/40">
+                                        {FOLDER_TEXTURE_OPTIONS.find((option) => option.value === folderMeta.texture)?.label || 'Suave'}
+                                      </span>
+                                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                        {folderTemplates.length === 1 ? '1 design' : `${folderTemplates.length} designs`}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {canManageTemplateFolders && (
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
+                                      <input
+                                        type="color"
+                                        value={folderColor}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => {
+                                          const color = e.target.value;
+                                          void handleUpdateTemplateFolderColor(folder.id, color, true);
+                                        }}
+                                        className="w-8 h-8 rounded-lg border border-white/80 dark:border-white/15 bg-white/60 dark:bg-zinc-900/40 cursor-pointer"
+                                        title="Personalizar cor da pasta"
+                                      />
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="w-8 h-8 rounded-lg bg-white/45 dark:bg-zinc-900/35 border border-white/70 dark:border-white/10 hover:bg-red-100 dark:hover:bg-red-900/30"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteTemplateFolder(folder.id);
+                                        }}
+                                        title="Deletar pasta"
+                                      >
+                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="relative mt-5 h-32">
+                                  <div
+                                    className="absolute top-1 left-4 w-28 h-9 rounded-t-[14px] border border-white/50 shadow-sm"
+                                    style={{
+                                      background: `linear-gradient(180deg, ${withHexAlpha(folderColor, '99')} 0%, ${withHexAlpha(folderAccentColor, 'd1')} 100%)`
+                                    }}
+                                  />
+                                  <div
+                                    className="absolute top-7 inset-x-0 bottom-0 rounded-[1.2rem] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_6px_14px_rgba(15,23,42,0.12)] border border-white/45 overflow-hidden"
+                                    style={{
+                                      background: `linear-gradient(145deg, ${withHexAlpha(folderColor, 'e8')} 0%, ${withHexAlpha(folderAccentColor, 'c2')} 100%)`
+                                    }}
+                                  >
+                                    <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent" />
+                                    <div className="absolute inset-0 pointer-events-none" style={folderTextureOverlay} />
+
+                                    <div className="relative z-10 flex items-center justify-between text-white/95">
+                                      <div className="w-8 h-8 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-base backdrop-blur-sm">
+                                        {folderMeta.avatar}
+                                      </div>
+                                      <span className="text-[11px] font-bold bg-white/25 border border-white/30 px-2 py-0.5 rounded-full">
+                                        {folderTemplates.length}
+                                      </span>
+                                    </div>
+
+                                    <div className="relative z-10 flex items-center gap-1.5 mt-3">
+                                      {folderPreview.length > 0 ? folderPreview.map((template: any) => (
+                                        <div key={template.id} className="w-10 h-8 rounded-md bg-white/25 overflow-hidden border border-white/35 backdrop-blur-sm">
+                                          {template.thumbnail_url ? (
+                                            <img src={template.thumbnail_url} alt={template.title} className="w-full h-full object-cover" />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                              <LayoutTemplate className="w-3 h-3 text-white/80" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      )) : (
+                                        <p className="text-[11px] text-white/85 font-medium">Pasta vazia</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Templates sem pasta */}
+                    {templates.some((t: any) => !t.folder_id) && (
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-4 hover:border-blue-300">
+                        <h3 className="font-bold text-slate-800 dark:text-white mb-4">Outros Templates</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {templates.filter((t: any) => !t.folder_id).map((template: any) => (
+                            <div 
+                              key={template.id} 
+                              onClick={() => handleLoadModel(template, true)}
+                              className="design-card rounded-xl p-3 cursor-pointer group flex flex-col gap-2"
+                            >
+                              <div className="aspect-[4/3] rounded-lg bg-slate-50 dark:bg-slate-800 overflow-hidden flex items-center justify-center relative">
+                                {template.thumbnail_url ? (
+                                  <img src={template.thumbnail_url} alt={template.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                                ) : (
+                                  <LayoutTemplate className="text-slate-300 dark:text-slate-700 w-8 h-8" />
+                                )}
+                                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="w-7 h-7 rounded-lg bg-blue-500/90 hover:bg-blue-600 shadow-sm"
+                                    onClick={(e) => {e.stopPropagation(); setMoveTemplateId(template.id); setMoveTemplateSelectedFolder(template.folder_id || null); setIsMoveTemplateDialogOpen(true);}}
+                                  >
+                                    <Move className="w-3 h-3 text-white" />
+                                  </Button>
+                                  <Button 
+                                    variant="destructive" 
+                                    size="icon" 
+                                    className="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 shadow-sm" 
+                                    onClick={(e) => handleDeleteModel(template.id, e, 'design_templates')}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="px-0.5">
+                                <h4 className="text-xs font-bold text-slate-800 dark:text-white truncate">{template.title}</h4>
+                                <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider mt-0.5">Template</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </section>
@@ -1027,6 +1937,314 @@ function SupportContent() {
           </main>
         </div>
         <NewDesignDialog />
+        <SaveTemplateDialogComponent 
+          isOpen={isSaveTemplateDialogOpen}
+          onOpenChange={setIsSaveTemplateDialogOpen}
+          templateName={templateSaveName}
+          onNameChange={setTemplateSaveName}
+          templateFolders={templateFolders}
+          selectedFolder={templateSaveFolderSelection}
+          onFolderChange={setTemplateSaveFolderSelection}
+          onSave={handleSaveAsTemplate}
+          isSaving={isSaving}
+        />
+        <MoveTemplateDialogComponent
+          isOpen={isMoveTemplateDialogOpen}
+          onOpenChange={setIsMoveTemplateDialogOpen}
+          templateFolders={templateFolders}
+          selectedFolder={moveTemplateSelectedFolder}
+          onFolderChange={setMoveTemplateSelectedFolder}
+          onMove={async () => {
+            if (moveTemplateId) {
+              await handleMoveTemplate(moveTemplateId, moveTemplateSelectedFolder);
+            }
+          }}
+          isMoving={false}
+        />
+
+        {isFolderTemplatesPopupOpen && (
+          <div className="fixed inset-0 z-[160]">
+            <button
+              type="button"
+              aria-label="Fechar painel da pasta"
+              className="absolute inset-0 bg-slate-950/25 backdrop-blur-[2px]"
+              onClick={() => {
+                setIsFolderTemplatesPopupOpen(false);
+                setActiveTemplateFolderId(null);
+              }}
+            />
+
+            <aside className="absolute right-0 top-0 h-full w-full max-w-[920px] apple-glass-popup border-l border-white/60 dark:border-white/10 overflow-hidden">
+              <div className="h-full flex flex-col">
+                <div className="px-6 py-5 border-b border-white/60 dark:border-white/10 bg-gradient-to-b from-white/80 to-white/45 dark:from-zinc-900/80 dark:to-zinc-900/45">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-3">
+                        <span className="text-2xl">{folderAvatarDraft}</span>
+                        {folderNameDraft || activeTemplateFolder?.name || 'Pasta'}
+                      </h3>
+                      <p className="text-sm text-slate-500 dark:text-zinc-400 mt-1">
+                        {activeTemplateFolderTemplates.length === 1 ? '1 design nesta pasta' : `${activeTemplateFolderTemplates.length} designs nesta pasta`}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-200/70 dark:border-blue-700/40">
+                          {folderTagDraft || 'Sem etiqueta'}
+                        </span>
+                        <span className={cn(
+                          'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
+                          folderIsPublicDraft
+                            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/85 dark:bg-emerald-900/30 border-emerald-200/80 dark:border-emerald-700/40'
+                            : 'text-slate-700 dark:text-slate-300 bg-slate-100/85 dark:bg-slate-800/70 border-slate-200/80 dark:border-slate-700/50'
+                        )}>
+                          {folderIsPublicDraft ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                          {folderIsPublicDraft ? 'Pública' : 'Privada'}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300 bg-violet-100/85 dark:bg-violet-900/30 px-2 py-0.5 rounded-full border border-violet-200/80 dark:border-violet-700/40">
+                          {FOLDER_TEXTURE_OPTIONS.find((option) => option.value === folderTextureDraft)?.label || 'Suave'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-9 h-9 rounded-xl bg-white/60 dark:bg-zinc-900/45 border border-white/70 dark:border-white/10"
+                      onClick={() => {
+                        setIsFolderTemplatesPopupOpen(false);
+                        setActiveTemplateFolderId(null);
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {activeTemplateFolder && canManageTemplateFolders && (
+                    <div className="space-y-3 mt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <Input
+                          value={folderNameDraft}
+                          onChange={(e) => setFolderNameDraft(e.target.value)}
+                          placeholder="Nome da pasta"
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                        />
+                        <Input
+                          value={folderTagDraft}
+                          onChange={(e) => setFolderTagDraft(e.target.value)}
+                          placeholder="Etiqueta da pasta"
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr_auto] gap-3">
+                        <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 px-3 h-10 bg-white/70 dark:bg-zinc-900/45">
+                          <Paintbrush className="w-4 h-4 text-slate-500" />
+                          <input
+                            type="color"
+                            value={normalizeHexColor(folderColorDraft)}
+                            onChange={(e) => setFolderColorDraft(normalizeHexColor(e.target.value))}
+                            className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                            title="Cor base da pasta"
+                          />
+                          <span className="text-[11px] font-semibold text-slate-500">Base</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 px-3 h-10 bg-white/70 dark:bg-zinc-900/45">
+                          <Sparkles className="w-4 h-4 text-slate-500" />
+                          <input
+                            type="color"
+                            value={normalizeHexColor(folderAccentColorDraft)}
+                            onChange={(e) => setFolderAccentColorDraft(normalizeHexColor(e.target.value))}
+                            className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                            title="Cor de acento da pasta"
+                          />
+                          <span className="text-[11px] font-semibold text-slate-500">Acento</span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-2 py-1 min-h-10">
+                          {FOLDER_TEXTURE_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setFolderTextureDraft(option.value)}
+                              className={cn(
+                                'h-7 px-2 rounded-lg text-[11px] font-semibold transition-colors',
+                                folderTextureDraft === option.value
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white/65 dark:bg-zinc-800/75 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700'
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                          onClick={() => setFolderIsPublicDraft((prev) => !prev)}
+                        >
+                          {folderIsPublicDraft ? (
+                            <><Eye className="w-4 h-4 mr-2" /> Pública</>
+                          ) : (
+                            <><EyeOff className="w-4 h-4 mr-2" /> Privada</>
+                          )}
+                        </Button>
+                      </div>
+
+                      <Button
+                        className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white w-full md:w-auto"
+                        onClick={() => handleUpdateTemplateFolderIdentity(
+                          activeTemplateFolder.id,
+                          folderNameDraft,
+                          folderTagDraft,
+                          folderAvatarDraft,
+                          folderColorDraft,
+                          folderAccentColorDraft,
+                          folderTextureDraft,
+                          folderIsPublicDraft,
+                        )}
+                      >
+                        Salvar personalização
+                      </Button>
+                    </div>
+                  )}
+
+                  {canManageTemplateFolders && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {FOLDER_AVATAR_OPTIONS.map((avatar) => (
+                        <button
+                          key={avatar}
+                          type="button"
+                          onClick={() => setFolderAvatarDraft(avatar)}
+                          className={cn(
+                            "w-9 h-9 rounded-xl border transition-colors",
+                            folderAvatarDraft === avatar
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white/65 dark:bg-zinc-900/45 border-white/70 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                          )}
+                          title={`Avatar ${avatar}`}
+                        >
+                          {avatar}
+                        </button>
+                      ))}
+
+                      {activeTemplateFolder && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-9 ml-auto"
+                          onClick={() => handleDeleteTemplateFolder(activeTemplateFolder.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" /> Deletar Pasta
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 overflow-auto p-6 bg-gradient-to-b from-white/35 to-white/15 dark:from-zinc-950/55 dark:to-zinc-950/75">
+                  {activeTemplateFolderTemplates.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {activeTemplateFolderTemplates.map((template: any) => (
+                        <div
+                          key={template.id}
+                          onClick={() => handleLoadModel(template, true)}
+                          className="design-card rounded-2xl p-3 cursor-pointer group flex flex-col gap-2 bg-white/75 dark:bg-zinc-900/70 border border-white/80 dark:border-white/10"
+                        >
+                          <div className="aspect-[4/3] rounded-xl bg-slate-100/90 dark:bg-zinc-800/75 overflow-hidden flex items-center justify-center relative">
+                            {template.thumbnail_url ? (
+                              <img src={template.thumbnail_url} alt={template.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                            ) : (
+                              <LayoutTemplate className="text-slate-300 dark:text-slate-700 w-8 h-8" />
+                            )}
+
+                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-7 h-7 rounded-lg bg-blue-500/90 hover:bg-blue-600 shadow-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMoveTemplateId(template.id);
+                                  setMoveTemplateSelectedFolder(template.folder_id || null);
+                                  setIsMoveTemplateDialogOpen(true);
+                                }}
+                                title="Mover template"
+                              >
+                                <Move className="w-3 h-3 text-white" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 shadow-sm"
+                                onClick={(e) => handleDeleteModel(template.id, e, 'design_templates')}
+                                title="Deletar template"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="px-0.5 min-h-12 flex flex-col justify-between">
+                            <h4 className="text-xs font-bold text-slate-800 dark:text-white truncate">{template.title}</h4>
+                            <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">Template</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/70 dark:border-white/10 bg-white/65 dark:bg-zinc-900/55 p-10 text-center backdrop-blur-sm">
+                      <FolderHeart className="w-10 h-10 mx-auto text-slate-300 dark:text-zinc-700 mb-3" />
+                      <p className="text-sm font-semibold text-slate-600 dark:text-zinc-300">Esta pasta ainda está vazia</p>
+                      <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">Salve ou mova designs para preencher esta pasta.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </aside>
+          </div>
+        )}
+
+        {/* Diálogo de Confirmação - Landing Page */}
+        <AlertDialog open={confirmDialog.isOpen} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, isOpen: open }))}>
+          <AlertDialogContent className="rounded-2xl max-w-[400px] dark:bg-zinc-900 dark:border-zinc-800">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-bold dark:text-zinc-100">{confirmDialog.title}</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-500 dark:text-zinc-400 text-sm leading-relaxed">
+                {confirmDialog.description}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 mt-4">
+              <AlertDialogCancel className="rounded-xl font-semibold border-slate-200 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800" disabled={isConfirmingAction}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={async () => {
+                  try {
+                    setIsConfirmingAction(true);
+                    await confirmDialog.onConfirm();
+                  } finally {
+                    setIsConfirmingAction(false);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                  }
+                }}
+                disabled={isConfirmingAction}
+                className={cn(
+                  "rounded-xl font-semibold px-6 relative",
+                  confirmDialog.variant === 'destructive' ? "bg-red-600 hover:bg-red-700 text-white disabled:bg-red-600/50" : "bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-600/50"
+                )}
+              >
+                {isConfirmingAction ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                    Deletando...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -1205,7 +2423,7 @@ function SupportContent() {
                           </div>
                         </DropdownMenuItem>
 
-                        <DropdownMenuItem onClick={handleSaveAsTemplate} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:text-blue-700 dark:focus:text-blue-400">
+                        <DropdownMenuItem onClick={() => { setTemplateSaveName(canvasTitle); setTemplateSaveFolderSelection(templateFolders[0]?.id || null); setIsSaveTemplateDialogOpen(true); }} className="cursor-pointer py-3 rounded-lg focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:text-blue-700 dark:focus:text-blue-400">
                           <LayoutTemplate className="w-4 h-4 mr-3 text-slate-500 dark:text-zinc-400" />
                           <div className="flex flex-col">
                             <span className="font-semibold text-sm">Salvar como Template</span>
@@ -2270,6 +3488,32 @@ function SupportContent() {
           </div>
         </div>
 
+        <SaveTemplateDialogComponent 
+          isOpen={isSaveTemplateDialogOpen}
+          onOpenChange={setIsSaveTemplateDialogOpen}
+          templateName={templateSaveName}
+          onNameChange={setTemplateSaveName}
+          templateFolders={templateFolders}
+          selectedFolder={templateSaveFolderSelection}
+          onFolderChange={setTemplateSaveFolderSelection}
+          onSave={handleSaveAsTemplate}
+          isSaving={isSaving}
+        />
+        <MoveTemplateDialogComponent
+          isOpen={isMoveTemplateDialogOpen}
+          onOpenChange={setIsMoveTemplateDialogOpen}
+          templateFolders={templateFolders}
+          selectedFolder={moveTemplateSelectedFolder}
+          onFolderChange={setMoveTemplateSelectedFolder}
+          onMove={async () => {
+            if (moveTemplateId) {
+              await handleMoveTemplate(moveTemplateId, moveTemplateSelectedFolder);
+            }
+          }}
+          isMoving={false}
+        />
+
+        {/* Diálogo de Confirmação - Editor View */}
         <AlertDialog open={confirmDialog.isOpen} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, isOpen: open }))}>
           <AlertDialogContent className="rounded-2xl max-w-[400px] dark:bg-zinc-900 dark:border-zinc-800">
             <AlertDialogHeader>
@@ -2279,23 +3523,35 @@ function SupportContent() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2 mt-4">
-              <AlertDialogCancel className="rounded-xl font-semibold border-slate-200 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800">Cancelar</AlertDialogCancel>
+              <AlertDialogCancel className="rounded-xl font-semibold border-slate-200 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800" disabled={isConfirmingAction}>Cancelar</AlertDialogCancel>
               <AlertDialogAction 
-                onClick={() => {
-                  confirmDialog.onConfirm();
-                  setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                onClick={async () => {
+                  try {
+                    setIsConfirmingAction(true);
+                    await confirmDialog.onConfirm();
+                  } finally {
+                    setIsConfirmingAction(false);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                  }
                 }}
+                disabled={isConfirmingAction}
                 className={cn(
-                  "rounded-xl font-semibold px-6",
-                  confirmDialog.variant === 'destructive' ? "bg-red-600 hover:bg-red-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+                  "rounded-xl font-semibold px-6 relative",
+                  confirmDialog.variant === 'destructive' ? "bg-red-600 hover:bg-red-700 text-white disabled:bg-red-600/50" : "bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-600/50"
                 )}
               >
-                Confirmar
+                {isConfirmingAction ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                    Deletando...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
       </main>
     </div>
   );

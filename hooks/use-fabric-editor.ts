@@ -627,29 +627,20 @@ export const useFabricEditor = () => {
   const saveToJson = useCallback(() => fabricCanvas.current ? JSON.stringify((fabricCanvas.current as any).toObject(['variableId', 'isFrame', 'frameType', 'customRadii', 'locked', 'isCropped', 'customName', '_origFrameW', '_origFrameH', '_origFrameScaleX', '_origFrameScaleY'])) : '', []);
 
   const loadFromJson = useCallback(async (json: any) => {
-    if (!fabricCanvas.current || isDisposed.current) return;
-    
-    // Verifica se o contexto ainda é válido
-    const ctx = fabricCanvas.current.getContext();
-    if (!ctx) return;
-
+    if (!fabricCanvas.current || !fabricCanvas.current.getContext() || isDisposed.current) return;
     isHistoryProcessing.current = true;
     try {
       const parsed = typeof json === 'string' ? JSON.parse(json) : json;
-      
       // Certifica-se que o canvas ainda está ativo antes de carregar
-      if (fabricCanvas.current && !isDisposed.current && fabricCanvas.current.getContext()) {
-        try {
-          await fabricCanvas.current.loadFromJSON(parsed);
-        } catch (loadErr) {
-          console.warn("Erro ao carregar JSON no Fabric:", loadErr);
-          return;
-        }
+      if (fabricCanvas.current && !isDisposed.current) {
+        await fabricCanvas.current.loadFromJSON(parsed);
       } else {
         return;
       }
       
-      const objects = fabricCanvas.current?.getObjects() || [];
+      if (!fabricCanvas.current || isDisposed.current || fabricCanvas.current !== canvas) return;
+
+      const objects = canvas.getObjects() || [];
       if (parsed.objects) {
         parsed.objects.forEach((data: any, i: number) => {
           const obj = objects[i]; if (!obj) return;
@@ -675,12 +666,15 @@ export const useFabricEditor = () => {
           obj.set('dirty', true);
         });
       }
-      if (fabricCanvas.current && !isDisposed.current) {
-        fabricCanvas.current.getObjects().forEach(obj => obj.setCoords());
-        fabricCanvas.current.renderAll();
-        undoStack.current = [JSON.stringify((fabricCanvas.current as any).toObject())]; redoStack.current = []; forceUpdate();
-      }
-    } catch (e) { console.error(e); } finally {
+      
+      canvas.getObjects().forEach(obj => obj.setCoords());
+      canvas.renderAll();
+      undoStack.current = [JSON.stringify((canvas as any).toObject())]; 
+      redoStack.current = []; 
+      forceUpdate();
+    } catch (e) { 
+      console.error("Erro ao carregar JSON:", e); 
+    } finally {
       isHistoryProcessing.current = false;
     }
   }, [forceUpdate]);
