@@ -195,6 +195,27 @@ interface ArtboardData {
 }
 
 const FOLDER_AVATAR_OPTIONS = ['📁', '🗂️', '📚', '💼', '🎨', '🚀', '⭐', '🧩'];
+const FOLDER_TEXTURE_OPTIONS = [
+  { value: 'soft', label: 'Suave' },
+  { value: 'diagonal', label: 'Diagonal' },
+  { value: 'grid', label: 'Grid' },
+] as const;
+
+type FolderTexture = (typeof FOLDER_TEXTURE_OPTIONS)[number]['value'];
+
+interface FolderMeta {
+  tag: string;
+  avatar: string;
+  accentColor: string;
+  texture: FolderTexture;
+}
+
+const DEFAULT_FOLDER_META: FolderMeta = {
+  tag: 'Sem etiqueta',
+  avatar: '📁',
+  accentColor: '#60a5fa',
+  texture: 'soft',
+};
 const FOLDER_EDITOR_ROLES = new Set([
   'Marketing',
   'Gestor',
@@ -225,113 +246,73 @@ const normalizeHexColor = (color?: string | null): string => {
 
 const withHexAlpha = (hex: string, alphaHex: string): string => `${normalizeHexColor(hex)}${alphaHex}`;
 
-type FolderMetaExtras = {
-  subtitle: string;
-  responsible: string;
-  audience: string;
-  campaign: string;
-  priority: string;
-  tone: string;
-  coverStyle: string;
-  layoutStyle: string;
-  badge: string;
-  notes: string;
+const isFolderTexture = (value: unknown): value is FolderTexture => {
+  return typeof value === 'string' && FOLDER_TEXTURE_OPTIONS.some((option) => option.value === value);
 };
 
-const DEFAULT_FOLDER_META_EXTRAS: FolderMetaExtras = {
-  subtitle: '',
-  responsible: '',
-  audience: '',
-  campaign: '',
-  priority: 'Normal',
-  tone: 'Neutro',
-  coverStyle: 'Vidro',
-  layoutStyle: 'Grid',
-  badge: '',
-  notes: '',
-};
-
-const FOLDER_EXTRA_FIELDS: Array<{ key: keyof FolderMetaExtras; label: string; placeholder: string; maxLength: number }> = [
-  { key: 'subtitle', label: 'Subtitulo', placeholder: 'Resumo curto da pasta', maxLength: 64 },
-  { key: 'responsible', label: 'Responsavel', placeholder: 'Nome do responsavel', maxLength: 48 },
-  { key: 'audience', label: 'Publico-alvo', placeholder: 'Ex: corretores premium', maxLength: 48 },
-  { key: 'campaign', label: 'Campanha', placeholder: 'Ex: lancamento Q2', maxLength: 48 },
-  { key: 'priority', label: 'Prioridade', placeholder: 'Baixa, Normal, Alta', maxLength: 24 },
-  { key: 'tone', label: 'Tom visual', placeholder: 'Ex: premium, clean', maxLength: 32 },
-  { key: 'coverStyle', label: 'Estilo da capa', placeholder: 'Ex: vidro, papel, neon', maxLength: 32 },
-  { key: 'layoutStyle', label: 'Layout preferido', placeholder: 'Ex: grid, lista', maxLength: 32 },
-  { key: 'badge', label: 'Badge da pasta', placeholder: 'Texto do badge', maxLength: 24 },
-  { key: 'notes', label: 'Observacao interna', placeholder: 'Observacao para equipe', maxLength: 80 },
-];
-
-const getDefaultFolderMetaExtras = (): FolderMetaExtras => ({ ...DEFAULT_FOLDER_META_EXTRAS });
-
-const sanitizeMetaField = (value: unknown, maxLength: number): string => {
-  if (typeof value !== 'string') return '';
-  return value.trim().slice(0, maxLength);
-};
-
-const getFolderMeta = (description?: string | null): { tag: string; avatar: string; extras: FolderMetaExtras } => {
-  if (!description) {
-    return {
-      tag: 'Sem etiqueta',
-      avatar: '📁',
-      extras: getDefaultFolderMetaExtras(),
-    };
+const getFolderTextureOverlayStyle = (texture: FolderTexture): React.CSSProperties => {
+  switch (texture) {
+    case 'diagonal':
+      return {
+        backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 12px)',
+        opacity: 0.45,
+      };
+    case 'grid':
+      return {
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)',
+        backgroundSize: '16px 16px',
+        opacity: 0.38,
+      };
+    default:
+      return {
+        backgroundImage: 'radial-gradient(120% 120% at 0% 0%, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0) 64%)',
+        opacity: 0.56,
+      };
   }
+};
+
+const getFolderMeta = (description?: string | null): FolderMeta => {
+  if (!description) return DEFAULT_FOLDER_META;
 
   try {
     const parsed = JSON.parse(description);
     if (parsed && typeof parsed === 'object') {
-      const tag = typeof parsed.tag === 'string' && parsed.tag.trim().length > 0 ? parsed.tag.trim() : 'Sem etiqueta';
-      const avatar = typeof parsed.avatar === 'string' && parsed.avatar.trim().length > 0 ? parsed.avatar.trim() : '📁';
-      const defaults = getDefaultFolderMetaExtras();
-      return {
-        tag,
-        avatar,
-        extras: {
-          subtitle: sanitizeMetaField(parsed.subtitle, 64),
-          responsible: sanitizeMetaField(parsed.responsible, 48),
-          audience: sanitizeMetaField(parsed.audience, 48),
-          campaign: sanitizeMetaField(parsed.campaign, 48),
-          priority: sanitizeMetaField(parsed.priority, 24) || defaults.priority,
-          tone: sanitizeMetaField(parsed.tone, 32) || defaults.tone,
-          coverStyle: sanitizeMetaField(parsed.coverStyle, 32) || defaults.coverStyle,
-          layoutStyle: sanitizeMetaField(parsed.layoutStyle, 32) || defaults.layoutStyle,
-          badge: sanitizeMetaField(parsed.badge, 24),
-          notes: sanitizeMetaField(parsed.notes, 80),
-        },
-      };
+      const payload = parsed as Record<string, unknown>;
+      const tag = typeof payload.tag === 'string' && payload.tag.trim().length > 0
+        ? payload.tag.trim().slice(0, 24)
+        : DEFAULT_FOLDER_META.tag;
+      const avatar = typeof payload.avatar === 'string' && payload.avatar.trim().length > 0
+        ? payload.avatar.trim()
+        : DEFAULT_FOLDER_META.avatar;
+      const accentColor = typeof payload.accentColor === 'string'
+        ? normalizeHexColor(payload.accentColor)
+        : DEFAULT_FOLDER_META.accentColor;
+      const texture = isFolderTexture(payload.texture)
+        ? payload.texture
+        : DEFAULT_FOLDER_META.texture;
+
+      return { tag, avatar, accentColor, texture };
     }
   } catch {
     // Fallback for plain text description from older records.
   }
 
   return {
-    tag: description.trim().length > 0 ? description.trim().slice(0, 24) : 'Sem etiqueta',
-    avatar: '📁',
-    extras: getDefaultFolderMetaExtras(),
+    ...DEFAULT_FOLDER_META,
+    tag: description.trim().length > 0 ? description.trim().slice(0, 24) : DEFAULT_FOLDER_META.tag,
   };
 };
 
-const stringifyFolderMeta = (tag: string, avatar: string, extras: FolderMetaExtras): string => {
-  const defaults = getDefaultFolderMetaExtras();
-  const safeTag = tag.trim().length > 0 ? tag.trim().slice(0, 24) : 'Sem etiqueta';
-  const safeAvatar = avatar.trim().length > 0 ? avatar.trim() : '📁';
-  return JSON.stringify({
-    tag: safeTag,
-    avatar: safeAvatar,
-    subtitle: sanitizeMetaField(extras.subtitle, 64),
-    responsible: sanitizeMetaField(extras.responsible, 48),
-    audience: sanitizeMetaField(extras.audience, 48),
-    campaign: sanitizeMetaField(extras.campaign, 48),
-    priority: sanitizeMetaField(extras.priority, 24) || defaults.priority,
-    tone: sanitizeMetaField(extras.tone, 32) || defaults.tone,
-    coverStyle: sanitizeMetaField(extras.coverStyle, 32) || defaults.coverStyle,
-    layoutStyle: sanitizeMetaField(extras.layoutStyle, 32) || defaults.layoutStyle,
-    badge: sanitizeMetaField(extras.badge, 24),
-    notes: sanitizeMetaField(extras.notes, 80),
-  });
+const stringifyFolderMeta = (
+  tag: string,
+  avatar: string,
+  accentColor: string = DEFAULT_FOLDER_META.accentColor,
+  texture: FolderTexture = DEFAULT_FOLDER_META.texture
+): string => {
+  const safeTag = tag.trim().length > 0 ? tag.trim().slice(0, 24) : DEFAULT_FOLDER_META.tag;
+  const safeAvatar = avatar.trim().length > 0 ? avatar.trim() : DEFAULT_FOLDER_META.avatar;
+  const safeAccentColor = normalizeHexColor(accentColor);
+  return JSON.stringify({ tag: safeTag, avatar: safeAvatar, accentColor: safeAccentColor, texture });
 };
 
 interface SaveTemplateDialogProps {
@@ -548,9 +529,11 @@ function SupportContent() {
   const [isCreatingTemplateFolder, setIsCreatingTemplateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderColor, setNewFolderColor] = useState('#3b82f6');
+  const [newFolderAccentColor, setNewFolderAccentColor] = useState(DEFAULT_FOLDER_META.accentColor);
+  const [newFolderTexture, setNewFolderTexture] = useState<FolderTexture>(DEFAULT_FOLDER_META.texture);
   const [newFolderTag, setNewFolderTag] = useState('Equipe');
   const [newFolderAvatar, setNewFolderAvatar] = useState('📁');
-  const [newFolderMetaExtras, setNewFolderMetaExtras] = useState<FolderMetaExtras>(getDefaultFolderMetaExtras());
+  const [newFolderIsPublic, setNewFolderIsPublic] = useState(false);
   const [isSaveTemplateDialogOpen, setIsSaveTemplateDialogOpen] = useState(false);
   const [templateSaveFolderSelection, setTemplateSaveFolderSelection] = useState<string | null>(null);
   const [templateSaveName, setTemplateSaveName] = useState('');
@@ -561,16 +544,29 @@ function SupportContent() {
   const [moveTemplateSelectedFolder, setMoveTemplateSelectedFolder] = useState<string | null>(null);
   const [isFolderTemplatesPopupOpen, setIsFolderTemplatesPopupOpen] = useState(false);
   const [activeTemplateFolderId, setActiveTemplateFolderId] = useState<string | null>(null);
+  const [folderNameDraft, setFolderNameDraft] = useState('');
   const [folderColorDraft, setFolderColorDraft] = useState('#3b82f6');
+  const [folderAccentColorDraft, setFolderAccentColorDraft] = useState(DEFAULT_FOLDER_META.accentColor);
+  const [folderTextureDraft, setFolderTextureDraft] = useState<FolderTexture>(DEFAULT_FOLDER_META.texture);
   const [folderTagDraft, setFolderTagDraft] = useState('Sem etiqueta');
   const [folderAvatarDraft, setFolderAvatarDraft] = useState('📁');
-  const [folderMetaExtrasDraft, setFolderMetaExtrasDraft] = useState<FolderMetaExtras>(getDefaultFolderMetaExtras());
+  const [folderIsPublicDraft, setFolderIsPublicDraft] = useState(false);
 
   const [showLanding, setShowLanding] = useState(true);
   const [isNewDesignModalOpen, setIsNewDesignModalOpen] = useState(false);
 
   const [gradColor1, setGradColor1] = useState('#3b82f6');
   const [gradColor2, setGradColor2] = useState('#1d4ed8');
+
+  const resetNewFolderDraft = () => {
+    setNewFolderName('');
+    setNewFolderColor('#3b82f6');
+    setNewFolderAccentColor(DEFAULT_FOLDER_META.accentColor);
+    setNewFolderTexture(DEFAULT_FOLDER_META.texture);
+    setNewFolderTag('Equipe');
+    setNewFolderAvatar('📁');
+    setNewFolderIsPublic(false);
+  };
 
   const activeTemplateFolder = useMemo(
     () => templateFolders.find((folder: any) => folder.id === activeTemplateFolderId) || null,
@@ -581,14 +577,6 @@ function SupportContent() {
     () => templates.filter((template: any) => template.folder_id === activeTemplateFolderId),
     [templates, activeTemplateFolderId]
   );
-
-  const updateNewFolderMetaExtra = (field: keyof FolderMetaExtras, value: string) => {
-    setNewFolderMetaExtras((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const updateFolderMetaDraftExtra = (field: keyof FolderMetaExtras, value: string) => {
-    setFolderMetaExtrasDraft((prev) => ({ ...prev, [field]: value }));
-  };
 
   // Gatilho para forçar re-renderização da página quando o Fabric altera objetos
   const [, setUpdateTrigger] = useState(0);
@@ -1137,23 +1125,23 @@ function SupportContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado.');
 
+      const primaryColor = normalizeHexColor(newFolderColor);
+      const accentColor = normalizeHexColor(newFolderAccentColor);
+
       const { error } = await supabase
         .from('template_folders')
         .insert({
           user_id: user.id,
           name: newFolderName.trim(),
-          color: newFolderColor,
-          description: stringifyFolderMeta(newFolderTag, newFolderAvatar, newFolderMetaExtras)
+          color: primaryColor,
+          is_public: newFolderIsPublic,
+          description: stringifyFolderMeta(newFolderTag, newFolderAvatar, accentColor, newFolderTexture)
         });
 
       if (error) throw error;
 
       toast.success('Pasta de templates criada com sucesso!');
-      setNewFolderName('');
-      setNewFolderColor('#3b82f6');
-      setNewFolderTag('Equipe');
-      setNewFolderAvatar('📁');
-      setNewFolderMetaExtras(getDefaultFolderMetaExtras());
+      resetNewFolderDraft();
       setIsCreatingTemplateFolder(false);
       fetchModels();
     } catch (error: any) {
@@ -1186,34 +1174,53 @@ function SupportContent() {
     }
   };
 
-  const handleUpdateTemplateFolderMeta = async (
+  const handleUpdateTemplateFolderIdentity = async (
     folderId: string,
+    name: string,
     tag: string,
     avatar: string,
-    extras: FolderMetaExtras,
+    primaryColor: string,
+    accentColor: string,
+    texture: FolderTexture,
+    isPublic: boolean,
   ) => {
     if (!canManageTemplateFolders) {
       toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
       return;
     }
 
-    const description = stringifyFolderMeta(tag, avatar, extras);
+    const safeName = name.trim();
+    if (!safeName) {
+      toast.error('Nome da pasta é obrigatório.');
+      return;
+    }
+
+    const safeColor = normalizeHexColor(primaryColor);
+    const safeAccentColor = normalizeHexColor(accentColor);
+    const description = stringifyFolderMeta(tag, avatar, safeAccentColor, texture);
 
     try {
       const { error } = await supabase
         .from('template_folders')
-        .update({ description })
+        .update({
+          name: safeName,
+          color: safeColor,
+          is_public: isPublic,
+          description,
+        })
         .eq('id', folderId);
 
       if (error) throw error;
 
       setTemplateFolders((prev) => prev.map((folder: any) => (
-        folder.id === folderId ? { ...folder, description } : folder
+        folder.id === folderId
+          ? { ...folder, name: safeName, color: safeColor, is_public: isPublic, description }
+          : folder
       )));
 
-      toast.success('Identidade da pasta atualizada!');
+      toast.success('Personalização da pasta atualizada!');
     } catch (error: any) {
-      toast.error('Erro ao atualizar identidade da pasta: ' + error.message);
+      toast.error('Erro ao atualizar personalização da pasta: ' + error.message);
     }
   };
 
@@ -1618,90 +1625,121 @@ function SupportContent() {
                 {/* Dialog para criar pasta */}
                 {isCreatingTemplateFolder && canManageTemplateFolders && (
                   <div className="apple-glass-folder rounded-3xl p-5 md:p-6 space-y-4 mb-6 border border-white/70 dark:border-white/10">
-                    <div className="flex flex-col md:flex-row gap-3">
-                      <Input 
-                        placeholder="Nome da pasta..." 
-                        value={newFolderName}
-                        onChange={(e) => setNewFolderName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleCreateTemplateFolder()}
-                        className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
-                        autoFocus
-                      />
-                      <Input
-                        placeholder="Etiqueta (ex: Marketing)"
-                        value={newFolderTag}
-                        onChange={(e) => setNewFolderTag(e.target.value)}
-                        className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 md:max-w-[220px]"
-                      />
-                      <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-3 h-10">
-                        <Paintbrush className="w-4 h-4 text-slate-500" />
-                        <input
-                          type="color"
-                          value={newFolderColor}
-                          onChange={(e) => setNewFolderColor(e.target.value)}
-                          className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
-                          title="Cor da pasta"
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_auto_auto] gap-3">
+                        <Input
+                          placeholder="Nome da pasta..."
+                          value={newFolderName}
+                          onChange={(e) => setNewFolderName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCreateTemplateFolder()}
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                          autoFocus
                         />
-                      </div>
-                      <div className="flex items-center gap-1 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-2 h-10">
-                        {FOLDER_AVATAR_OPTIONS.slice(0, 4).map((avatar) => (
-                          <button
-                            key={avatar}
-                            type="button"
-                            onClick={() => setNewFolderAvatar(avatar)}
-                            className={cn(
-                              "w-7 h-7 rounded-lg text-sm transition-colors",
-                              newFolderAvatar === avatar
-                                ? "bg-blue-600 text-white"
-                                : "bg-white/60 dark:bg-zinc-800/70 hover:bg-slate-100 dark:hover:bg-zinc-700"
-                            )}
-                            title={`Avatar ${avatar}`}
-                          >
-                            {avatar}
-                          </button>
-                        ))}
-                      </div>
-                      <Button 
-                        onClick={handleCreateTemplateFolder}
-                        className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl"
-                      >
-                        Criar
-                      </Button>
-                      <Button 
-                        onClick={() => {
-                          setIsCreatingTemplateFolder(false);
-                          setNewFolderName('');
-                          setNewFolderColor('#3b82f6');
-                          setNewFolderTag('Equipe');
-                          setNewFolderAvatar('📁');
-                          setNewFolderMetaExtras(getDefaultFolderMetaExtras());
-                        }}
-                        variant="outline"
-                        className="h-10 px-4 rounded-xl"
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {FOLDER_EXTRA_FIELDS.map((field) => (
-                        <div key={field.key} className="space-y-1">
-                          <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            {field.label}
-                          </Label>
-                          <Input
-                            value={newFolderMetaExtras[field.key]}
-                            onChange={(e) => updateNewFolderMetaExtra(field.key, e.target.value)}
-                            placeholder={field.placeholder}
-                            maxLength={field.maxLength}
-                            className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                        <Input
+                          placeholder="Etiqueta (ex: Marketing)"
+                          value={newFolderTag}
+                          onChange={(e) => setNewFolderTag(e.target.value)}
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                        />
+                        <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-3 h-10">
+                          <Paintbrush className="w-4 h-4 text-slate-500" />
+                          <input
+                            type="color"
+                            value={newFolderColor}
+                            onChange={(e) => setNewFolderColor(normalizeHexColor(e.target.value))}
+                            className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                            title="Cor base"
                           />
+                          <span className="text-[11px] font-semibold text-slate-500">Base</span>
                         </div>
-                      ))}
+                        <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-3 h-10">
+                          <Sparkles className="w-4 h-4 text-slate-500" />
+                          <input
+                            type="color"
+                            value={newFolderAccentColor}
+                            onChange={(e) => setNewFolderAccentColor(normalizeHexColor(e.target.value))}
+                            className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                            title="Cor de acento"
+                          />
+                          <span className="text-[11px] font-semibold text-slate-500">Acento</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-2 h-10">
+                          {FOLDER_AVATAR_OPTIONS.slice(0, 6).map((avatar) => (
+                            <button
+                              key={avatar}
+                              type="button"
+                              onClick={() => setNewFolderAvatar(avatar)}
+                              className={cn(
+                                "w-7 h-7 rounded-lg text-sm transition-colors",
+                                newFolderAvatar === avatar
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white/60 dark:bg-zinc-800/70 hover:bg-slate-100 dark:hover:bg-zinc-700"
+                              )}
+                              title={`Avatar ${avatar}`}
+                            >
+                              {avatar}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-1 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-2 h-10">
+                          {FOLDER_TEXTURE_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setNewFolderTexture(option.value)}
+                              className={cn(
+                                'h-7 px-2 rounded-lg text-[11px] font-semibold transition-colors',
+                                newFolderTexture === option.value
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white/60 dark:bg-zinc-800/70 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700'
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setNewFolderIsPublic((prev) => !prev)}
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                        >
+                          {newFolderIsPublic ? (
+                            <><Eye className="w-4 h-4 mr-2" /> Pública</>
+                          ) : (
+                            <><EyeOff className="w-4 h-4 mr-2" /> Privada</>
+                          )}
+                        </Button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                          onClick={handleCreateTemplateFolder}
+                          className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl"
+                          disabled={!newFolderName.trim()}
+                        >
+                          Criar
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setIsCreatingTemplateFolder(false);
+                            resetNewFolderDraft();
+                          }}
+                          variant="outline"
+                          className="h-10 px-4 rounded-xl"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
                     </div>
 
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Estrutura escolhida: arquivo de luxo com 12 controles de identidade (2 base + 10 extras).
+                      Estrutura escolhida: capa com cor base/acento, textura, visibilidade e identidade visual.
                     </p>
                   </div>
                 )}
@@ -1720,16 +1758,21 @@ function SupportContent() {
                           const folderPreview = folderTemplates.slice(0, 3);
                           const folderColor = normalizeHexColor(folder.color);
                           const folderMeta = getFolderMeta(folder.description);
+                          const folderAccentColor = normalizeHexColor(folderMeta.accentColor);
+                          const folderTextureOverlay = getFolderTextureOverlayStyle(folderMeta.texture);
 
                           return (
                             <div
                               key={folder.id}
                               onClick={() => {
                                 setActiveTemplateFolderId(folder.id);
+                                setFolderNameDraft(folder.name || '');
                                 setFolderColorDraft(folderColor);
+                                setFolderAccentColorDraft(folderAccentColor);
+                                setFolderTextureDraft(folderMeta.texture);
                                 setFolderTagDraft(folderMeta.tag);
                                 setFolderAvatarDraft(folderMeta.avatar);
-                                setFolderMetaExtrasDraft({ ...folderMeta.extras });
+                                setFolderIsPublicDraft(Boolean(folder.is_public));
                                 setIsFolderTemplatesPopupOpen(true);
                               }}
                               className="group relative cursor-pointer w-full min-w-0"
@@ -1739,9 +1782,21 @@ function SupportContent() {
                                 <div className="relative z-10 flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <h3 className="text-base md:text-[17px] font-black text-slate-800 dark:text-white truncate tracking-tight">{folder.name}</h3>
-                                    <div className="mt-1.5 flex items-center gap-2">
+                                    <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                                       <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-200/70 dark:border-blue-700/40">
                                         {folderMeta.tag}
+                                      </span>
+                                      <span className={cn(
+                                        'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
+                                        folder.is_public
+                                          ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/85 dark:bg-emerald-900/30 border-emerald-200/80 dark:border-emerald-700/40'
+                                          : 'text-slate-700 dark:text-slate-300 bg-slate-100/85 dark:bg-slate-800/70 border-slate-200/80 dark:border-slate-700/50'
+                                      )}>
+                                        {folder.is_public ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                        {folder.is_public ? 'Pública' : 'Privada'}
+                                      </span>
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300 bg-violet-100/85 dark:bg-violet-900/30 px-2 py-0.5 rounded-full border border-violet-200/80 dark:border-violet-700/40">
+                                        {FOLDER_TEXTURE_OPTIONS.find((option) => option.value === folderMeta.texture)?.label || 'Suave'}
                                       </span>
                                       <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                                         {folderTemplates.length === 1 ? '1 design' : `${folderTemplates.length} designs`}
@@ -1782,16 +1837,17 @@ function SupportContent() {
                                   <div
                                     className="absolute top-1 left-4 w-28 h-9 rounded-t-[14px] border border-white/50 shadow-sm"
                                     style={{
-                                      background: `linear-gradient(180deg, ${withHexAlpha(folderColor, '99')} 0%, ${withHexAlpha(folderColor, 'd1')} 100%)`
+                                      background: `linear-gradient(180deg, ${withHexAlpha(folderColor, '99')} 0%, ${withHexAlpha(folderAccentColor, 'd1')} 100%)`
                                     }}
                                   />
                                   <div
                                     className="absolute top-7 inset-x-0 bottom-0 rounded-[1.2rem] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_6px_14px_rgba(15,23,42,0.12)] border border-white/45 overflow-hidden"
                                     style={{
-                                      background: `linear-gradient(145deg, ${withHexAlpha(folderColor, 'e6')} 0%, ${withHexAlpha(folderColor, 'bf')} 100%)`
+                                      background: `linear-gradient(145deg, ${withHexAlpha(folderColor, 'e8')} 0%, ${withHexAlpha(folderAccentColor, 'c2')} 100%)`
                                     }}
                                   >
                                     <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent" />
+                                    <div className="absolute inset-0 pointer-events-none" style={folderTextureOverlay} />
 
                                     <div className="relative z-10 flex items-center justify-between text-white/95">
                                       <div className="w-8 h-8 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-base backdrop-blur-sm">
@@ -1923,11 +1979,28 @@ function SupportContent() {
                     <div>
                       <h3 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-3">
                         <span className="text-2xl">{folderAvatarDraft}</span>
-                        {activeTemplateFolder?.name || 'Pasta'}
+                        {folderNameDraft || activeTemplateFolder?.name || 'Pasta'}
                       </h3>
                       <p className="text-sm text-slate-500 dark:text-zinc-400 mt-1">
                         {activeTemplateFolderTemplates.length === 1 ? '1 design nesta pasta' : `${activeTemplateFolderTemplates.length} designs nesta pasta`}
                       </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-200/70 dark:border-blue-700/40">
+                          {folderTagDraft || 'Sem etiqueta'}
+                        </span>
+                        <span className={cn(
+                          'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
+                          folderIsPublicDraft
+                            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/85 dark:bg-emerald-900/30 border-emerald-200/80 dark:border-emerald-700/40'
+                            : 'text-slate-700 dark:text-slate-300 bg-slate-100/85 dark:bg-slate-800/70 border-slate-200/80 dark:border-slate-700/50'
+                        )}>
+                          {folderIsPublicDraft ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                          {folderIsPublicDraft ? 'Pública' : 'Privada'}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300 bg-violet-100/85 dark:bg-violet-900/30 px-2 py-0.5 rounded-full border border-violet-200/80 dark:border-violet-700/40">
+                          {FOLDER_TEXTURE_OPTIONS.find((option) => option.value === folderTextureDraft)?.label || 'Suave'}
+                        </span>
+                      </div>
                     </div>
 
                     <Button
@@ -1944,36 +2017,93 @@ function SupportContent() {
                   </div>
 
                   {activeTemplateFolder && canManageTemplateFolders && (
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 mt-4">
-                      <Input
-                        value={folderTagDraft}
-                        onChange={(e) => setFolderTagDraft(e.target.value)}
-                        placeholder="Etiqueta da pasta"
-                        className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
-                      />
-                      <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 px-3 h-10 bg-white/70 dark:bg-zinc-900/45">
-                        <Paintbrush className="w-4 h-4 text-slate-500" />
-                        <input
-                          type="color"
-                          value={normalizeHexColor(folderColorDraft)}
-                          onChange={(e) => setFolderColorDraft(normalizeHexColor(e.target.value))}
-                          className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
-                          title="Cor da pasta"
+                    <div className="space-y-3 mt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <Input
+                          value={folderNameDraft}
+                          onChange={(e) => setFolderNameDraft(e.target.value)}
+                          placeholder="Nome da pasta"
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                        />
+                        <Input
+                          value={folderTagDraft}
+                          onChange={(e) => setFolderTagDraft(e.target.value)}
+                          placeholder="Etiqueta da pasta"
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
                         />
                       </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr_auto] gap-3">
+                        <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 px-3 h-10 bg-white/70 dark:bg-zinc-900/45">
+                          <Paintbrush className="w-4 h-4 text-slate-500" />
+                          <input
+                            type="color"
+                            value={normalizeHexColor(folderColorDraft)}
+                            onChange={(e) => setFolderColorDraft(normalizeHexColor(e.target.value))}
+                            className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                            title="Cor base da pasta"
+                          />
+                          <span className="text-[11px] font-semibold text-slate-500">Base</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 rounded-xl border border-white/70 dark:border-white/10 px-3 h-10 bg-white/70 dark:bg-zinc-900/45">
+                          <Sparkles className="w-4 h-4 text-slate-500" />
+                          <input
+                            type="color"
+                            value={normalizeHexColor(folderAccentColorDraft)}
+                            onChange={(e) => setFolderAccentColorDraft(normalizeHexColor(e.target.value))}
+                            className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                            title="Cor de acento da pasta"
+                          />
+                          <span className="text-[11px] font-semibold text-slate-500">Acento</span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45 px-2 py-1 min-h-10">
+                          {FOLDER_TEXTURE_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setFolderTextureDraft(option.value)}
+                              className={cn(
+                                'h-7 px-2 rounded-lg text-[11px] font-semibold transition-colors',
+                                folderTextureDraft === option.value
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white/65 dark:bg-zinc-800/75 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700'
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                          onClick={() => setFolderIsPublicDraft((prev) => !prev)}
+                        >
+                          {folderIsPublicDraft ? (
+                            <><Eye className="w-4 h-4 mr-2" /> Pública</>
+                          ) : (
+                            <><EyeOff className="w-4 h-4 mr-2" /> Privada</>
+                          )}
+                        </Button>
+                      </div>
+
                       <Button
-                        className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-                        onClick={async () => {
-                          await handleUpdateTemplateFolderColor(activeTemplateFolder.id, normalizeHexColor(folderColorDraft), true);
-                          await handleUpdateTemplateFolderMeta(
-                            activeTemplateFolder.id,
-                            folderTagDraft,
-                            folderAvatarDraft,
-                            folderMetaExtrasDraft,
-                          );
-                        }}
+                        className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white w-full md:w-auto"
+                        onClick={() => handleUpdateTemplateFolderIdentity(
+                          activeTemplateFolder.id,
+                          folderNameDraft,
+                          folderTagDraft,
+                          folderAvatarDraft,
+                          folderColorDraft,
+                          folderAccentColorDraft,
+                          folderTextureDraft,
+                          folderIsPublicDraft,
+                        )}
                       >
-                        Salvar identidade
+                        Salvar personalização
                       </Button>
                     </div>
                   )}
