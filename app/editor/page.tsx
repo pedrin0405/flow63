@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { jsPDF } from 'jspdf';
+
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import {
   Type as TypeIcon, Image as ImageIcon, Download, Save, Trash2,
@@ -203,6 +203,10 @@ const FOLDER_TEXTURE_OPTIONS = [
 ] as const;
 
 type FolderTexture = (typeof FOLDER_TEXTURE_OPTIONS)[number]['value'];
+
+type PortfolioFilter = 'all' | 'recent' | 'active' | 'multi';
+type PortfolioSort = 'recent' | 'oldest' | 'name' | 'artboards';
+type PortfolioView = 'grid' | 'list';
 
 interface FolderMeta {
   tag: string;
@@ -558,6 +562,10 @@ function SupportContent() {
 
   const [gradColor1, setGradColor1] = useState('#3b82f6');
   const [gradColor2, setGradColor2] = useState('#1d4ed8');
+  const [portfolioSearch, setPortfolioSearch] = useState('');
+  const [portfolioFilter, setPortfolioFilter] = useState<PortfolioFilter>('all');
+  const [portfolioSort, setPortfolioSort] = useState<PortfolioSort>('recent');
+  const [portfolioView, setPortfolioView] = useState<PortfolioView>('grid');
 
   const resetNewFolderDraft = () => {
     setNewFolderName('');
@@ -578,6 +586,94 @@ function SupportContent() {
     () => templates.filter((template: any) => template.folder_id === activeTemplateFolderId),
     [templates, activeTemplateFolderId]
   );
+
+  const getArtboardCount = useCallback((model: any) => {
+    return Array.isArray(model?.data?.artboards) ? model.data.artboards.length : 1;
+  }, []);
+
+  const isRecentPortfolioModel = useCallback((model: any) => {
+    if (!model?.created_at) return false;
+    const createdAtTime = new Date(model.created_at).getTime();
+    if (Number.isNaN(createdAtTime)) return false;
+
+    const twentyOneDays = 1000 * 60 * 60 * 24 * 21;
+    return Date.now() - createdAtTime <= twentyOneDays;
+  }, []);
+
+  const formatPortfolioDate = useCallback((rawDate?: string) => {
+    if (!rawDate) return 'Sem data';
+    const parsedDate = new Date(rawDate);
+    if (Number.isNaN(parsedDate.getTime())) return 'Sem data';
+
+    return parsedDate.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }, []);
+
+  const filteredPortfolioModels = useMemo(() => {
+    const normalizedSearch = portfolioSearch.trim().toLowerCase();
+
+    const filtered = savedModels.filter((model: any) => {
+      const artboardCount = getArtboardCount(model);
+      const title = String(model?.title ?? '').toLowerCase();
+      const id = String(model?.id ?? '').toLowerCase();
+
+      const matchesSearch = !normalizedSearch
+        || title.includes(normalizedSearch)
+        || id.includes(normalizedSearch)
+        || `${artboardCount}`.includes(normalizedSearch);
+
+      if (!matchesSearch) return false;
+
+      if (portfolioFilter === 'recent') return isRecentPortfolioModel(model);
+      if (portfolioFilter === 'active') return model.id === currentModelId;
+      if (portfolioFilter === 'multi') return artboardCount > 1;
+
+      return true;
+    });
+
+    return filtered.sort((a: any, b: any) => {
+      if (portfolioSort === 'name') {
+        return String(a?.title ?? '').localeCompare(String(b?.title ?? ''), 'pt-BR');
+      }
+
+      if (portfolioSort === 'artboards') {
+        return getArtboardCount(b) - getArtboardCount(a);
+      }
+
+      const aTime = new Date(a?.created_at ?? 0).getTime();
+      const bTime = new Date(b?.created_at ?? 0).getTime();
+      const safeATime = Number.isNaN(aTime) ? 0 : aTime;
+      const safeBTime = Number.isNaN(bTime) ? 0 : bTime;
+
+      return portfolioSort === 'oldest' ? safeATime - safeBTime : safeBTime - safeATime;
+    });
+  }, [
+    savedModels,
+    portfolioSearch,
+    portfolioFilter,
+    portfolioSort,
+    getArtboardCount,
+    isRecentPortfolioModel,
+    currentModelId,
+  ]);
+
+  const portfolioStats = useMemo(() => {
+    const recent = savedModels.filter((model: any) => isRecentPortfolioModel(model)).length;
+    const multi = savedModels.filter((model: any) => getArtboardCount(model) > 1).length;
+    const active = currentModelId
+      ? savedModels.filter((model: any) => model.id === currentModelId).length
+      : 0;
+
+    return {
+      total: savedModels.length,
+      recent,
+      active,
+      multi,
+    };
+  }, [savedModels, currentModelId, isRecentPortfolioModel, getArtboardCount]);
 
   // Gatilho para forçar re-renderização da página quando o Fabric altera objetos
   const [, setUpdateTrigger] = useState(0);
@@ -1330,6 +1426,7 @@ function SupportContent() {
       }
 
       if (exportFormat === 'pdf') {
+        const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
         const doc = new jsPDF({
           orientation: 'portrait',
           unit: 'px',
@@ -2586,7 +2683,7 @@ function SupportContent() {
                       </TabsTrigger>
 
                       <TabsTrigger value="projetos" className="group flex flex-col items-center justify-center gap-1.5 w-[68px] h-16 text-[10px] font-medium text-white data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent border-none rounded-xl transition-all hover:bg-white/10 hover:text-white">
-                        <FolderHeart className="w-[22px] h-[22px] text-white" /> Projetos
+                        <FolderHeart className="w-[22px] h-[22px] text-white" /> Portfolio
                       </TabsTrigger>
                       
                       <TabsTrigger value="modelos" className="group flex flex-col items-center justify-center gap-1.5 w-[68px] h-16 text-[10px] font-medium text-white data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent border-none rounded-xl transition-all hover:bg-white/10 hover:text-white">
@@ -2806,44 +2903,266 @@ function SupportContent() {
                       </TabsContent>
 
                       <TabsContent value="projetos" className="m-0 p-5 space-y-4 outline-none border-none">
-                        <h3 className="font-bold text-base text-slate-800 dark:text-zinc-100 mb-4">Meus Projetos</h3>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className="font-bold text-base text-slate-800 dark:text-zinc-100">Portfolio</h3>
+                            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1">Busque, filtre e organize seus projetos em segundos.</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={handleCreateNew}
+                            className="h-8 px-3 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Novo
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/40 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-500">Total</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-zinc-100">{portfolioStats.total}</p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/40 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-500">Recentes</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-zinc-100">{portfolioStats.recent}</p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/40 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-500">Ativo</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-zinc-100">{portfolioStats.active}</p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/40 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-500">Multi</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-zinc-100">{portfolioStats.multi}</p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-3 space-y-3">
+                          <Input
+                            value={portfolioSearch}
+                            onChange={(e) => setPortfolioSearch(e.target.value)}
+                            placeholder="Buscar por nome, ID ou pranchetas..."
+                            className="h-9 rounded-lg border-slate-200 dark:border-zinc-800"
+                          />
+
+                          <div className="flex flex-wrap gap-2">
+                            {[
+                              { label: 'Todos', value: 'all' as const },
+                              { label: 'Recentes', value: 'recent' as const },
+                              { label: 'Ativo', value: 'active' as const },
+                              { label: 'Multi-prancheta', value: 'multi' as const },
+                            ].map((option) => (
+                              <Button
+                                key={option.value}
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setPortfolioFilter(option.value)}
+                                className={cn(
+                                  'h-7 px-2 text-[11px] rounded-lg border-slate-200 dark:border-zinc-800',
+                                  portfolioFilter === option.value
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                                    : 'text-slate-600 dark:text-zinc-400 bg-transparent'
+                                )}
+                              >
+                                {option.label}
+                              </Button>
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <Select value={portfolioSort} onValueChange={(value: PortfolioSort) => setPortfolioSort(value)}>
+                              <SelectTrigger className="h-8 rounded-lg border-slate-200 dark:border-zinc-800 text-xs">
+                                <SelectValue placeholder="Ordenar" />
+                              </SelectTrigger>
+                              <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                                <SelectItem value="recent" className="text-xs">Mais recentes</SelectItem>
+                                <SelectItem value="oldest" className="text-xs">Mais antigos</SelectItem>
+                                <SelectItem value="name" className="text-xs">Nome (A-Z)</SelectItem>
+                                <SelectItem value="artboards" className="text-xs">Mais pranchetas</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 dark:border-zinc-800 p-1 bg-slate-50 dark:bg-zinc-900/70">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setPortfolioView('grid')}
+                                className={cn(
+                                  'h-6 rounded-md text-[11px] font-semibold',
+                                  portfolioView === 'grid'
+                                    ? 'bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-400 shadow-sm'
+                                    : 'text-slate-500 dark:text-zinc-400'
+                                )}
+                              >
+                                Grade
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setPortfolioView('list')}
+                                className={cn(
+                                  'h-6 rounded-md text-[11px] font-semibold',
+                                  portfolioView === 'list'
+                                    ? 'bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-400 shadow-sm'
+                                    : 'text-slate-500 dark:text-zinc-400'
+                                )}
+                              >
+                                Lista
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
                         {isLoadingModels ? (
                           <div className="flex justify-center p-8"><Loader2 className="animate-spin text-blue-600" /></div>
                         ) : savedModels.length === 0 ? (
-                          <div className="text-center p-6 bg-slate-50 dark:bg-zinc-800/20 rounded-lg border border-dashed border-slate-200 dark:border-zinc-800">
-                             <p className="text-sm font-medium text-slate-600 dark:text-zinc-400">Nenhum projeto salvo</p>
-                             <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">Crie sua arte e vá em Compartilhar {'>'} Salvar.</p>
+                          <div className="text-center p-6 bg-slate-50 dark:bg-zinc-800/20 rounded-lg border border-dashed border-slate-200 dark:border-zinc-800 space-y-2">
+                            <p className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Seu portfolio ainda está vazio</p>
+                            <p className="text-[11px] text-slate-500 dark:text-zinc-500">Crie sua arte e use Compartilhar {'>'} Salvar para começar.</p>
+                            <Button size="sm" onClick={handleCreateNew} className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                              <Plus className="w-3.5 h-3.5 mr-1" /> Criar primeiro projeto
+                            </Button>
                           </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-4">
-                            {savedModels.map((model) => (
-                              <div 
-                                key={model.id} 
-                                onClick={() => handleLoadModel(model, false)}
-                                className="group flex flex-col gap-2 cursor-pointer"
-                              >
-                                <div className={`relative aspect-square bg-white dark:bg-zinc-950 rounded-xl border flex items-center justify-center overflow-hidden transition-all ${currentModelId === model.id ? 'border-blue-600 shadow-md ring-1 ring-blue-600' : 'border-slate-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-900'}`}>
-                                  {model.thumbnail_url ? (
-                                    <img src={model.thumbnail_url} alt={model.title} className="max-w-[80%] max-h-[80%] object-contain shadow-sm rounded-sm" />
-                                  ) : (
-                                    <Layers className="text-slate-300 dark:text-zinc-700 w-8 h-8" />
-                                  )}
-                                  
-                                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="destructive" size="icon" className="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 shadow-sm" onClick={(e) => handleDeleteModel(model.id, e, 'design_models')}>
-                                      <Trash2 className="w-3.5 h-3.5" />
+                        ) : filteredPortfolioModels.length === 0 ? (
+                          <div className="text-center p-6 bg-slate-50 dark:bg-zinc-800/20 rounded-lg border border-dashed border-slate-200 dark:border-zinc-800 space-y-2">
+                            <p className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Nenhum projeto encontrado</p>
+                            <p className="text-[11px] text-slate-500 dark:text-zinc-500">Ajuste a busca ou remova os filtros para visualizar mais resultados.</p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3 rounded-lg"
+                              onClick={() => {
+                                setPortfolioSearch('');
+                                setPortfolioFilter('all');
+                              }}
+                            >
+                              Limpar filtros
+                            </Button>
+                          </div>
+                        ) : portfolioView === 'grid' ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            {filteredPortfolioModels.map((model: any) => {
+                              const artboardCount = getArtboardCount(model);
+                              const isActive = currentModelId === model.id;
+
+                              return (
+                                <div
+                                  key={model.id}
+                                  onClick={() => handleLoadModel(model, false)}
+                                  className="group rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-2 cursor-pointer transition-all hover:border-blue-400 dark:hover:border-blue-900 hover:shadow-sm"
+                                >
+                                  <div className={cn(
+                                    'relative aspect-[4/3] rounded-lg border overflow-hidden flex items-center justify-center',
+                                    isActive
+                                      ? 'border-blue-600 ring-1 ring-blue-600 bg-blue-50/40 dark:bg-blue-900/15'
+                                      : 'border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950'
+                                  )}>
+                                    {model.thumbnail_url ? (
+                                      <img src={model.thumbnail_url} alt={model.title} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Layers className="text-slate-300 dark:text-zinc-700 w-7 h-7" />
+                                    )}
+                                  </div>
+
+                                  <div className="mt-2 space-y-1">
+                                    <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">{model.title}</p>
+                                    <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-zinc-500">
+                                      <span>{artboardCount} pranchetas</span>
+                                      <span>{formatPortfolioDate(model.created_at)}</span>
+                                    </div>
+                                    {isActive && (
+                                      <span className="inline-flex h-5 items-center px-2 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                        Projeto ativo
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-1 mt-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[10px] rounded-md"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleLoadModel(model, false);
+                                      }}
+                                    >
+                                      Abrir
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      className="h-7 text-[10px] rounded-md"
+                                      onClick={(e) => handleDeleteModel(model.id, e, 'design_models')}
+                                    >
+                                      Excluir
                                     </Button>
                                   </div>
                                 </div>
-                                
-                                <div className="px-1 flex flex-col">
-                                  <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">{model.title}</span>
-                                  <span className="text-[10px] text-slate-500 dark:text-zinc-500 truncate mt-0.5">
-                                    {model.data?.artboards ? `${model.data.artboards.length} pranchetas` : '1 prancheta'}
-                                  </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {filteredPortfolioModels.map((model: any) => {
+                              const artboardCount = getArtboardCount(model);
+                              const isActive = currentModelId === model.id;
+
+                              return (
+                                <div
+                                  key={model.id}
+                                  onClick={() => handleLoadModel(model, false)}
+                                  className={cn(
+                                    'rounded-xl border p-2.5 cursor-pointer transition-all',
+                                    isActive
+                                      ? 'border-blue-600 ring-1 ring-blue-600 bg-blue-50/40 dark:bg-blue-900/15'
+                                      : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 hover:border-blue-400 dark:hover:border-blue-900'
+                                  )}
+                                >
+                                  <div className="flex gap-2.5 items-start">
+                                    <div className="w-16 h-16 rounded-lg border border-slate-200 dark:border-zinc-800 overflow-hidden bg-slate-50 dark:bg-zinc-950 shrink-0 flex items-center justify-center">
+                                      {model.thumbnail_url ? (
+                                        <img src={model.thumbnail_url} alt={model.title} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <Layers className="text-slate-300 dark:text-zinc-700 w-6 h-6" />
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">{model.title}</p>
+                                      <p className="text-[10px] text-slate-500 dark:text-zinc-500 mt-1">{artboardCount} pranchetas</p>
+                                      <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">Atualizado em {formatPortfolioDate(model.updated_at || model.created_at)}</p>
+                                      {isActive && (
+                                        <span className="inline-flex h-5 items-center px-2 mt-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                          Projeto ativo
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-1 mt-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[10px] rounded-md"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleLoadModel(model, false);
+                                      }}
+                                    >
+                                      Abrir projeto
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      className="h-7 text-[10px] rounded-md"
+                                      onClick={(e) => handleDeleteModel(model.id, e, 'design_models')}
+                                    >
+                                      Excluir
+                                    </Button>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </TabsContent>
