@@ -39,7 +39,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Copy,
-  X
+  X,
+  Library,
+  Folder,
+  FolderOpen
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -119,6 +122,43 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
   });
 
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+
+  // Property Folders Management
+  const [propertyFolders, setPropertyFolders] = useState<any[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderColor, setNewFolderColor] = useState("#3b82f6");
+  const [newFolderIcon, setNewFolderIcon] = useState("📁");
+  const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+
+  // Load Property Folders
+  useEffect(() => {
+    if (!id) return;
+    loadPropertyFolders();
+  }, [id]);
+
+  const loadPropertyFolders = async () => {
+    try {
+      setLoadingFolders(true);
+      const { data, error } = await supabase
+        .from('bio_property_folders')
+        .select('*')
+        .eq('bio_page_id', id)
+        .order('order_index', { ascending: true });
+      
+      if (error) throw error;
+      setPropertyFolders(data || []);
+      if (data && data.length > 0 && !selectedFolderId) {
+        setSelectedFolderId(data[0].id);
+      }
+    } catch (error: any) {
+      console.error('Error loading property folders:', error);
+      toast.error('Erro ao carregar pastas');
+    } finally {
+      setLoadingFolders(false);
+    }
+  };
 
   // Pre-fill WhatsApp from Profile
   useEffect(() => {
@@ -313,11 +353,79 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
       });
       toast.error("Imóvel removido do portfólio");
     } else {
+      const itemWithFolder = { ...imovel, folder_id: selectedFolderId };
       setFormData({
         ...formData,
-        featured_properties: { ...formData.featured_properties, items: [...items, imovel] }
+        featured_properties: { ...formData.featured_properties, items: [...items, itemWithFolder] }
       });
       toast.success("Imóvel adicionado ao portfólio");
+    }
+  };
+
+  const createPropertyFolder = async () => {
+    if (!newFolderName.trim()) {
+      toast.error("Nome da pasta não pode estar vazio");
+      return;
+    }
+
+    if (!id) {
+      toast.error("Primeiro salve a bio para criar pastas de imóveis");
+      return;
+    }
+
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user?.id) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      const { data, error } = await supabase
+        .from('bio_property_folders')
+        .insert({
+          user_id: user.id,
+          bio_page_id: id,
+          name: newFolderName.trim(),
+          color: newFolderColor,
+          icon: newFolderIcon,
+          order_index: propertyFolders.length
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setPropertyFolders([...propertyFolders, data]);
+      setSelectedFolderId(data.id);
+      setNewFolderName("");
+      setNewFolderColor("#3b82f6");
+      setNewFolderIcon("📁");
+      setShowNewFolderDialog(false);
+      toast.success("Pasta criada com sucesso!");
+    } catch (error: any) {
+      console.error('Error creating property folder:', error);
+      toast.error(`Erro ao criar pasta: ${error.message}`);
+    }
+  };
+
+  const deletePropertyFolder = async (folderId: string) => {
+    if (!confirm("Tem certeza que deseja deletar esta pasta? Os imóveis não serão removidos, apenas desorganizados.")) return;
+
+    try {
+      const { error } = await supabase
+        .from('bio_property_folders')
+        .delete()
+        .eq('id', folderId);
+
+      if (error) throw error;
+      setPropertyFolders(propertyFolders.filter(f => f.id !== folderId));
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(propertyFolders.length > 1 ? propertyFolders[0].id : null);
+      }
+      toast.success("Pasta removida!");
+    } catch (error: any) {
+      console.error('Error deleting property folder:', error);
+      toast.error('Erro ao deletar pasta');
     }
   };
 
@@ -920,6 +1028,150 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
 
                     {formData.featured_properties.enabled && (
                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-6 pt-2">
+                        {/* FOLDER MANAGEMENT */}
+                        <div className="p-5 rounded-[2rem] bg-gradient-to-br from-purple-500/5 to-pink-500/5 dark:from-purple-500/10 dark:to-pink-500/10 backdrop-blur-xl border border-purple-500/30 dark:border-purple-500/20 shadow-inner space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-sm border border-white/20">
+                                <Library className="w-3 h-3 text-white" />
+                              </div>
+                              <span className="text-[9px] font-black uppercase tracking-[0.15em] text-purple-600 dark:text-purple-400">Pastas de Imóveis</span>
+                            </div>
+                            <button
+                              onClick={() => setShowNewFolderDialog(!showNewFolderDialog)}
+                              className="text-[8px] font-black text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 px-3 py-1.5 rounded-full transition-all hover:text-purple-700 dark:hover:text-purple-300 flex items-center gap-1.5"
+                            >
+                              <Plus className="w-3 h-3" /> Nova Pasta
+                            </button>
+                          </div>
+
+                          {showNewFolderDialog && (
+                            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-white/60 dark:bg-white/5 rounded-2xl border border-purple-500/20 space-y-3">
+                              {!id && (
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2 mb-2">
+                                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                  <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400">Salve a bio primeiro para criar pastas</span>
+                                </div>
+                              )}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <input
+                                  type="text"
+                                  placeholder="Nome da pasta..."
+                                  value={newFolderName}
+                                  onChange={(e) => setNewFolderName(e.target.value)}
+                                  disabled={!id}
+                                  className="col-span-1 md:col-span-2 px-4 py-2.5 rounded-xl bg-white/60 dark:bg-black/20 border border-white/40 dark:border-white/10 focus:ring-2 focus:ring-purple-500 text-sm font-bold placeholder:text-muted-foreground/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                                <input
+                                  type="color"
+                                  value={newFolderColor}
+                                  onChange={(e) => setNewFolderColor(e.target.value)}
+                                  disabled={!id}
+                                  className="w-full h-11 rounded-xl cursor-pointer border border-white/40 dark:border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={createPropertyFolder}
+                                  disabled={!id || !newFolderName.trim()}
+                                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Criar Pasta
+                                </button>
+                                <button
+                                  onClick={() => setShowNewFolderDialog(false)}
+                                  className="flex-1 px-4 py-2.5 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/80 dark:hover:bg-white/10 transition-all"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {propertyFolders.length > 0 ? (
+                              propertyFolders.map((folder) => {
+                                const folderItemCount = formData.featured_properties.items?.filter((item: any) => item.folder_id === folder.id).length || 0;
+                                const isSelected = selectedFolderId === folder.id;
+                                
+                                return (
+                                  <motion.div
+                                    key={folder.id}
+                                    whileHover={{ y: -4, scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => setSelectedFolderId(folder.id)}
+                                    className={cn(
+                                      "relative cursor-pointer group transition-all rounded-[1.2rem] overflow-hidden",
+                                      "bg-white/60 dark:bg-white/5 backdrop-blur-xl border-2",
+                                      "p-4 flex flex-col items-center text-center gap-2.5",
+                                      "hover:shadow-lg active:shadow-none",
+                                      isSelected
+                                        ? "border-2 shadow-lg shadow-blue-500/40 ring-2 ring-blue-500/30"
+                                        : "border-white/40 dark:border-white/10 hover:border-white/60 dark:hover:border-white/20"
+                                    )}
+                                    style={isSelected ? { 
+                                      backgroundColor: `${folder.color}15`,
+                                      borderColor: folder.color
+                                    } : {}}
+                                  >
+                                    {/* Folder Icon */}
+                                    <div className={cn(
+                                      "w-12 h-12 rounded-lg flex items-center justify-center transition-all",
+                                      isSelected ? "scale-110" : "group-hover:scale-105"
+                                    )} style={{ backgroundColor: `${folder.color}30` }}>
+                                      {isSelected ? (
+                                        <FolderOpen className="w-6 h-6" style={{ color: folder.color }} strokeWidth={1.5} />
+                                      ) : (
+                                        <Folder className="w-6 h-6" style={{ color: folder.color }} strokeWidth={1.5} />
+                                      )}
+                                    </div>
+
+                                    {/* Folder Name */}
+                                    <div className="min-w-0 w-full">
+                                      <h4 className="text-[11px] font-black truncate text-foreground">{folder.name}</h4>
+                                    </div>
+
+                                    {/* Item Count Badge */}
+                                    <div className={cn(
+                                      "text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full",
+                                      "transition-all text-white"
+                                    )} style={{ backgroundColor: folder.color }}>
+                                      {folderItemCount} {folderItemCount === 1 ? "imóvel" : "imóveis"}
+                                    </div>
+
+                                    {/* Delete Button */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deletePropertyFolder(folder.id);
+                                      }}
+                                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md text-rose-500 flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white hover:scale-110"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+
+                                    {/* Selection Indicator */}
+                                    {isSelected && (
+                                      <motion.div
+                                        layoutId="folder-indicator"
+                                        className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center"
+                                        style={{ backgroundColor: folder.color }}
+                                      >
+                                        <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                                      </motion.div>
+                                    )}
+                                  </motion.div>
+                                );
+                              })
+                            ) : (
+                              <div className="col-span-2 md:col-span-3 lg:col-span-4 py-8 text-center border-2 border-dashed border-white/40 dark:border-white/10 rounded-[1.2rem] bg-white/20 dark:bg-white/5">
+                                <Folder className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+                                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/50">Nenhuma pasta criada</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         {/* BUSCADOR MAGIC FILL IMÓVEIS */}
                         <div className="p-5 rounded-[2rem] bg-white/50 dark:bg-white/5 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-inner space-y-4">
                           <div className="flex items-center justify-between">
@@ -1002,33 +1254,81 @@ export default function BioEditor({ initialData, id }: BioEditorProps) {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4">
-                            {formData.featured_properties.items?.map((item: any) => (
-                              <motion.div whileHover={{ y: -2 }} key={item.id} className="group relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-[2rem] p-3 flex flex-col gap-2 shadow-sm transition-all hover:shadow-lg">
-                                <div className="aspect-video w-full rounded-[1.2rem] overflow-hidden relative border border-white/40 dark:border-white/5 shadow-inner">
-                                  <img src={item.imagem} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                  <button
-                                    onClick={() => togglePropertySelection(item)}
-                                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md text-rose-500 flex items-center justify-center shadow-md hover:scale-110 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                          {(!formData.featured_properties.items || formData.featured_properties.items.length === 0) ? (
+                            <div className="py-12 text-center border-2 border-dashed border-white/60 dark:border-white/10 rounded-[2rem] bg-white/20 dark:bg-white/5">
+                              <LayoutGrid className="w-6 h-6 mx-auto mb-2 text-muted-foreground/40" />
+                              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/50">Nenhum imóvel selecionado</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-5">
+                              {propertyFolders.length > 0 ? (
+                                propertyFolders.map((folder) => {
+                                  const folderItems = formData.featured_properties.items?.filter((item: any) => item.folder_id === folder.id) || [];
+                                  if (folderItems.length === 0) return null;
+                                  
+                                  return (
+                                    <motion.div key={folder.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                                      <div className="px-2 flex items-center gap-2">
+                                        <span className="text-xl">{folder.icon}</span>
+                                        <span className="text-xs font-black" style={{ color: folder.color }}>
+                                          {folder.name} ({folderItems.length})
+                                        </span>
+                                        <div className="h-px flex-1" style={{ backgroundColor: `${folder.color}40` }} />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        {folderItems.map((item: any) => (
+                                          <motion.div whileHover={{ y: -2 }} key={item.id} className="group relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border-2 rounded-[2rem] p-3 flex flex-col gap-2 shadow-sm transition-all hover:shadow-lg" style={{ borderColor: `${folder.color}60` }}>
+                                            <div className="aspect-video w-full rounded-[1.2rem] overflow-hidden relative border border-white/40 dark:border-white/5 shadow-inner">
+                                              <img src={item.imagem} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                              <button
+                                                onClick={() => togglePropertySelection(item)}
+                                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md text-rose-500 flex items-center justify-center shadow-md hover:scale-110 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                            <div className="space-y-1 px-1">
+                                              <div className="text-xs font-black truncate text-foreground">{item.titulo}</div>
+                                              <div className="text-[10px] font-black text-blue-600 dark:text-blue-400">{item.preco}</div>
+                                            </div>
+                                          </motion.div>
+                                        ))}
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })
+                              ) : (
+                                <div className="space-y-3">
+                                  <div className="px-2 flex items-center gap-2 opacity-60">
+                                    <span className="text-xl">📋</span>
+                                    <span className="text-xs font-black text-muted-foreground">Sem Classificação</span>
+                                    <div className="h-px flex-1 bg-muted-foreground/20" />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    {formData.featured_properties.items?.map((item: any) => (
+                                      <motion.div whileHover={{ y: -2 }} key={item.id} className="group relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-[2rem] p-3 flex flex-col gap-2 shadow-sm transition-all hover:shadow-lg">
+                                        <div className="aspect-video w-full rounded-[1.2rem] overflow-hidden relative border border-white/40 dark:border-white/5 shadow-inner">
+                                          <img src={item.imagem} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                          <button
+                                            onClick={() => togglePropertySelection(item)}
+                                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md text-rose-500 flex items-center justify-center shadow-md hover:scale-110 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                        <div className="space-y-1 px-1">
+                                          <div className="text-xs font-black truncate text-foreground">{item.titulo}</div>
+                                          <div className="text-[10px] font-black text-blue-600 dark:text-blue-400">{item.preco}</div>
+                                        </div>
+                                      </motion.div>
+                                    ))}
+                                  </div>
                                 </div>
-                                <div className="space-y-1 px-1">
-                                  <div className="text-xs font-black truncate text-foreground">{item.titulo}</div>
-                                  <div className="text-[10px] font-black text-blue-600 dark:text-blue-400">{item.preco}</div>
-                                </div>
-                              </motion.div>
-                            ))}
-
-                            {(!formData.featured_properties.items || formData.featured_properties.items.length === 0) && (
-                              <div className="col-span-2 py-12 text-center border-2 border-dashed border-white/60 dark:border-white/10 rounded-[2rem] bg-white/20 dark:bg-white/5">
-                                <LayoutGrid className="w-6 h-6 mx-auto mb-2 text-muted-foreground/40" />
-                                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/50">Nenhum imóvel selecionado</p>
-                              </div>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </motion.div>
                     )}

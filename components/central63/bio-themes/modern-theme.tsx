@@ -21,6 +21,33 @@ import {
 
 export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationProps, isPreview }: BioThemeProps) {
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [propertyFolders, setPropertyFolders] = useState<any[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+
+  // Fetch property folders when data changes
+  useMemo(() => {
+    if (data.id && typeof window !== 'undefined') {
+      const { supabase } = require("@/lib/supabase");
+      const fetchFolders = async () => {
+        try {
+          const { data: folders } = await supabase
+            .from('bio_property_folders')
+            .select('*')
+            .eq('bio_page_id', data.id)
+            .order('order_index', { ascending: true });
+          
+          if (folders && folders.length > 0) {
+            setPropertyFolders(folders);
+            setSelectedFolderId(folders[0].id);
+          }
+        } catch (error) {
+          console.error('Error fetching property folders:', error);
+        }
+      };
+      
+      fetchFolders();
+    }
+  }, [data.id]);
 
   const { socialLinks, regularLinks } = useMemo(() => processLinks(visibleLinks), [visibleLinks]);
 
@@ -45,6 +72,29 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
   const handleWhatsAppClick = () => {
     handleLinkClick({ title: 'Botão WhatsApp', url: `https://wa.me/${data.whatsapp?.number}`, type: 'whatsapp' }, 0);
   };
+
+  // Group properties by folder
+  const groupedProperties = useMemo(() => {
+    if (!data.featured_properties?.items) return {};
+    
+    const grouped: Record<string, any[]> = {};
+    data.featured_properties.items.forEach((item: any) => {
+      const folderId = item.folder_id || 'unfolded';
+      if (!grouped[folderId]) {
+        grouped[folderId] = [];
+      }
+      grouped[folderId].push(item);
+    });
+    
+    return grouped;
+  }, [data.featured_properties?.items]);
+
+  const filteredProperties = useMemo(() => {
+    if (selectedFolderId && groupedProperties[selectedFolderId]) {
+      return groupedProperties[selectedFolderId];
+    }
+    return data.featured_properties?.items || [];
+  }, [selectedFolderId, groupedProperties, data.featured_properties?.items]);
 
   return (
     <div 
@@ -142,9 +192,73 @@ export function ModernTheme({ data, visibleLinks, handleLinkClick, getAnimationP
               <div className="flex items-center justify-between mb-5 px-1">
                 <h3 className="text-[11px] font-black uppercase tracking-[4px] opacity-50" style={{ color: "var(--theme-text)" }}>Portfólio</h3>
               </div>
+
+              {propertyFolders.length > 0 && (
+                <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 px-1">
+                  {propertyFolders.map((folder) => {
+                    const folderItemCount = data.featured_properties.items?.filter((item: any) => item.folder_id === folder.id).length || 0;
+                    const isSelected = selectedFolderId === folder.id;
+                    return (
+                      <motion.button
+                        key={folder.id}
+                        whileHover={{ y: -4, scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedFolderId(folder.id)}
+                        className={cn(
+                          "relative p-4 rounded-[1.5rem] transition-all group",
+                          "flex flex-col items-center text-center gap-2",
+                          "border-2 backdrop-blur-sm",
+                          isSelected
+                            ? "shadow-2xl ring-2"
+                            : "shadow-lg hover:shadow-xl"
+                        )}
+                        style={{
+                          backgroundColor: isSelected ? `${folder.color}25` : `${folder.color}12`,
+                          borderColor: isSelected ? folder.color : `${folder.color}40`,
+                          ...(isSelected && { boxShadow: `0 8px 32px ${folder.color}40` })
+                        }}
+                      >
+                        {/* Folder Icon - Large */}
+                        <div className={cn(
+                          "w-14 h-12 rounded-lg flex items-center justify-center transition-all",
+                          "relative overflow-hidden"
+                        )} style={{ backgroundColor: `${folder.color}30` }}>
+                          <span className="text-3xl">{isSelected ? "📂" : folder.icon}</span>
+                          {/* Shine effect */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-lg" />
+                        </div>
+
+                        {/* Folder Name */}
+                        <div className="min-w-0 w-full">
+                          <p className="text-[10px] font-black uppercase tracking-wider truncate" style={{ color: folder.color }}>
+                            {folder.name}
+                          </p>
+                        </div>
+
+                        {/* Item Count Badge */}
+                        <div className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full text-white" style={{ backgroundColor: folder.color }}>
+                          {folderItemCount} {folderItemCount === 1 ? "item" : "itens"}
+                        </div>
+
+                        {/* Selection Indicator */}
+                        {isSelected && (
+                          <motion.div
+                            layoutId={`folder-indicator-${folder.id}`}
+                            className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-black"
+                            style={{ backgroundColor: folder.color }}
+                          >
+                            ✓
+                          </motion.div>
+                        )}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="w-full relative">
                 <div className={cn("flex pt-2 pb-6 snap-x snap-mandatory gap-4 overflow-x-auto", !isPreview && "lg:grid lg:grid-cols-2 lg:overflow-x-visible lg:pb-0 lg:pt-0", "[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full", "[scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]")}>
-                  {data.featured_properties.items.map((imovel: any) => (
+                  {filteredProperties.map((imovel: any) => (
                     <motion.div 
                       key={imovel.id} 
                       whileHover={{ y: -6 }} 

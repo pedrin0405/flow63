@@ -221,3 +221,37 @@ WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete their own models" 
 ON public.design_models FOR DELETE 
 USING (auth.uid() = user_id);
+
+-- 14. Create Bio Property Folders Table (para organizar imóveis em pastas)
+CREATE TABLE IF NOT EXISTS public.bio_property_folders (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    bio_page_id UUID REFERENCES public.bio_pages(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    color TEXT DEFAULT '#3b82f6',
+    icon TEXT DEFAULT '📁',
+    order_index INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 15. Enable RLS for Bio Property Folders
+ALTER TABLE public.bio_property_folders ENABLE ROW LEVEL SECURITY;
+
+-- 16. Create RLS Policies for Bio Property Folders
+CREATE POLICY "Users can view their own bio property folders" 
+ON public.bio_property_folders FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own bio property folders" 
+ON public.bio_property_folders FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own bio property folders" 
+ON public.bio_property_folders FOR UPDATE 
+USING (auth.uid() = user_id) 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own bio property folders" 
+ON public.bio_property_folders FOR DELETE 
+USING (auth.uid() = user_id);
