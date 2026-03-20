@@ -110,7 +110,7 @@ const generatePDF = async (form: any) => {
   // Busca os dados detalhados antes de gerar o PDF
   const detailData = await fetchDetails(form.id);
   
-  const { jsPDF } = await import('jspdf');
+  const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
   const { default: autoTable } = await import('jspdf-autotable');
   
   const doc = new jsPDF();

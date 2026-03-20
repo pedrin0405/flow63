@@ -1426,7 +1426,7 @@ function SupportContent() {
       }
 
       if (exportFormat === 'pdf') {
-        const { jsPDF } = await import('jspdf');
+        const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
         const doc = new jsPDF({
           orientation: 'portrait',
           unit: 'px',

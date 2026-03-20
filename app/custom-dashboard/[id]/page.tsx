@@ -539,7 +539,7 @@ const ExportModal = ({ isOpen, onClose, dashboardName }: { isOpen: boolean, onCl
       const canvasWidth = element.scrollWidth;
       const canvasHeight = element.scrollHeight;
 
-      const { jsPDF } = await import('jspdf');
+      const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
       const pdf = new jsPDF({
         orientation: canvasWidth > canvasHeight ? 'landscape' : 'portrait',
         unit: 'px',

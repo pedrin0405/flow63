@@ -3,7 +3,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  transpilePackages: ['leaflet', 'react-leaflet', 'jspdf', 'jspdf-autotable'],
+  transpilePackages: ['leaflet', 'react-leaflet'],
   images: {
     unoptimized: true, // Mantém sua configuração atual
     remotePatterns: [

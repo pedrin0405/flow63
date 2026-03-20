@@ -376,7 +376,7 @@ export default function MyBenefitCardPage() {
       // O fundo do PDF se adapta ao tema selecionado para evitar bordas feias
       const pdfBg = cardTheme === 'dark' ? '#0a0a0a' : '#ffffff'
       const dataUrl = await toPng(cardRef.current, { cacheBust: true, pixelRatio: 3, style: { borderRadius: '0', background: pdfBg } })
-      const { jsPDF } = await import('jspdf')
+      const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js')
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 54] })
       pdf.addImage(dataUrl, 'PNG', 0, 0, 85.6, 54)
       pdf.save(`ticket-central63-${user?.full_name?.split(' ')[0] || 'membro'}.pdf`)
