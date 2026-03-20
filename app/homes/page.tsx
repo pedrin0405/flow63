@@ -71,6 +71,15 @@ export default function ImoveisPage() {
     } catch (e) { return 0; }
   }
 
+  const normalizeCoordinate = (value: any): number | null => {
+    if (value === null || value === undefined || value === "") return null
+    if (typeof value === "number") return Number.isFinite(value) ? value : null
+
+    const normalized = String(value).trim().replace(/\s+/g, "").replace(",", ".")
+    const parsed = Number.parseFloat(normalized)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
   const fetchProperties = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -135,8 +144,8 @@ export default function ImoveisPage() {
         description: item.descricao,
         type: item.tipo || "Imóvel",
         createdAt: item.created_at,
-        latitude: item.latitude ? parseFloat(item.latitude) : null,
-        longitude: item.longitude ? parseFloat(item.longitude) : null
+        latitude: normalizeCoordinate(item.latitude),
+        longitude: normalizeCoordinate(item.longitude)
       })
 
       setPropertiesData((data || []).map(mapItem))
@@ -228,7 +237,10 @@ export default function ImoveisPage() {
                         <PropertyMap 
                             properties={[selectedProperty]}
                             selectedProperty={selectedProperty}
-                            center={[selectedProperty.latitude || -10.18, selectedProperty.longitude || -48.33]}
+                            center={[
+                              normalizeCoordinate(selectedProperty.latitude) ?? -10.1837,
+                              normalizeCoordinate(selectedProperty.longitude) ?? -48.3337,
+                            ]}
                             zoom={16}
                             formatCurrency={formatCurrency}
                             showPopups={false}

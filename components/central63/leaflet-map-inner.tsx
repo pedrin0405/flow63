@@ -42,7 +42,18 @@ export default function LeafletMapInner({
     fixLeafletIcons()
   }, [])
 
-  const defaultCenter: [number, number] = center || [-10.1837, -48.3337]
+  const parseCoordinate = (value: any): number | null => {
+    if (value === null || value === undefined || value === "") return null
+    if (typeof value === "number") return Number.isFinite(value) ? value : null
+    const normalized = String(value).trim().replace(/\s+/g, "").replace(",", ".")
+    const parsed = Number.parseFloat(normalized)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  const parsedCenterLat = parseCoordinate(center?.[0])
+  const parsedCenterLng = parseCoordinate(center?.[1])
+  const defaultCenter: [number, number] =
+    parsedCenterLat !== null && parsedCenterLng !== null ? [parsedCenterLat, parsedCenterLng] : [-10.1837, -48.3337]
 
   const createIcon = (type: string, isSelected: boolean, isFeatured: boolean) => {
     const t = type.toLowerCase()
@@ -99,13 +110,15 @@ export default function LeafletMapInner({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       
-      {center && <ChangeView center={center} zoom={zoom} />}
+      {center && parsedCenterLat !== null && parsedCenterLng !== null && (
+        <ChangeView center={[parsedCenterLat, parsedCenterLng]} zoom={zoom} />
+      )}
       
       {properties.map((prop: any, idx: number) => {
-        if (!prop.latitude || !prop.longitude) return null;
+        const lat = parseCoordinate(prop.latitude)
+        const lng = parseCoordinate(prop.longitude)
+        if (lat === null || lng === null) return null
 
-        const lat = prop.latitude
-        const lng = prop.longitude
         const isSelected = selectedProperty?.code === prop.code
         const isFeatured = featuredCodes.includes(prop.code)
         const icon = createIcon(prop.type, isSelected, isFeatured)
