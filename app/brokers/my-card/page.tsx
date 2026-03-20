@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getCardWithBenefits, updateCardSettings } from "@/app/actions/benefit-cards"
 import { toPng } from 'html-to-image'
-import jsPDF from 'jspdf'
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -376,6 +376,7 @@ export default function MyBenefitCardPage() {
       // O fundo do PDF se adapta ao tema selecionado para evitar bordas feias
       const pdfBg = cardTheme === 'dark' ? '#0a0a0a' : '#ffffff'
       const dataUrl = await toPng(cardRef.current, { cacheBust: true, pixelRatio: 3, style: { borderRadius: '0', background: pdfBg } })
+      const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 54] })
       pdf.addImage(dataUrl, 'PNG', 0, 0, 85.6, 54)
       pdf.save(`ticket-central63-${user?.full_name?.split(' ')[0] || 'membro'}.pdf`)

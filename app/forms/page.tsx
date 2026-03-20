@@ -55,8 +55,7 @@ import { Sidebar } from "@/components/central63/sidebar"
 import { NotificationBell } from "@/components/central63/notification-bell"
 import { useToast } from "@/hooks/use-toast"
 
-import { jsPDF } from "jspdf";
-import autoTable from 'jspdf-autotable';
+
 
 export default function FormList() {
   const [search, setSearch] = useState("")
@@ -110,6 +109,9 @@ const generatePDF = async (form: any) => {
   
   // Busca os dados detalhados antes de gerar o PDF
   const detailData = await fetchDetails(form.id);
+  
+  const { jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   
   const doc = new jsPDF();
   const margin = 20;

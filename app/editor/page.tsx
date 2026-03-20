@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { jsPDF } from 'jspdf';
+
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import {
   Type as TypeIcon, Image as ImageIcon, Download, Save, Trash2,
@@ -1426,6 +1426,7 @@ function SupportContent() {
       }
 
       if (exportFormat === 'pdf') {
+        const { jsPDF } = await import('jspdf');
         const doc = new jsPDF({
           orientation: 'portrait',
           unit: 'px',

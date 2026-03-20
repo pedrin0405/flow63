@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import { toPng } from 'html-to-image';
-import jsPDF from 'jspdf';
+
 import {
   ResponsiveContainer, BarChart as ReBarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -539,6 +539,7 @@ const ExportModal = ({ isOpen, onClose, dashboardName }: { isOpen: boolean, onCl
       const canvasWidth = element.scrollWidth;
       const canvasHeight = element.scrollHeight;
 
+      const { jsPDF } = await import('jspdf');
       const pdf = new jsPDF({
         orientation: canvasWidth > canvasHeight ? 'landscape' : 'portrait',
         unit: 'px',
