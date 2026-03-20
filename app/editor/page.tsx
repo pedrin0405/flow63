@@ -195,6 +195,19 @@ interface ArtboardData {
 }
 
 const FOLDER_AVATAR_OPTIONS = ['📁', '🗂️', '📚', '💼', '🎨', '🚀', '⭐', '🧩'];
+const FOLDER_EDITOR_ROLES = new Set([
+  'Marketing',
+  'Gestor',
+  'Secretária',
+  'Secretaria',
+  'Diretor',
+  'Diretores',
+]);
+
+const canManageFoldersByRole = (role?: string | null): boolean => {
+  if (!role) return false;
+  return FOLDER_EDITOR_ROLES.has(role);
+};
 
 const normalizeHexColor = (color?: string | null): string => {
   if (!color) return '#3b82f6';
@@ -212,15 +225,83 @@ const normalizeHexColor = (color?: string | null): string => {
 
 const withHexAlpha = (hex: string, alphaHex: string): string => `${normalizeHexColor(hex)}${alphaHex}`;
 
-const getFolderMeta = (description?: string | null): { tag: string; avatar: string } => {
-  if (!description) return { tag: 'Sem etiqueta', avatar: '📁' };
+type FolderMetaExtras = {
+  subtitle: string;
+  responsible: string;
+  audience: string;
+  campaign: string;
+  priority: string;
+  tone: string;
+  coverStyle: string;
+  layoutStyle: string;
+  badge: string;
+  notes: string;
+};
+
+const DEFAULT_FOLDER_META_EXTRAS: FolderMetaExtras = {
+  subtitle: '',
+  responsible: '',
+  audience: '',
+  campaign: '',
+  priority: 'Normal',
+  tone: 'Neutro',
+  coverStyle: 'Vidro',
+  layoutStyle: 'Grid',
+  badge: '',
+  notes: '',
+};
+
+const FOLDER_EXTRA_FIELDS: Array<{ key: keyof FolderMetaExtras; label: string; placeholder: string; maxLength: number }> = [
+  { key: 'subtitle', label: 'Subtitulo', placeholder: 'Resumo curto da pasta', maxLength: 64 },
+  { key: 'responsible', label: 'Responsavel', placeholder: 'Nome do responsavel', maxLength: 48 },
+  { key: 'audience', label: 'Publico-alvo', placeholder: 'Ex: corretores premium', maxLength: 48 },
+  { key: 'campaign', label: 'Campanha', placeholder: 'Ex: lancamento Q2', maxLength: 48 },
+  { key: 'priority', label: 'Prioridade', placeholder: 'Baixa, Normal, Alta', maxLength: 24 },
+  { key: 'tone', label: 'Tom visual', placeholder: 'Ex: premium, clean', maxLength: 32 },
+  { key: 'coverStyle', label: 'Estilo da capa', placeholder: 'Ex: vidro, papel, neon', maxLength: 32 },
+  { key: 'layoutStyle', label: 'Layout preferido', placeholder: 'Ex: grid, lista', maxLength: 32 },
+  { key: 'badge', label: 'Badge da pasta', placeholder: 'Texto do badge', maxLength: 24 },
+  { key: 'notes', label: 'Observacao interna', placeholder: 'Observacao para equipe', maxLength: 80 },
+];
+
+const getDefaultFolderMetaExtras = (): FolderMetaExtras => ({ ...DEFAULT_FOLDER_META_EXTRAS });
+
+const sanitizeMetaField = (value: unknown, maxLength: number): string => {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, maxLength);
+};
+
+const getFolderMeta = (description?: string | null): { tag: string; avatar: string; extras: FolderMetaExtras } => {
+  if (!description) {
+    return {
+      tag: 'Sem etiqueta',
+      avatar: '📁',
+      extras: getDefaultFolderMetaExtras(),
+    };
+  }
 
   try {
     const parsed = JSON.parse(description);
     if (parsed && typeof parsed === 'object') {
       const tag = typeof parsed.tag === 'string' && parsed.tag.trim().length > 0 ? parsed.tag.trim() : 'Sem etiqueta';
       const avatar = typeof parsed.avatar === 'string' && parsed.avatar.trim().length > 0 ? parsed.avatar.trim() : '📁';
-      return { tag, avatar };
+      const defaults = getDefaultFolderMetaExtras();
+      return {
+        tag,
+        avatar,
+        extras: {
+          subtitle: sanitizeMetaField(parsed.subtitle, 64),
+          responsible: sanitizeMetaField(parsed.responsible, 48),
+          audience: sanitizeMetaField(parsed.audience, 48),
+          campaign: sanitizeMetaField(parsed.campaign, 48),
+          priority: sanitizeMetaField(parsed.priority, 24) || defaults.priority,
+          tone: sanitizeMetaField(parsed.tone, 32) || defaults.tone,
+          coverStyle: sanitizeMetaField(parsed.coverStyle, 32) || defaults.coverStyle,
+          layoutStyle: sanitizeMetaField(parsed.layoutStyle, 32) || defaults.layoutStyle,
+          badge: sanitizeMetaField(parsed.badge, 24),
+          notes: sanitizeMetaField(parsed.notes, 80),
+        },
+      };
     }
   } catch {
     // Fallback for plain text description from older records.
@@ -228,14 +309,29 @@ const getFolderMeta = (description?: string | null): { tag: string; avatar: stri
 
   return {
     tag: description.trim().length > 0 ? description.trim().slice(0, 24) : 'Sem etiqueta',
-    avatar: '📁'
+    avatar: '📁',
+    extras: getDefaultFolderMetaExtras(),
   };
 };
 
-const stringifyFolderMeta = (tag: string, avatar: string): string => {
+const stringifyFolderMeta = (tag: string, avatar: string, extras: FolderMetaExtras): string => {
+  const defaults = getDefaultFolderMetaExtras();
   const safeTag = tag.trim().length > 0 ? tag.trim().slice(0, 24) : 'Sem etiqueta';
   const safeAvatar = avatar.trim().length > 0 ? avatar.trim() : '📁';
-  return JSON.stringify({ tag: safeTag, avatar: safeAvatar });
+  return JSON.stringify({
+    tag: safeTag,
+    avatar: safeAvatar,
+    subtitle: sanitizeMetaField(extras.subtitle, 64),
+    responsible: sanitizeMetaField(extras.responsible, 48),
+    audience: sanitizeMetaField(extras.audience, 48),
+    campaign: sanitizeMetaField(extras.campaign, 48),
+    priority: sanitizeMetaField(extras.priority, 24) || defaults.priority,
+    tone: sanitizeMetaField(extras.tone, 32) || defaults.tone,
+    coverStyle: sanitizeMetaField(extras.coverStyle, 32) || defaults.coverStyle,
+    layoutStyle: sanitizeMetaField(extras.layoutStyle, 32) || defaults.layoutStyle,
+    badge: sanitizeMetaField(extras.badge, 24),
+    notes: sanitizeMetaField(extras.notes, 80),
+  });
 };
 
 interface SaveTemplateDialogProps {
@@ -291,7 +387,7 @@ const SaveTemplateDialogComponent = React.memo(({
               <SelectTrigger className="h-11 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:border-blue-500">
                 <SelectValue placeholder="Selecione uma pasta" />
               </SelectTrigger>
-              <SelectContent className="z-[150] rounded-xl shadow-2xl">
+              <SelectContent className="z-[240] rounded-xl shadow-2xl">
                 {templateFolders.map((folder) => (
                   <SelectItem key={folder.id} value={folder.id} className="text-sm font-medium">
                     <div className="flex items-center gap-2">
@@ -379,7 +475,7 @@ const MoveTemplateDialogComponent = React.memo(({
               <SelectTrigger className="h-11 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:border-blue-500">
                 <SelectValue placeholder="Selecione uma pasta" />
               </SelectTrigger>
-              <SelectContent className="z-[150] rounded-xl shadow-2xl">
+              <SelectContent className="z-[240] rounded-xl shadow-2xl">
                 <SelectItem value="none" className="text-sm font-medium">
                   Sem pasta
                 </SelectItem>
@@ -448,11 +544,13 @@ function SupportContent() {
   const [savedModels, setSavedModels] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [templateFolders, setTemplateFolders] = useState<any[]>([]);
+  const [canManageTemplateFolders, setCanManageTemplateFolders] = useState(false);
   const [isCreatingTemplateFolder, setIsCreatingTemplateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderColor, setNewFolderColor] = useState('#3b82f6');
   const [newFolderTag, setNewFolderTag] = useState('Equipe');
   const [newFolderAvatar, setNewFolderAvatar] = useState('📁');
+  const [newFolderMetaExtras, setNewFolderMetaExtras] = useState<FolderMetaExtras>(getDefaultFolderMetaExtras());
   const [isSaveTemplateDialogOpen, setIsSaveTemplateDialogOpen] = useState(false);
   const [templateSaveFolderSelection, setTemplateSaveFolderSelection] = useState<string | null>(null);
   const [templateSaveName, setTemplateSaveName] = useState('');
@@ -466,6 +564,7 @@ function SupportContent() {
   const [folderColorDraft, setFolderColorDraft] = useState('#3b82f6');
   const [folderTagDraft, setFolderTagDraft] = useState('Sem etiqueta');
   const [folderAvatarDraft, setFolderAvatarDraft] = useState('📁');
+  const [folderMetaExtrasDraft, setFolderMetaExtrasDraft] = useState<FolderMetaExtras>(getDefaultFolderMetaExtras());
 
   const [showLanding, setShowLanding] = useState(true);
   const [isNewDesignModalOpen, setIsNewDesignModalOpen] = useState(false);
@@ -482,6 +581,14 @@ function SupportContent() {
     () => templates.filter((template: any) => template.folder_id === activeTemplateFolderId),
     [templates, activeTemplateFolderId]
   );
+
+  const updateNewFolderMetaExtra = (field: keyof FolderMetaExtras, value: string) => {
+    setNewFolderMetaExtras((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateFolderMetaDraftExtra = (field: keyof FolderMetaExtras, value: string) => {
+    setFolderMetaExtrasDraft((prev) => ({ ...prev, [field]: value }));
+  };
 
   // Gatilho para forçar re-renderização da página quando o Fabric altera objetos
   const [, setUpdateTrigger] = useState(0);
@@ -771,6 +878,14 @@ function SupportContent() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      setCanManageTemplateFolders(canManageFoldersByRole(profileData?.role));
+
       const { data, error } = await supabase
         .from('design_models')
         .select('*')
@@ -787,6 +902,8 @@ function SupportContent() {
         .order('created_at', { ascending: true });
       
       if (!foldersError && foldersData) setTemplateFolders(foldersData);
+    } else {
+      setCanManageTemplateFolders(false);
     }
 
     const { data: templatesData, error: templatesError } = await supabase
@@ -1006,6 +1123,11 @@ function SupportContent() {
   };
 
   const handleCreateTemplateFolder = async () => {
+    if (!canManageTemplateFolders) {
+      toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
+      return;
+    }
+
     if (!newFolderName.trim()) {
       toast.error('Nome da pasta é obrigatório.');
       return;
@@ -1021,7 +1143,7 @@ function SupportContent() {
           user_id: user.id,
           name: newFolderName.trim(),
           color: newFolderColor,
-          description: stringifyFolderMeta(newFolderTag, newFolderAvatar)
+          description: stringifyFolderMeta(newFolderTag, newFolderAvatar, newFolderMetaExtras)
         });
 
       if (error) throw error;
@@ -1031,6 +1153,7 @@ function SupportContent() {
       setNewFolderColor('#3b82f6');
       setNewFolderTag('Equipe');
       setNewFolderAvatar('📁');
+      setNewFolderMetaExtras(getDefaultFolderMetaExtras());
       setIsCreatingTemplateFolder(false);
       fetchModels();
     } catch (error: any) {
@@ -1039,6 +1162,13 @@ function SupportContent() {
   };
 
   const handleUpdateTemplateFolderColor = async (folderId: string, color: string, silent = false) => {
+    if (!canManageTemplateFolders) {
+      if (!silent) {
+        toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
+      }
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('template_folders')
@@ -1056,8 +1186,18 @@ function SupportContent() {
     }
   };
 
-  const handleUpdateTemplateFolderMeta = async (folderId: string, tag: string, avatar: string) => {
-    const description = stringifyFolderMeta(tag, avatar);
+  const handleUpdateTemplateFolderMeta = async (
+    folderId: string,
+    tag: string,
+    avatar: string,
+    extras: FolderMetaExtras,
+  ) => {
+    if (!canManageTemplateFolders) {
+      toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
+      return;
+    }
+
+    const description = stringifyFolderMeta(tag, avatar, extras);
 
     try {
       const { error } = await supabase
@@ -1078,6 +1218,11 @@ function SupportContent() {
   };
 
   const handleDeleteTemplateFolder = async (folderId: string) => {
+    if (!canManageTemplateFolders) {
+      toast.error('Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas.');
+      return;
+    }
+
     showConfirm(
       'Deletar Pasta de Templates?',
       'Tem certeza que deseja deletar esta pasta? Os templates dentro dela não serão deletados.',
@@ -1462,14 +1607,16 @@ function SupportContent() {
                   </h2>
                   <Button 
                     onClick={() => setIsCreatingTemplateFolder(true)}
+                    disabled={!canManageTemplateFolders}
                     className="text-xs font-semibold h-9 px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm"
+                    title={canManageTemplateFolders ? 'Criar pasta' : 'Apenas Marketing, Gestor, Secretária e Diretor podem editar pastas'}
                   >
                     <Plus className="w-3.5 h-3.5" /> Nova Pasta
                   </Button>
                 </div>
 
                 {/* Dialog para criar pasta */}
-                {isCreatingTemplateFolder && (
+                {isCreatingTemplateFolder && canManageTemplateFolders && (
                   <div className="apple-glass-folder rounded-3xl p-5 md:p-6 space-y-4 mb-6 border border-white/70 dark:border-white/10">
                     <div className="flex flex-col md:flex-row gap-3">
                       <Input 
@@ -1527,6 +1674,7 @@ function SupportContent() {
                           setNewFolderColor('#3b82f6');
                           setNewFolderTag('Equipe');
                           setNewFolderAvatar('📁');
+                          setNewFolderMetaExtras(getDefaultFolderMetaExtras());
                         }}
                         variant="outline"
                         className="h-10 px-4 rounded-xl"
@@ -1535,8 +1683,25 @@ function SupportContent() {
                       </Button>
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {FOLDER_EXTRA_FIELDS.map((field) => (
+                        <div key={field.key} className="space-y-1">
+                          <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {field.label}
+                          </Label>
+                          <Input
+                            value={newFolderMetaExtras[field.key]}
+                            onChange={(e) => updateNewFolderMetaExtra(field.key, e.target.value)}
+                            placeholder={field.placeholder}
+                            maxLength={field.maxLength}
+                            className="h-10 rounded-xl border-white/70 dark:border-white/10 bg-white/70 dark:bg-zinc-900/45"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Estrutura escolhida: arquivo de luxo com capa personalizada, etiqueta e avatar.
+                      Estrutura escolhida: arquivo de luxo com 12 controles de identidade (2 base + 10 extras).
                     </p>
                   </div>
                 )}
@@ -1564,6 +1729,7 @@ function SupportContent() {
                                 setFolderColorDraft(folderColor);
                                 setFolderTagDraft(folderMeta.tag);
                                 setFolderAvatarDraft(folderMeta.avatar);
+                                setFolderMetaExtrasDraft({ ...folderMeta.extras });
                                 setIsFolderTemplatesPopupOpen(true);
                               }}
                               className="group relative cursor-pointer w-full min-w-0"
@@ -1583,31 +1749,33 @@ function SupportContent() {
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-                                    <input
-                                      type="color"
-                                      value={folderColor}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onChange={(e) => {
-                                        const color = e.target.value;
-                                        void handleUpdateTemplateFolderColor(folder.id, color, true);
-                                      }}
-                                      className="w-8 h-8 rounded-lg border border-white/80 dark:border-white/15 bg-white/60 dark:bg-zinc-900/40 cursor-pointer"
-                                      title="Personalizar cor da pasta"
-                                    />
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="w-8 h-8 rounded-lg bg-white/45 dark:bg-zinc-900/35 border border-white/70 dark:border-white/10 hover:bg-red-100 dark:hover:bg-red-900/30"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteTemplateFolder(folder.id);
-                                      }}
-                                      title="Deletar pasta"
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-500" />
-                                    </Button>
-                                  </div>
+                                  {canManageTemplateFolders && (
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
+                                      <input
+                                        type="color"
+                                        value={folderColor}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => {
+                                          const color = e.target.value;
+                                          void handleUpdateTemplateFolderColor(folder.id, color, true);
+                                        }}
+                                        className="w-8 h-8 rounded-lg border border-white/80 dark:border-white/15 bg-white/60 dark:bg-zinc-900/40 cursor-pointer"
+                                        title="Personalizar cor da pasta"
+                                      />
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="w-8 h-8 rounded-lg bg-white/45 dark:bg-zinc-900/35 border border-white/70 dark:border-white/10 hover:bg-red-100 dark:hover:bg-red-900/30"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteTemplateFolder(folder.id);
+                                        }}
+                                        title="Deletar pasta"
+                                      >
+                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
 
                                 <div className="relative mt-5 h-32">
@@ -1775,7 +1943,7 @@ function SupportContent() {
                     </Button>
                   </div>
 
-                  {activeTemplateFolder && (
+                  {activeTemplateFolder && canManageTemplateFolders && (
                     <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 mt-4">
                       <Input
                         value={folderTagDraft}
@@ -1797,7 +1965,12 @@ function SupportContent() {
                         className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
                         onClick={async () => {
                           await handleUpdateTemplateFolderColor(activeTemplateFolder.id, normalizeHexColor(folderColorDraft), true);
-                          await handleUpdateTemplateFolderMeta(activeTemplateFolder.id, folderTagDraft, folderAvatarDraft);
+                          await handleUpdateTemplateFolderMeta(
+                            activeTemplateFolder.id,
+                            folderTagDraft,
+                            folderAvatarDraft,
+                            folderMetaExtrasDraft,
+                          );
                         }}
                       >
                         Salvar identidade
@@ -1805,35 +1978,37 @@ function SupportContent() {
                     </div>
                   )}
 
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {FOLDER_AVATAR_OPTIONS.map((avatar) => (
-                      <button
-                        key={avatar}
-                        type="button"
-                        onClick={() => setFolderAvatarDraft(avatar)}
-                        className={cn(
-                          "w-9 h-9 rounded-xl border transition-colors",
-                          folderAvatarDraft === avatar
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-white/65 dark:bg-zinc-900/45 border-white/70 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-zinc-800"
-                        )}
-                        title={`Avatar ${avatar}`}
-                      >
-                        {avatar}
-                      </button>
-                    ))}
+                  {canManageTemplateFolders && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {FOLDER_AVATAR_OPTIONS.map((avatar) => (
+                        <button
+                          key={avatar}
+                          type="button"
+                          onClick={() => setFolderAvatarDraft(avatar)}
+                          className={cn(
+                            "w-9 h-9 rounded-xl border transition-colors",
+                            folderAvatarDraft === avatar
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white/65 dark:bg-zinc-900/45 border-white/70 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                          )}
+                          title={`Avatar ${avatar}`}
+                        >
+                          {avatar}
+                        </button>
+                      ))}
 
-                    {activeTemplateFolder && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="h-9 ml-auto"
-                        onClick={() => handleDeleteTemplateFolder(activeTemplateFolder.id)}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" /> Deletar Pasta
-                      </Button>
-                    )}
-                  </div>
+                      {activeTemplateFolder && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-9 ml-auto"
+                          onClick={() => handleDeleteTemplateFolder(activeTemplateFolder.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" /> Deletar Pasta
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-auto p-6 bg-gradient-to-b from-white/35 to-white/15 dark:from-zinc-950/55 dark:to-zinc-950/75">
@@ -1901,7 +2076,7 @@ function SupportContent() {
 
         {/* Diálogo de Confirmação - Landing Page */}
         <AlertDialog open={confirmDialog.isOpen} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, isOpen: open }))}>
-          <AlertDialogContent className="rounded-2xl max-w-[400px] dark:bg-zinc-900 dark:border-zinc-800 z-[200]">
+          <AlertDialogContent className="rounded-2xl max-w-[400px] dark:bg-zinc-900 dark:border-zinc-800">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-xl font-bold dark:text-zinc-100">{confirmDialog.title}</AlertDialogTitle>
               <AlertDialogDescription className="text-slate-500 dark:text-zinc-400 text-sm leading-relaxed">
@@ -3203,7 +3378,7 @@ function SupportContent() {
 
         {/* Diálogo de Confirmação - Editor View */}
         <AlertDialog open={confirmDialog.isOpen} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, isOpen: open }))}>
-          <AlertDialogContent className="rounded-2xl max-w-[400px] dark:bg-zinc-900 dark:border-zinc-800 z-[200]">
+          <AlertDialogContent className="rounded-2xl max-w-[400px] dark:bg-zinc-900 dark:border-zinc-800">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-xl font-bold dark:text-zinc-100">{confirmDialog.title}</AlertDialogTitle>
               <AlertDialogDescription className="text-slate-500 dark:text-zinc-400 text-sm leading-relaxed">

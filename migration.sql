@@ -136,22 +136,55 @@ ALTER TABLE public.design_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.design_models ENABLE ROW LEVEL SECURITY;
 
 -- 11. Create RLS Policies for Template Folders
+DROP POLICY IF EXISTS "Users can view their own template folders" ON public.template_folders;
+DROP POLICY IF EXISTS "Users can create their own template folders" ON public.template_folders;
+DROP POLICY IF EXISTS "Users can update their own template folders" ON public.template_folders;
+DROP POLICY IF EXISTS "Users can delete their own template folders" ON public.template_folders;
+
 CREATE POLICY "Users can view their own template folders" 
 ON public.template_folders FOR SELECT 
 USING (auth.uid() = user_id OR is_public = true);
 
 CREATE POLICY "Users can create their own template folders" 
 ON public.template_folders FOR INSERT 
-WITH CHECK (auth.uid() = user_id);
+WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND role IN ('Marketing', 'Gestor', 'Secretária', 'Secretaria', 'Diretor', 'Diretores')
+    )
+);
 
 CREATE POLICY "Users can update their own template folders" 
 ON public.template_folders FOR UPDATE 
-USING (auth.uid() = user_id) 
-WITH CHECK (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id
+    AND EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND role IN ('Marketing', 'Gestor', 'Secretária', 'Secretaria', 'Diretor', 'Diretores')
+    )
+)
+WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND role IN ('Marketing', 'Gestor', 'Secretária', 'Secretaria', 'Diretor', 'Diretores')
+    )
+);
 
 CREATE POLICY "Users can delete their own template folders" 
 ON public.template_folders FOR DELETE 
-USING (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id
+    AND EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND role IN ('Marketing', 'Gestor', 'Secretária', 'Secretaria', 'Diretor', 'Diretores')
+    )
+);
 
 -- 12. Create RLS Policies for Design Templates
 CREATE POLICY "Users can view their own templates" 
