@@ -178,17 +178,31 @@ export default function ImoveisPage() {
 
   return (
     <Suspense fallback={<Loading />}>
-      <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground">
+      <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden font-sans text-foreground relative">
+        <div className="pointer-events-none absolute -top-32 right-[-120px] h-[340px] w-[340px] rounded-full bg-sky-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 left-[-120px] h-[320px] w-[320px] rounded-full bg-emerald-400/15 blur-3xl" />
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeTab={activeTab} onTabChange={setActiveTab} />
         
-        <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-          <header className="w-full bg-card border-b border-border px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
+        <main className="flex-1 flex flex-col h-full overflow-hidden relative animate-in fade-in duration-700">
+          <header className="h-20 shrink-0 px-6 lg:px-8 flex items-center justify-between z-20">
             <div className="flex items-center gap-4">
-              <button className="lg:hidden p-2 text-muted-foreground hover:bg-accent rounded-lg" onClick={() => setSidebarOpen(true)}><Menu /></button>
-              <Building2 className="text-primary hidden lg:block" />
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">
-                {selectedProperty ? "Detalhes do Imóvel" : "Carteira de Imóveis"}
-              </h2>
+              <Button variant="ghost" size="icon" className="lg:hidden rounded-xl bg-white/50 dark:bg-white/[0.02] border border-white/20" onClick={() => setSidebarOpen(true)}>
+                <Menu size={22} />
+              </Button>
+              <div className="relative flex items-center gap-4 bg-white/60 dark:bg-white/[0.02] backdrop-blur-2xl border border-white/20 dark:border-white/[0.06] px-5 py-2.5 rounded-2xl shadow-sm">
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+                <div className="h-10 w-10 bg-gradient-to-br from-primary/90 to-primary/60 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                  <Building2 className="text-white" size={20} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black tracking-tight text-foreground uppercase">
+                    {selectedProperty ? "Detalhes do Imovel" : "Carteira de Imoveis"}
+                  </h2>
+                  <p className="text-[9px] text-muted-foreground/60 font-black uppercase tracking-widest mt-0.5">
+                    Inteligencia Comercial em Tempo Real
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -196,7 +210,7 @@ export default function ImoveisPage() {
                 <Button 
                     variant="outline" 
                     size="sm" 
-                    className="rounded-xl h-9 gap-2 font-bold hover:bg-accent transition-all"
+                    className="rounded-xl h-10 px-4 gap-2 font-black uppercase text-[10px] tracking-widest bg-white/60 dark:bg-white/[0.02] border-white/30 dark:border-white/[0.08] backdrop-blur-xl hover:bg-white dark:hover:bg-white/[0.05] transition-all"
                     onClick={() => setSelectedProperty(null)}
                 >
                     <ChevronLeft size={16} /> Voltar para Lista
@@ -205,11 +219,12 @@ export default function ImoveisPage() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-hidden relative flex flex-col bg-background">
+          <div className="flex-1 overflow-hidden relative flex flex-col">
             {selectedProperty ? (
                 /* VIEW: DETALHES COM MAPA LATERAL ESQUERDO */
-                <div className="flex-1 flex overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
-                    <div className="hidden lg:block flex-1 border-r relative bg-muted h-full">
+                <div className="flex-1 flex overflow-hidden p-6 lg:p-8 gap-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <div className="hidden lg:block flex-1 relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl h-full">
+                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent z-[1000]" />
                         <PropertyMap 
                             properties={[selectedProperty]}
                             selectedProperty={selectedProperty}
@@ -220,7 +235,7 @@ export default function ImoveisPage() {
                             className="w-full h-full"
                             featuredCodes={featuredCodes}
                         />
-                        <div className="absolute top-4 left-4 z-[1000] bg-white/90 backdrop-blur shadow-xl p-4 rounded-2xl border flex items-center gap-3">
+                          <div className="absolute top-4 left-4 z-[1000] bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl shadow-xl p-4 rounded-2xl border border-white/30 dark:border-white/[0.08] flex items-center gap-3">
                              <div className="p-2 bg-primary/10 rounded-lg"><MapPin className="text-primary" size={16}/></div>
                              <div>
                                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">Localização Exata</p>
@@ -228,7 +243,8 @@ export default function ImoveisPage() {
                              </div>
                         </div>
                     </div>
-                    <div className="w-full lg:w-[500px] xl:w-[600px] h-full shadow-2xl z-10 border-l border-border/50">
+                        <div className="w-full lg:w-[500px] xl:w-[600px] h-full rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl z-10 relative">
+                          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent z-[1000]" />
                         <PropertyDetailsContent 
                             property={selectedProperty} 
                             formatCurrency={formatCurrency}
@@ -239,31 +255,41 @@ export default function ImoveisPage() {
                 </div>
             ) : (
                 /* VIEW: LISTA + MAPA AO FUNDO */
-                <div className="flex-1 overflow-y-auto bg-background custom-scrollbar">
-                    <div className="p-4 lg:p-8 space-y-12 max-w-[1600px] mx-auto">
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="p-6 lg:p-8 space-y-8 max-w-[1650px] mx-auto">
                         {/* Estatísticas */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl p-4 lg:p-5">
+                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <StatCard title="Imóveis Listados" value={totalItems} icon={Building2} trend="Atual" color="bg-blue-500" />
                             <StatCard title="VGV (Valor Geral da Tela)" value={formatCompact(propertiesData.reduce((acc, curr) => acc + curr.value, 0))} icon={RefreshCw} trend="Total" color="bg-emerald-500" />
                             <StatCard title="Ticket Médio (Tela)" value={formatCompact(propertiesData.length > 0 ? (propertiesData.reduce((acc, curr) => acc + curr.value, 0) / propertiesData.length) : 0)} icon={MapPin} trend="Média" color="bg-purple-500" />
+                    </div>
                         </div>
 
                         {/* Letreiro de Destaques */}
-                        <FeaturedPropertiesTicker 
-                            onPropertyClick={setSelectedProperty}
-                            formatCurrency={formatCurrency}
-                        />
+                  <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl p-4">
+                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+                    <FeaturedPropertiesTicker 
+                      onPropertyClick={setSelectedProperty}
+                      formatCurrency={formatCurrency}
+                    />
+                  </div>
 
                         {/* Filtros */}
-                        <PropertyFilters 
-                            filters={filters} 
-                            onFilterChange={handleFilterChange} 
-                            cities={CITIES}
-                            types={PROPERTY_TYPES}
-                        />
+                  <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl p-4 lg:p-5">
+                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
+                    <PropertyFilters 
+                      filters={filters} 
+                      onFilterChange={handleFilterChange} 
+                      cities={CITIES}
+                      types={PROPERTY_TYPES}
+                    />
+                  </div>
 
                         {/* Grade de Imóveis */}
-                        <div className="space-y-6">
+                  <div className="space-y-6 relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl p-4 lg:p-6">
+                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
                             {isLoading ? (
                                 <div className="flex justify-center items-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>
                             ) : propertiesData.length > 0 ? (
@@ -286,12 +312,13 @@ export default function ImoveisPage() {
                                     )}
                                 </>
                             ) : (
-                                <div className="text-center py-20 text-muted-foreground border-2 border-dashed rounded-3xl">Nenhum imóvel encontrado.</div>
+                                  <div className="text-center py-20 text-muted-foreground border-2 border-dashed border-white/40 dark:border-white/[0.12] rounded-3xl bg-black/[0.02] dark:bg-white/[0.01]">Nenhum imóvel encontrado.</div>
                             )}
                         </div>
 
                         {/* SEÇÃO DO MAPA (NO FIM DA PÁGINA) */}
-                        <div className="pt-12 border-t border-border/50">
+                              <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl p-5 lg:p-6">
+                                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2.5 bg-primary/10 rounded-xl">
@@ -307,7 +334,7 @@ export default function ImoveisPage() {
                                 </Badge>
                             </div>
 
-                            <div className="h-[350px] lg:h-[450px] rounded-[2.5rem] overflow-hidden border border-border/50 shadow-2xl relative group">
+                              <div className="h-[350px] lg:h-[450px] rounded-[2rem] overflow-hidden border border-white/30 dark:border-white/[0.08] shadow-2xl relative group bg-black/[0.02] dark:bg-white/[0.01]">
                                 <PropertyMap 
                                     properties={allPropertiesForMap}
                                     formatCurrency={formatCurrency}
@@ -317,7 +344,7 @@ export default function ImoveisPage() {
                                 />
                                 
                                 {/* Legenda Flutuante (dentro do mapa) */}
-                                <div className="absolute bottom-6 left-6 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl p-5 rounded-3xl shadow-2xl border border-white/20 z-[1000] hidden md:block">
+                                <div className="absolute bottom-6 left-6 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl p-5 rounded-3xl shadow-2xl border border-white/30 dark:border-white/[0.08] z-[1000] hidden md:block">
                                     <h5 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 mb-4">Classificação por Cores</h5>
                                     <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                                         <div className="flex items-center gap-3 text-xs font-bold text-foreground/80">

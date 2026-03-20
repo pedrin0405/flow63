@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MapPin, Home, Ruler, DollarSign, Calendar, Star, Loader2 } from "lucide-react"
+import { MapPin, Home, Ruler, DollarSign, Calendar, Star, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
@@ -20,6 +20,8 @@ export function PropertyDetailsContent({ property, formatCurrency, onClose, isIn
   const [isFeatured, setIsFeatured] = useState(false)
   const [isFeatureLoading, setIsFeatureLoading] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [images, setImages] = useState<string[]>([])
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   useEffect(() => {
     const checkRoleAndFeatured = async () => {
@@ -48,6 +50,52 @@ export function PropertyDetailsContent({ property, formatCurrency, onClose, isIn
 
     checkRoleAndFeatured()
   }, [property])
+
+  useEffect(() => {
+    const fetchPropertyImages = async () => {
+      if (!property) return
+
+      const baseImages = [property.image, property.imagem, property.urlfotoprincipal].filter(Boolean)
+      const propertyCode = property.code || property.codigo || property.id
+
+      if (!propertyCode) {
+        setImages(Array.from(new Set(baseImages)))
+        setCurrentImageIndex(0)
+        return
+      }
+
+      const codeValue = /^\d+$/.test(String(propertyCode)) ? parseInt(String(propertyCode), 10) : propertyCode
+
+      try {
+        const [pmwFotosRes, auxFotosRes] = await Promise.all([
+          supabase.from('fotos_imoveis_pmw').select('url').eq('imovel_codigo', codeValue),
+          supabase.from('fotos_imoveis_aux').select('url').eq('imovel_codigo', codeValue),
+        ])
+
+        const extraImages = [
+          ...(pmwFotosRes.data?.map((f: any) => f.url) || []),
+          ...(auxFotosRes.data?.map((f: any) => f.url) || []),
+        ].filter(Boolean)
+
+        const merged = Array.from(new Set([...baseImages, ...extraImages]))
+        setImages(merged.length > 0 ? merged : baseImages)
+      } catch (error) {
+        setImages(Array.from(new Set(baseImages)))
+      } finally {
+        setCurrentImageIndex(0)
+      }
+    }
+
+    fetchPropertyImages()
+  }, [property])
+
+  const nextImage = () => {
+    if (currentImageIndex < images.length - 1) setCurrentImageIndex((prev) => prev + 1)
+  }
+
+  const prevImage = () => {
+    if (currentImageIndex > 0) setCurrentImageIndex((prev) => prev - 1)
+  }
 
   const toggleFeatured = async () => {
     setIsFeatureLoading(true)
@@ -92,12 +140,61 @@ export function PropertyDetailsContent({ property, formatCurrency, onClose, isIn
         <div className="flex flex-col">
           {/* Imagem de Capa */}
           <div className="relative h-72 w-full bg-muted shrink-0">
-            <img 
-              src={property.image} 
-              alt="Foto Principal" 
-              className="w-full h-full object-cover"
-            />
+            <div
+              className="flex h-full w-full transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
+            >
+              {(images.length > 0 ? images : [property.image]).filter(Boolean).map((src, index) => (
+                <div key={index} className="w-full h-full flex-shrink-0">
+                  <img
+                    src={src}
+                    alt={`Foto ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+            {images.length > 0 && (
+              <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[11px] font-black z-10 border border-white/10">
+                {currentImageIndex + 1} / {images.length}
+              </div>
+            )}
+
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); prevImage() }}
+                  disabled={currentImageIndex === 0}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all z-20 disabled:opacity-40"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); nextImage() }}
+                  disabled={currentImageIndex === images.length - 1}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all z-20 disabled:opacity-40"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                  {images.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx) }}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all duration-300",
+                        idx === currentImageIndex ? "w-6 bg-white" : "w-1.5 bg-white/40 hover:bg-white/70"
+                      )}
+                      aria-label={`Ir para foto ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
             <div className="absolute top-4 right-4 flex gap-2">
                 {canManageFeatured && (
                     <Button
