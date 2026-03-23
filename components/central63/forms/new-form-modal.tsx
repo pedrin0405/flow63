@@ -110,8 +110,8 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col">
-          <ScrollArea className="max-h-[60vh] px-6 py-4">
-            <div className="space-y-6 p-1">
+          <ScrollArea className="max-h-[70vh] px-6 py-4">
+            <div className="space-y-6 p-1 pb-4">
 
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground">Nome do Cliente</Label>
@@ -121,74 +121,70 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Nome completo"
-                    className="pl-10 h-11 rounded-xl bg-accent/20 border-accent-foreground/10"
+                    className="pl-10 h-11 rounded-xl bg-accent/20 border-border"
                     required
                   />
                 </div>
               </div>
 
-              {/* Campo Corretor com Bloco de Filtros Ajustado */}
-              <div className="flex items-end gap-3">
-                <div className="flex flex-col gap-2 min-w-[220px]">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground pb-1">
+              {/* Campo Corretor e Filtros de Localidade */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">
                     Corretor Responsável
                   </Label>
-
-                  <Select value={brokerName} onValueChange={setBrokerName} required>
-                    <SelectTrigger className="h-11 rounded-xl bg-accent/20 border-accent-foreground/10 pl-3">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Briefcase size={18} />
-                        <SelectValue placeholder={isLoading ? "Carregando..." : "Selecione o corretor..."} />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {displayedBrokers.length > 0 ? (
-                        displayedBrokers.map((broker) => (
-                          <SelectItem key={broker.nome} value={broker.nome}>
-                            {broker.nome}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="none" disabled>Nenhum corretor nesta lista</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-
-                </div>
-                <div className="flex flex-col gap-2 min-w-[220px]">
-                  <div className="flex items-center gap-4 self-start" style={{ marginTop: '-0.5rem' }}>
-                    {/* translate-y para alinhar com o centro do texto da label */}
-                    <div className="flex bg-accent/30 p-1 rounded-lg gap-1 border border-accent-foreground/5 translate-y-[2px]">
-                      <button
-                        type="button"
-                        onClick={() => setFilter("todos")}
-                        className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${filter === "todos" ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-accent/50"}`}
-                      >
-                        TODOS
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilter("pmw")}
-                        className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${filter === "pmw" ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-accent/50"}`}
-                      >
-                        PALMAS
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilter("arg")}
-                        className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${filter === "arg" ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-accent/50"}`}
-                      >
-                        ARAGUAÍNA
-                      </button>
-                    </div>
+                  
+                  {/* Filtros de Localidade (Reposicionados para melhor alinhamento) */}
+                  <div className="flex bg-accent/30 p-1 rounded-lg gap-1 border border-border">
+                    <button
+                      type="button"
+                      onClick={() => setFilter("todos")}
+                      className={`text-[9px] px-2 py-1 rounded-md font-bold transition-all ${filter === "todos" ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-accent/50"}`}
+                    >
+                      TODOS
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilter("pmw")}
+                      className={`text-[9px] px-2 py-1 rounded-md font-bold transition-all ${filter === "pmw" ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-accent/50"}`}
+                    >
+                      PALMAS
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilter("arg")}
+                      className={`text-[9px] px-2 py-1 rounded-md font-bold transition-all ${filter === "arg" ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-accent/50"}`}
+                    >
+                      ARAGUAÍNA
+                    </button>
                   </div>
                 </div>
+
+                <Select value={brokerName} onValueChange={setBrokerName} required>
+                  <SelectTrigger className="h-11 rounded-xl bg-accent/20 border-border pl-3">
+                    <div className="flex items-center gap-2 text-foreground">
+                      <Briefcase size={18} className="text-muted-foreground" />
+                      <SelectValue placeholder={isLoading ? "Carregando..." : "Selecione o corretor..."} />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="z-[300]">
+                    {displayedBrokers.length > 0 ? (
+                      displayedBrokers.map((broker) => (
+                        <SelectItem key={broker.nome} value={broker.nome}>
+                          {broker.nome}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>Nenhum corretor nesta lista</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* NOVA SEÇÃO: MODALIDADE */}
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground">Modalidade</Label>
-                <div className="flex bg-accent/30 p-1 rounded-xl gap-1 border border-accent-foreground/5">
+                <div className="flex bg-accent/30 p-1 rounded-xl gap-1 border border-border">
                   <button
                     type="button"
                     onClick={() => setCategory("venda")}
@@ -216,7 +212,7 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
                   <Input
                     value={secretaryName}
                     onChange={(e) => setSecretaryName(e.target.value)}
-                    className="pl-10 h-11 rounded-xl bg-primary/5 border-primary/20 text-primary font-medium"
+                    className="pl-10 h-11 rounded-xl bg-primary/5 border-primary/20 text-primary font-bold"
                     required
                   />
                 </div>
@@ -224,6 +220,7 @@ export function NewFormModal({ isOpen, onClose, onSubmit }: NewFormModalProps) {
             </div>
 
           </ScrollArea>
+
 
           <div className="p-6 pt-4 border-t bg-gray-50/50 dark:bg-zinc-900/50">
             <DialogFooter>
