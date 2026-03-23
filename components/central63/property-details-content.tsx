@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MapPin, Home, Ruler, DollarSign, Calendar, Star, Loader2, ChevronLeft, ChevronRight, BedDouble, Bath, Car, Landmark, Wallet, ShieldCheck, ArrowRightLeft, Building2, Sparkles } from "lucide-react"
+import { MapPin, Home, Ruler, DollarSign, Calendar, Star, Loader2, ChevronLeft, ChevronRight, BedDouble, Bath, Car, Landmark, Wallet, ShieldCheck, ArrowRightLeft, Building2, Sparkles, MessageCircle, Mail, Phone } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
@@ -23,6 +23,9 @@ export function PropertyDetailsContent({ property, formatCurrency, onClose, isIn
   const [fullDetails, setFullDetails] = useState<any>(null)
   const [images, setImages] = useState<string[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [captadores, setCaptadores] = useState<any[]>([])
+  const [captadoresLoading, setCaptadoresLoading] = useState(false)
+  const [captadoresComFoto, setCaptadoresComFoto] = useState<Map<string, { foto: string | null }>>(new Map())
 
   useEffect(() => {
     const checkRoleAndFeatured = async () => {
@@ -132,6 +135,160 @@ export function PropertyDetailsContent({ property, formatCurrency, onClose, isIn
     fetchPropertyImages()
   }, [property])
 
+  useEffect(() => {
+    const fetchCaptadores = async () => {
+      if (!property) return
+
+      const code = property.code || property.codigo || property.id
+      if (!code) {
+        setCaptadores([])
+        return
+      }
+
+      const normalizeText = (value: string) =>
+        value
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+
+      const cityText = normalizeText(String(property.city || ""))
+      const isAuxCity = cityText.includes("aragua")
+      const tableName = isAuxCity ? "imovel_aux" : "imovel_pmw"
+
+      try {
+        setCaptadoresLoading(true)
+
+        // 1. Tentar buscar dados dos captadores já armazenados na tabela
+        const { data: imovelData } = await supabase
+          .from(tableName)
+          .select('captador_Nome, captador_Email, captador_Telefone, captador_Json')
+          .eq('codigo', code)
+          .maybeSingle()
+
+        if (imovelData?.captador_Json && Array.isArray(imovelData.captador_Json) && imovelData.captador_Json.length > 0) {
+          setCaptadores(imovelData.captador_Json)
+          return
+        }
+
+        // 2. Se não houver dados armazenados, buscar pela API
+        const { data: settings, error: settingsError } = await supabase
+          .from('company_settings')
+          .select('instance_name')
+          .neq('instance_name', 'GLOBAL_BROADCAST')
+          .order('created_at', { ascending: true })
+
+        if (settingsError || !settings || settings.length === 0) {
+          setCaptadores([])
+          return
+        }
+
+        const preferredKeywords = isAuxCity ? ['aux', 'aragua'] : ['pmw', 'palmas']
+        const matchedInstance = settings.find((item: any) => {
+          const normalized = normalizeText(String(item.instance_name || ''))
+          return preferredKeywords.some((keyword) => normalized.includes(keyword))
+        })
+
+        const instanceName = matchedInstance?.instance_name || settings[0].instance_name
+
+        const response = await fetch('/api/imoview/indicators', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'getCaptadores',
+            instanceName,
+            codigoImovel: code,
+          }),
+        })
+
+        if (!response.ok) {
+          setCaptadores([])
+          return
+        }
+
+        const result = await response.json()
+        const list = Array.isArray(result)
+          ? result
+          : Array.isArray(result?.data)
+            ? result.data
+            : Array.isArray(result?.body)
+              ? result.body
+              : result
+                ? [result]
+                : []
+
+        setCaptadores(list)
+
+        // 3. Armazenar dados na tabela para futuras consultas (cache)
+        if (list.length > 0) {
+          const nomes = list.map((item: any) => 
+            item.nome || item.Nome || item.captador || item.Captador || item.corretor || item.Corretor || item.usuario || item.Usuario || ""
+          ).filter(Boolean)
+
+          const emails = list.map((item: any) =>
+            item.email || item.Email || item.eMail || item.corretorEmail || item.CorretorEmail || item.usuarioEmail || item.UsuarioEmail || ""
+          ).filter(Boolean)
+
+          const telefones = list.map((item: any) =>
+            item.telefone || item.Telefone || item.celular || item.Celular || item.numero || item.Numero || item.fone || item.Fone || ""
+          ).filter(Boolean)
+
+          await supabase
+            .from(tableName)
+            .update({
+              captador_Nome: nomes.length > 0 ? nomes : null,
+              captador_Email: emails.length > 0 ? emails : null,
+              captador_Telefone: telefones.length > 0 ? telefones : null,
+              captador_Json: list,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('codigo', code)
+            .maybeSingle()
+        }
+      } catch (error) {
+        console.error("Erro ao carregar captadores do imóvel:", error)
+        setCaptadores([])
+      } finally {
+        setCaptadoresLoading(false)
+      }
+    }
+
+    fetchCaptadores()
+  }, [property])
+
+  useEffect(() => {
+    const fetchFotosCaptadores = async () => {
+      if (captadores.length === 0) {
+        setCaptadoresComFoto(new Map())
+        return
+      }
+
+      try {
+        const fotoMap = new Map<string, { foto: string | null }>()
+
+        for (const captador of captadores) {
+          const nome = captadorLabel(captador)
+          if (!nome) continue
+
+          const { data: corretor } = await supabase
+            .from('todos_corretores')
+            .select('imagem_url')
+            .ilike('nome', `%${nome}%`)
+            .maybeSingle()
+
+          const foto = corretor?.imagem_url || null
+          fotoMap.set(nome, { foto })
+        }
+
+        setCaptadoresComFoto(fotoMap)
+      } catch (error) {
+        console.error("Erro ao carregar fotos dos corretores:", error)
+        setCaptadoresComFoto(new Map())
+      }
+    }
+
+    fetchFotosCaptadores()
+  }, [captadores])
+
   const nextImage = () => {
     if (currentImageIndex < images.length - 1) setCurrentImageIndex((prev) => prev + 1)
   }
@@ -212,6 +369,111 @@ export function PropertyDetailsContent({ property, formatCurrency, onClose, isIn
     { icon: Bath, label: "Banheiros", value: pick(details.numerobanhos, "N/A") },
     { icon: Car, label: "Vagas", value: pick(details.numerovagas, "N/A") },
   ]
+
+  const captadorLabel = (captador: any) =>
+    pick(
+      captador?.nome,
+      captador?.Nome,
+      captador?.captador,
+      captador?.Captador,
+      captador?.corretor,
+      captador?.Corretor,
+      captador?.usuario,
+      captador?.Usuario,
+      captador?.descricao,
+      captador?.Descricao
+    )
+
+  const captadorEmail = (captador: any) =>
+    pick(
+      captador?.email,
+      captador?.Email,
+      captador?.eMail,
+      captador?.corretorEmail,
+      captador?.CorretorEmail,
+      captador?.usuarioEmail,
+      captador?.UsuarioEmail
+    )
+
+  const captadorTelefone = (captador: any) =>
+    pick(
+      captador?.telefone,
+      captador?.Telefone,
+      captador?.celular,
+      captador?.Celular,
+      captador?.numero,
+      captador?.Numero,
+      captador?.fone,
+      captador?.Fone,
+      captador?.telefone1,
+      captador?.Telefone1,
+      captador?.telefone2,
+      captador?.Telefone2,
+      captador?.corretorTelefone,
+      captador?.CorretorTelefone,
+      captador?.usuarioTelefone,
+      captador?.UsuarioTelefone
+    )
+
+  const normalizePhoneForWhatsapp = (phone: string | null) => {
+    if (!phone) return null
+
+    const digits = String(phone).replace(/\D/g, "")
+    if (!digits) return null
+
+    if (digits.length === 10 || digits.length === 11) return `55${digits}`
+    if (digits.length >= 12 && digits.startsWith("55")) return digits
+    return digits
+  }
+
+  const buildCaptadorMessage = () => {
+    const tipo = pick(details.tipo, property.type, "Imóvel")
+    const valor = pick(details.valor, details.valor_venda)
+    const valorTexto = valor ? String(valor) : formatCurrency(property.value || 0)
+    const endereco = fullAddress || property.address || "Endereço não informado"
+    const bairro = pick(details.bairro, property.neighborhood, "Não informado")
+    const cidade = pick(details.cidade, property.city, "Não informada")
+    const situacao = pick(details.situacao, property.status, "Não informada")
+
+    return [
+      "Olá! Tudo bem?",
+      "",
+      "Estou consultando este imóvel e gostaria de mais informações:",
+      `• Código: ${propertyCode}`,
+      `• Tipo: ${tipo}`,
+      `• Valor: ${valorTexto}`,
+      `• Endereço: ${endereco}`,
+      `• Bairro/Cidade: ${bairro} - ${cidade}`,
+      `• Situação: ${situacao}`,
+      "",
+      "Pode me ajudar, por favor?"
+    ].join("\n")
+  }
+
+  const handleContactCaptador = (captador: any) => {
+    const phoneRaw = captadorTelefone(captador)
+    const phone = normalizePhoneForWhatsapp(phoneRaw)
+
+    if (!phone) {
+      toast({
+        title: "Número indisponível",
+        description: "Este captador não possui número válido para contato.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const message = buildCaptadorMessage()
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank")
+  }
+
+  const getInitials = (name: string) =>
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "CP"
 
   return (
     <div className="flex flex-col h-full bg-card">
@@ -333,6 +595,93 @@ export function PropertyDetailsContent({ property, formatCurrency, onClose, isIn
                 <p className="font-bold text-sm">{pick(details.cidade, property.city)} - {pick(details.estado, property.state)}</p>
                 <p className="text-xs text-muted-foreground font-medium">{pick(details.bairro, property.neighborhood)}</p>
                 {details.cep && <p className="text-xs text-muted-foreground font-medium">CEP: {details.cep}</p>}
+              </div>
+            </div>
+
+            <Separator className="opacity-50" />
+
+            <div className="space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                <DollarSign size={14} className="text-primary" /> Captação
+              </h3>
+              <div className="rounded-2xl border bg-gradient-to-br from-primary/[0.06] via-background to-emerald-500/[0.05] p-4 sm:p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Dados do Captador</p>
+                  {!captadoresLoading && captadores.length > 0 && (
+                    <span className="text-[10px] px-2.5 py-1 rounded-full border bg-background/80 font-black uppercase tracking-wider text-foreground/80">
+                      {captadores.length} {captadores.length > 1 ? "contatos" : "contato"}
+                    </span>
+                  )}
+                </div>
+                {captadoresLoading ? (
+                  <div className="rounded-xl border bg-background/70 p-4">
+                    <p className="text-sm font-bold">Carregando captador...</p>
+                    <p className="text-xs text-muted-foreground mt-1">Buscando os dados de contato da captação.</p>
+                  </div>
+                ) : captadores.length > 0 ? (
+                  <div className="mt-3 grid grid-cols-1 gap-3">
+                    {captadores.map((item, index) => {
+                      const nome = captadorLabel(item) || "Captador não informado"
+                      const email = captadorEmail(item) || "Email não informado"
+                      const telefone = captadorTelefone(item) || "Número não informado"
+                      const hasValidPhone = !!normalizePhoneForWhatsapp(captadorTelefone(item))
+
+                      return (
+                        <div key={index} className="rounded-xl border bg-background/85 backdrop-blur-sm p-3 sm:p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="h-10 w-10 shrink-0 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-black tracking-wider border-2 border-primary/20 overflow-hidden">
+                                {captadoresComFoto.get(nome)?.foto ? (
+                                  <img
+                                    src={captadoresComFoto.get(nome)?.foto as string}
+                                    alt={nome}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  getInitials(nome)
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-black leading-tight truncate">{nome}</p>
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mt-1">Captador responsável</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
+                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-black flex items-center gap-1">
+                                <Mail size={11} className="text-primary" /> Email
+                              </p>
+                              <p className="text-xs font-semibold mt-1 break-all">{email}</p>
+                            </div>
+                            <div className="rounded-lg border bg-muted/30 px-2.5 py-2">
+                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-black flex items-center gap-1">
+                                <Phone size={11} className="text-primary" /> Número
+                              </p>
+                              <p className="text-xs font-semibold mt-1">{telefone}</p>
+                            </div>
+                          </div>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleContactCaptador(item)}
+                            disabled={!hasValidPhone}
+                            className="mt-3 h-8 rounded-lg text-[10px] font-black uppercase tracking-widest w-full sm:w-auto"
+                          >
+                            <MessageCircle size={12} className="mr-1.5" /> Enviar Mensagem
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed bg-background/70 p-4">
+                    <p className="text-sm font-bold">Captador não informado</p>
+                    <p className="text-xs text-muted-foreground mt-1">Não encontramos dados de captação para este imóvel.</p>
+                  </div>
+                )}
               </div>
             </div>
 
