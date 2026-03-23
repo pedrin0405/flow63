@@ -94,15 +94,15 @@ export function DetailsDrawer({ lead, onClose, formatCurrency, onEditClick }: De
                 </div>
                 {/* NOVO CAMPO: Valor Lançado no Dashboard */}
                 <div className="space-y-2">
-                  <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border ${
+                  <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-md border transition-colors ${
                     lead.visibleOnDashboard && lead.valueLaunched > 0 
-                      ? "bg-emerald-50 border-emerald-200" 
-                      : "bg-slate-50 border-slate-200"
+                      ? "bg-emerald-500/10 border-emerald-500/20" 
+                      : "bg-muted/50 border-border"
                   }`}>
-                    <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600" : "text-slate-500"} font-medium`}>
+                    <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"} font-medium`}>
                       No Dashboard:
                     </span>
-                    <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-800" : "text-slate-400"} font-semibold`}>
+                    <span className={`${lead.visibleOnDashboard && lead.valueLaunched > 0 ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground/70"} font-semibold`}>
                       {lead.visibleOnDashboard && lead.valueLaunched > 0 
                         ? formatCurrency(lead.valueLaunched) 
                         : "Valor pendente"}
@@ -110,16 +110,17 @@ export function DetailsDrawer({ lead, onClose, formatCurrency, onEditClick }: De
                   </div>
 
                   {lead.visibleOnDashboard && lead.comissao !== undefined && (
-                    <div className="flex items-center justify-between text-sm px-3 py-2 rounded-md border bg-indigo-50 border-indigo-100">
-                      <span className="text-indigo-600 font-medium flex items-center gap-1.5">
+                    <div className="flex items-center justify-between text-sm px-3 py-2 rounded-md border bg-indigo-500/10 border-indigo-500/20">
+                      <span className="text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1.5">
                         <Percent size={14} /> Comissão:
                       </span>
-                      <span className="text-indigo-800 font-semibold">
+                      <span className="text-indigo-700 dark:text-indigo-300 font-semibold">
                         {lead.comissao}% ({formatCurrency((lead.valueLaunched * lead.comissao) / 100)})
                       </span>
                     </div>
                   )}
                 </div>
+
               </div>
               
 

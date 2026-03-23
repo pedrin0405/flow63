@@ -293,17 +293,17 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`${dialogMaxWidth} max-h-[90vh] h-[90vh] overflow-hidden p-0 gap-0 transition-all duration-300 flex flex-col`}>
+      <DialogContent className={`${dialogMaxWidth} max-h-[90vh] h-[90vh] overflow-hidden p-0 gap-0 transition-all duration-300 flex flex-col bg-background border-border`}>
         <div className={`grid h-full overflow-hidden ${mode === "sale" ? "grid-cols-1 md:grid-cols-12" : "grid-cols-1"}`}>
-          <div className={`flex flex-col h-full overflow-y-auto ${mode === "sale" ? "md:col-span-7 border-r bg-white" : "p-1"}`}>
+          <div className={`flex flex-col h-full overflow-y-auto ${mode === "sale" ? "md:col-span-7 border-r border-border bg-background" : "p-1"}`}>
             
             {/* Header */}
-            <div className="p-6 pb-2 sticky top-0 bg-white z-10">
+            <div className="p-6 pb-2 sticky top-0 bg-background z-10 border-b border-transparent">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-xl">
+                <DialogTitle className="flex items-center gap-2 text-xl text-foreground">
                   {mode === "sale" ? <><div className="text-emerald-500 font-bold text-lg">R$</div> Lançar Venda</> : <><User className="text-primary" /> Editar Lead</>}
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-muted-foreground">
                   {mode === "sale" ? "Confirme os imóveis e os valores da negociação." : "Atualize os dados de contato."}
                 </DialogDescription>
               </DialogHeader>
@@ -311,21 +311,21 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
 
             <div className="p-6 pt-2 space-y-6 flex-1">
               <div className="grid gap-2">
-                <Label htmlFor="clientName">Nome do Cliente</Label>
-                <Input id="clientName" value={formData.clientName || ""} onChange={(e) => setFormData({ ...formData, clientName: e.target.value })} className="font-medium" />
+                <Label htmlFor="clientName" className="text-foreground">Nome do Cliente</Label>
+                <Input id="clientName" value={formData.clientName || ""} onChange={(e) => setFormData({ ...formData, clientName: e.target.value })} className="font-medium bg-background border-border" />
               </div>
 
               {mode === "sale" && (
                 <>
                   {/* Seção Adicionar Imóvel */}
-                  <div className="p-4 bg-slate-50 border rounded-lg space-y-3">
-                    <Label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-1"><Plus size={12} /> Adicionar Imóvel</Label>
+                  <div className="p-4 bg-muted/40 border border-border rounded-lg space-y-3">
+                    <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1"><Plus size={12} /> Adicionar Imóvel</Label>
                     <div className="flex gap-2">
                       <div className="flex-1">
-                        <Input placeholder="Cód. Imóvel" value={novoImovel.codigo || ""} onChange={(e) => setNovoImovel({...novoImovel, codigo: e.target.value})} className="bg-white" />
+                        <Input placeholder="Cód. Imóvel" value={novoImovel.codigo || ""} onChange={(e) => setNovoImovel({...novoImovel, codigo: e.target.value})} className="bg-background border-border" />
                       </div>
                       <div className="flex-1 relative">
-                        <Input type="text" className="pl-3 bg-white" placeholder="0,00" value={valorVisual} onChange={(e) => {
+                        <Input type="text" className="pl-3 bg-background border-border" placeholder="0,00" value={valorVisual} onChange={(e) => {
                           const numericValue = parseBRLToNumber(e.target.value);
                           setNovoImovel({...novoImovel, valor: numericValue});
                           setValorVisual(formatToBRL(numericValue));
@@ -338,17 +338,17 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                   {/* VGV Total e VGV DASH */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label className="text-emerald-700 font-semibold text-xs">VGV Total</Label>
+                      <Label className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs">VGV Total</Label>
                       <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-xs font-bold text-emerald-600">R$</span>
-                        <Input readOnly className="pl-9 border-emerald-200 bg-emerald-50 text-emerald-700 font-bold h-10 w-full" value={formatCurrency(formData.valor_venda)} />
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">R$</span>
+                        <Input readOnly className="pl-9 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold h-10 w-full" value={formatCurrency(formData.valor_venda)} />
                       </div>
                     </div>
                     <div className="grid gap-2">
-                      <Label className="text-blue-700 font-semibold text-xs">VGV DASH (Atual no Banco)</Label>
+                      <Label className="text-blue-600 dark:text-blue-400 font-semibold text-xs">VGV DASH (Atual no Banco)</Label>
                       <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-xs font-bold text-blue-600">R$</span>
-                        <Input readOnly className="pl-9 border-blue-200 bg-blue-50 text-blue-700 font-bold h-10 w-full" value={formatCurrency(formData.valor_venda_db)} />
+                        <span className="absolute left-3 top-2.5 text-xs font-bold text-blue-600 dark:text-blue-400">R$</span>
+                        <Input readOnly className="pl-9 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-bold h-10 w-full" value={formatCurrency(formData.valor_venda_db)} />
                       </div>
                     </div>
                   </div>
@@ -356,28 +356,28 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                   {/* Data e Comissão */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label className="text-xs font-medium text-slate-500">Data da Venda</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">Data da Venda</Label>
                       <div className="relative">
                         <Calendar size={14} className="absolute left-3 top-3 text-muted-foreground" />
-                        <Input type="datetime-local" className="pl-9 text-[11px] h-10 w-full" value={formData.data_venda || ""} onChange={(e) => setFormData({ ...formData, data_venda: e.target.value })} />
+                        <Input type="datetime-local" className="pl-9 text-[11px] h-10 w-full bg-background border-border" value={formData.data_venda || ""} onChange={(e) => setFormData({ ...formData, data_venda: e.target.value })} />
                       </div>
                     </div>
                     <div className="grid gap-2">
-                      <Label className="text-xs font-medium text-slate-500">Comissão (%)</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">Comissão (%)</Label>
                       <div className="relative">
                         <Percent size={14} className="absolute left-3 top-3 text-muted-foreground" />
-                        <Input type="number" className="pl-9 h-10 w-full" value={formData.comissao} onChange={(e) => setFormData({ ...formData, comissao: Number(e.target.value) })} />
+                        <Input type="number" className="pl-9 h-10 w-full bg-background border-border" value={formData.comissao} onChange={(e) => setFormData({ ...formData, comissao: Number(e.target.value) })} />
                       </div>
                     </div>
                   </div>
 
                   <div className="grid gap-2">
-                    <Label>Observações</Label>
-                    <Textarea placeholder="Forma de pagamento..." className="min-h-[80px]" value={formData.obs_venda || ""} onChange={(e) => setFormData({ ...formData, obs_venda: e.target.value })} />
+                    <Label className="text-foreground">Observações</Label>
+                    <Textarea placeholder="Forma de pagamento..." className="min-h-[80px] bg-background border-border" value={formData.obs_venda || ""} onChange={(e) => setFormData({ ...formData, obs_venda: e.target.value })} />
                   </div>
 
                   <div className={`flex items-center space-x-2 border p-3 rounded-md transition-all duration-300 ${
-                      isDashboardVisible ? 'bg-emerald-50 border-emerald-100' : 'bg-muted/50 border-transparent'
+                      isDashboardVisible ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-muted/50 border-transparent'
                     }`}>
                       <Checkbox 
                         id="status_dashboard" 
@@ -386,10 +386,10 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                           setFormData({ ...formData, status_dashboard: checked as boolean });
                         }} 
                       />
-                      <Label htmlFor="status_dashboard" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                      <Label htmlFor="status_dashboard" className="text-sm font-medium cursor-pointer flex items-center gap-2 text-foreground">
                         {isDashboardVisible ? (
                           <div className="flex items-center gap-2 animate-in fade-in duration-300">
-                            <Eye size={14} className="text-emerald-600"/>
+                            <Eye size={14} className="text-emerald-600 dark:text-emerald-400"/>
                             <span>Visível no Dashboard</span>
                           </div>
                         ) : (
@@ -405,13 +405,13 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
             </div>
 
             {/* Footer com Botão de Remover */}
-            <DialogFooter className="p-6 border-t mt-auto bg-gray-50/50 sticky bottom-0 flex justify-between items-center">
+            <DialogFooter className="p-6 border-t border-border mt-auto bg-muted/20 sticky bottom-0 flex justify-between items-center">
               <div className="flex-1">
                 {mode === "sale" && hasSaleInDb && (
                   <Button 
                     type="button" 
                     variant="ghost" 
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-2 px-2" 
+                    className="text-red-500 hover:text-red-600 hover:bg-red-500/10 gap-2 px-2" 
                     onClick={handleRemoveSale}
                     disabled={loadingAction}
                   >
@@ -421,7 +421,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                 )}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={onClose}>Cancelar</Button>
+                <Button variant="outline" onClick={onClose} className="border-border">Cancelar</Button>
                 <Button onClick={handleConfirmSave} className={mode === "sale" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}>
                   {mode === "sale" ? "Confirmar Venda" : "Salvar"}
                 </Button>
@@ -431,13 +431,13 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
 
           {/* Lateral de Imóveis */}
           {mode === "sale" && (
-            <div className="md:col-span-5 bg-slate-100/80 flex flex-col h-full border-l overflow-hidden">
+            <div className="md:col-span-5 bg-muted/30 flex flex-col h-full border-l border-border overflow-hidden">
               <div className="p-6 pb-2 shrink-0">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                    <Home size={16} className="text-slate-500" />
+                  <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Home size={16} className="text-muted-foreground" />
                     Imóveis Selecionados
-                    <span className="ml-1 bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded-full">{formData.lista_imoveis?.length || 0}</span>
+                    <span className="ml-1 bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full">{formData.lista_imoveis?.length || 0}</span>
                   </h4>
                   {loadingImoveis && <Loader2 size={14} className="animate-spin text-emerald-600" />}
                 </div>
@@ -449,9 +449,9 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                   const apenasEmVendas = item.origemVendas === true;
                   
                   return (
-                    <div key={index} className={`group relative bg-white border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 ${jaVendido || apenasEmVendas ? "border-emerald-200 ring-1 ring-emerald-100" : "border-slate-200"}`}>
-                      <div className="aspect-video w-full bg-slate-100 relative overflow-hidden">
-                        {item.imagem ? <img src={item.imagem} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt="Imóvel" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-slate-300 w-8" /></div>}
+                    <div key={index} className={`group relative bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 ${jaVendido || apenasEmVendas ? "border-emerald-500/50 ring-1 ring-emerald-500/20" : "border-border"}`}>
+                      <div className="aspect-video w-full bg-muted relative overflow-hidden">
+                        {item.imagem ? <img src={item.imagem} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt="Imóvel" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-muted-foreground/30 w-8" /></div>}
                         
                         {apenasEmVendas ? (
                           <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
@@ -465,18 +465,18 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
                         <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeImovel(index)}><Trash2 size={12} /></Button>
                       </div>
                       <div className="p-3">
-                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">#{item.codigo}</span>
-                        <p className="text-emerald-700 font-bold text-sm mt-1">{formatCurrency(item.valor)}</p>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-muted text-muted-foreground">#{item.codigo}</span>
+                        <p className="text-emerald-600 dark:text-emerald-400 font-bold text-sm mt-1">{formatCurrency(item.valor)}</p>
                       </div>
                     </div>
                   )
                 })}
               </div>
 
-              <div className="p-4 border-t border-slate-200 shrink-0 bg-slate-100">
+              <div className="p-4 border-t border-border shrink-0 bg-muted/40">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Subtotal:</span>
-                  <span className="font-bold text-slate-800">{formatCurrency(formData.valor_venda)}</span>
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span className="font-bold text-foreground">{formatCurrency(formData.valor_venda)}</span>
                 </div>
               </div>
             </div>
@@ -484,5 +484,6 @@ export function EditLeadModal({ lead, isOpen, onClose, onSave, mode = "edit" }: 
         </div>
       </DialogContent>
     </Dialog>
+
   )
 }

@@ -149,24 +149,24 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
       {/* --- RODAPÉ DO CARD --- */}
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <span className={`font-bold text-lg ${isActive ? "text-black-700" : "text-foreground"}`}>
+          <span className={`font-bold text-lg ${isActive ? "text-primary dark:text-primary-foreground/90" : "text-foreground"}`}>
             {formatCurrency(lead.valueLaunched > 0 ? lead.valueLaunched : lead.value)}
           </span>
         </div>
 
         {/* Campo de Valor Lançado */}
-        <div className="flex items-center justify-between text-sm px-3 py-2 rounded-md border bg-slate-50 shadow-sm">
+        <div className="flex items-center justify-between text-sm px-3 py-2 rounded-md border bg-muted/30 dark:bg-muted/10 border-border shadow-sm">
           <span className={`${
             isActive && lead.valueLaunched > 0 
-              ? isHidden ? "text-orange-600" : "text-emerald-600" 
-              : "text-slate-500"
+              ? isHidden ? "text-orange-600 dark:text-orange-400" : "text-emerald-600 dark:text-emerald-400" 
+              : "text-muted-foreground"
           } font-medium`}>
             No Dashboard:
           </span>
           <span className={`${
             isActive && lead.valueLaunched > 0 
-              ? isHidden ? "text-orange-800" : "text-emerald-800" 
-              : "text-slate-400"
+              ? isHidden ? "text-orange-700 dark:text-orange-300" : "text-emerald-700 dark:text-emerald-300" 
+              : "text-muted-foreground/60"
           } font-semibold`}>
             {isActive && lead.valueLaunched > 0 
               ? formatCurrency(lead.valueLaunched) 
@@ -217,9 +217,9 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
               className={`h-7 text-xs px-3 gap-1.5 transition-all shadow-sm ${
                 isActive 
                   ? isHidden
-                    ? "border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 hover:text-orange-800 hover:border-orange-300" // Cor Laranja se Oculto
-                    : "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300" // Cor Verde se Visível
-                  : "bg-primary hover:bg-primary/90"
+                    ? "border-orange-500/30 text-orange-600 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20" // Cor Laranja se Oculto
+                    : "border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" // Cor Verde se Visível
+                  : "bg-primary hover:bg-primary/90 text-primary-foreground"
               }`}
               onClick={(e) => {
                 e.preventDefault();
@@ -240,6 +240,7 @@ export function LeadCard({ lead, formatCurrency, onClick, onAddToDashboard }: Le
           </div>
         </div>
       </div>
+
     </div>
   )
 }
