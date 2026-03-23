@@ -16,6 +16,7 @@ interface PropertyMapProps {
   zoom?: number
   className?: string
   showPopups?: boolean
+  featuredCodes?: string[]
 }
 
 // O componente real do Leaflet que só roda no cliente

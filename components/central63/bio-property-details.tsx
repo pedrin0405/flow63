@@ -93,6 +93,25 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber, is
   const transitionSettings = { type: "spring" as const, damping: 30, stiffness: 300, mass: 0.8 };
 
   if (!property) return null;
+  const propertyCode = details?.codigo || property.id || property.codigo || "N/A";
+
+  const sanitizeAddressPart = (value: any) => {
+    if (value === null || value === undefined) return null;
+    const cleaned = String(value).replace(/\*+/g, "").trim();
+    return cleaned.length > 0 ? cleaned : null;
+  };
+
+  const fullAddress = [
+    sanitizeAddressPart(details?.endereco || property?.endereco || property?.address),
+    sanitizeAddressPart(details?.numero) ? `Nº ${sanitizeAddressPart(details?.numero)}` : null,
+    sanitizeAddressPart(details?.complemento),
+    sanitizeAddressPart(details?.bloco) ? `Bloco ${sanitizeAddressPart(details?.bloco)}` : null,
+    sanitizeAddressPart(details?.edificio),
+    sanitizeAddressPart(details?.bairro || property?.bairro),
+    sanitizeAddressPart(details?.cidade || property?.cidade),
+    sanitizeAddressPart(details?.estado || property?.estado),
+    sanitizeAddressPart(details?.cep) ? `CEP ${sanitizeAddressPart(details?.cep)}` : null,
+  ].filter(Boolean).join(", ");
 
   const features = [
     { icon: Ruler, label: "Área", value: details?.areaprincipal ? `${details.areaprincipal}m²` : null },
@@ -233,13 +252,16 @@ export function BioPropertyDetails({ property, onClose, tema, whatsappNumber, is
                 <span className="px-3 py-1 rounded-lg text-[12px] font-black uppercase tracking-[1.5px] border border-current opacity-60">
                   {details?.situacao || "Venda"}
                 </span>
+                <span className="px-3 py-1 rounded-lg text-[12px] font-black uppercase tracking-[1.5px] bg-primary/15 border border-primary/30 text-primary">
+                  Código: {propertyCode}
+                </span>
               </div>
               <h2 className={cn("font-black tracking-tighter leading-[1.1]", isPreview ? "text-[22px]" : "text-2xl md:text-4xl")}>
                 {details?.titulo || property.titulo}
               </h2>
               <div className="flex items-center gap-2 text-sm font-medium opacity-50">
                 <MapPin className="w-4 h-4 text-rose-500" />
-                {details?.bairro}, {details?.cidade}
+                {fullAddress || `${details?.bairro || property?.bairro || ""}, ${details?.cidade || property?.cidade || ""}`}
               </div>
               <div className={cn("font-black tracking-tight pt-2", isPreview ? "text-[26px]" : "text-3xl md:text-4xl")} style={{ color: accentColor }}>
                 {details?.valor || property.preco}
