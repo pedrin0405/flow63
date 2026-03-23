@@ -16,14 +16,14 @@ export function PropertyCard({ property, formatCurrency, onClick, isFeatured = f
   return (
     <div 
       className={cn(
-        "relative overflow-hidden rounded-2xl border bg-white/70 dark:bg-zinc-900/55 backdrop-blur-xl cursor-pointer transition-all duration-500 group",
-        "hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/10 dark:hover:shadow-black/30",
-        isFeatured ? "border-amber-400/45 shadow-lg shadow-amber-500/10" : "border-white/45 dark:border-white/10",
+        "relative overflow-hidden rounded-2xl border bg-white/95 dark:bg-zinc-900/55 backdrop-blur-xl cursor-pointer transition-all duration-500 group",
+        "shadow-md shadow-zinc-900/8 dark:shadow-none hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/12 dark:hover:shadow-black/30",
+        isFeatured ? "border-amber-400/55 shadow-lg shadow-amber-500/12" : "border-zinc-200/90 dark:border-white/10",
         isHighlighted && "ring-2 ring-primary/50 border-primary/35 scale-[1.01]"
       )}
       onClick={onClick}
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/25 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-200/80 dark:via-white/25 to-transparent" />
 
       <div className="relative aspect-[16/11] bg-muted overflow-hidden">
         <img 
@@ -66,14 +66,14 @@ export function PropertyCard({ property, formatCurrency, onClick, isFeatured = f
             </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/40 dark:border-white/10">
-            <div className="flex flex-col rounded-lg bg-white/60 dark:bg-zinc-900/45 px-2.5 py-2">
+        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-200/90 dark:border-white/10">
+          <div className="flex flex-col rounded-lg bg-zinc-100/80 dark:bg-zinc-900/45 px-2.5 py-2 border border-zinc-200/75 dark:border-white/10">
                 <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                     <Expand size={10} /> Área
                 </span>
                 <span className="text-xs font-bold">{property.area || "--"} m²</span>
             </div>
-            <div className="flex flex-col text-right rounded-lg bg-white/60 dark:bg-zinc-900/45 px-2.5 py-2">
+          <div className="flex flex-col text-right rounded-lg bg-zinc-100/80 dark:bg-zinc-900/45 px-2.5 py-2 border border-zinc-200/75 dark:border-white/10">
                  <span className="text-[11px] text-muted-foreground flex items-center gap-1 justify-end">
                     <TrendingUp size={10} /> Valor m²
                 </span>
