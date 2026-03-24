@@ -38,6 +38,8 @@ export const Artboard = ({
     let retryCount = 0;
     
     const initCanvas = async () => {
+      console.log(`[Artboard ${id}] Initing canvas...`, { hasInitialData: !!initialData });
+      
       // Verifica se o fabricCanvas.current já existe
       if (!fabricCanvas.current) {
         if (isMounted) setTimeout(initCanvas, 50);
@@ -51,23 +53,28 @@ export const Artboard = ({
       }
 
       // Carrega dados se for a primeira vez OU se o canvas estiver vazio mas tivermos dados iniciais
-      // Isso protege contra o caso em que o canvas foi reiniciado pelo hook
       const objects = fabricCanvas.current.getObjects();
-      if (initialData && (objects.length === 0 || !isInitialized.current)) {
+      const alreadyInitialized = isInitialized.current;
+
+      if (initialData && (objects.length === 0 || !alreadyInitialized)) {
         if (!isMounted || isDisposed.current) return;
         try {
+          console.log(`[Artboard ${id}] Loading initial data...`);
           await loadFromJson(initialData);
+          console.log(`[Artboard ${id}] Data loaded successfully.`);
         } catch (err) {
-          console.error("Erro ao carregar JSON na prancheta:", err);
+          console.error(`[Artboard ${id}] Erro ao carregar JSON:`, err);
         }
-      } else if (!initialData) {
-        isInitialized.current = true;
-      }
+      } 
       
+      // Sempre registra os métodos na primeira vez, independente de ter dados ou não
       if (isMounted) {
-        if (!isInitialized.current) {
-          isInitialized.current = true;
-          onMethodsReady(id, methods);
+        if (!alreadyInitialized || isInitialized.current) {
+          if (!isDisposed.current) {
+            console.log(`[Artboard ${id}] Registering methods to parent...`);
+            isInitialized.current = true;
+            onMethodsReady(id, methods);
+          }
         }
       }
     };

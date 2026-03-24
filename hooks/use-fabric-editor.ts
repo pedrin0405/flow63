@@ -51,18 +51,49 @@ export const useFabricEditor = () => {
     setUpdateTrigger((prev) => prev + 1);
   }, []);
 
+  const saveToJson = useCallback(() => {
+    if (!fabricCanvas.current || isDisposed.current) {
+      console.warn("[useFabricEditor] saveToJson ignorado: canvas não disponível ou destruído.");
+      return JSON.stringify({ version: "7.2.0", objects: [] });
+    }
+
+    try {
+      // No Fabric 7, o toJSON/toObject deve ser chamado com as propriedades extras desejadas
+      const extraProps = [
+        'variableId', 'isFrame', 'frameType', 'customRadii', 'locked', 'isCropped', 
+        '_origFrameW', '_origFrameH', '_origFrameScaleX', '_origFrameScaleY',
+        'originX', 'originY', 'customName', 'clipPath', 'isPlaceholder'
+      ];
+      
+      const canvasObj = fabricCanvas.current.toObject(extraProps);
+      
+      const objectsCount = canvasObj.objects?.length || 0;
+      console.log(`[useFabricEditor] Serializando canvas. Objetos encontrados: ${objectsCount}`);
+      
+      if (objectsCount === 0 && fabricCanvas.current.getObjects().length > 0) {
+        console.error("[useFabricEditor] ALERTA: toObject retornou 0 objetos mas o canvas físico tem objetos!");
+      }
+
+      const json = JSON.stringify(canvasObj);
+      return json;
+    } catch (error) {
+      console.error("[useFabricEditor] Erro crítico na serialização saveToJson:", error);
+      return JSON.stringify({ version: "7.2.0", objects: [], error: String(error) });
+    }
+  }, []);
+
   const saveHistory = useCallback(() => {
     if (!fabricCanvas.current || isHistoryProcessing.current || isDisposed.current) return;
-    const json = JSON.stringify((fabricCanvas.current as any).toObject([
-      'variableId', 'isFrame', 'frameType', 'customRadii', 'locked', 'isCropped', 
-      '_origFrameW', '_origFrameH', '_origFrameScaleX', '_origFrameScaleY',
-      'originX', 'originY', 'customName'
-    ]));
-    if (undoStack.current.length > 0 && undoStack.current[undoStack.current.length - 1] === json) return;
-    undoStack.current.push(json);
-    redoStack.current = [];
-    if (undoStack.current.length > 50) undoStack.current.shift();
-    forceUpdate();
+    try {
+      const json = saveToJson();
+      if (undoStack.current.length > 0 && undoStack.current[undoStack.current.length - 1] === json) return;
+      undoStack.current.push(json);
+      redoStack.current = [];
+      if (undoStack.current.length > 50) undoStack.current.shift();
+      forceUpdate();
+    } catch (err) {
+      console.error("Erro ao salvar histórico:", err);
+    }
   }, [forceUpdate]);
 
   const undo = useCallback(async () => {
@@ -623,11 +654,14 @@ export const useFabricEditor = () => {
     toast.info("Recorte removido");
   }, [selectedObject, saveHistory, forceUpdate]);
 
-  const exportToImage = useCallback(() => fabricCanvas.current?.toDataURL({ format: 'png', multiplier: 2 }) || '', []);
-  const saveToJson = useCallback(() => fabricCanvas.current ? JSON.stringify((fabricCanvas.current as any).toObject(['variableId', 'isFrame', 'frameType', 'customRadii', 'locked', 'isCropped', 'customName', '_origFrameW', '_origFrameH', '_origFrameScaleX', '_origFrameScaleY'])) : '', []);
+  const exportToImage = useCallback(() => {
+    if (!fabricCanvas.current || isDisposed.current) return '';
+    return fabricCanvas.current.toDataURL({ format: 'png', multiplier: 2 }) || '';
+  }, []);
+  
 
   const loadFromJson = useCallback(async (json: any) => {
-    if (!fabricCanvas.current || isDisposed.current) return;
+    if (!json || !fabricCanvas.current || isDisposed.current) return;
     
     // Verifica se o contexto ainda é válido
     const ctx = fabricCanvas.current.getContext();
