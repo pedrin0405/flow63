@@ -323,7 +323,7 @@ export default function PublicFormPage() {
 
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <Label className="font-bold text-gray-700">Endereço(s)</Label>
+                    <Label className="font-bold text-gray-700">Endereço de imóvel á Venda/Locação</Label>
                     <Button 
                       type="button" 
                       onClick={addEndereco}

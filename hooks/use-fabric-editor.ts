@@ -406,14 +406,14 @@ export const useFabricEditor = () => {
   const addShape = useCallback((type: 'rect' | 'circle' | 'triangle' | 'line') => {
     if (!fabricCanvas.current || isDisposed.current) return;
     let shapeObj: fabric.FabricObject;
-    const base = { fill: '#94a3b8', originX: 'center' as const, originY: 'center' as const };
+    const base = { fill: '#94a3b8', originX: 'center' as const, originY: 'center' as const, strokeLineJoin: 'round' as const };
     if (type === 'rect') { 
       shapeObj = new fabric.Rect({ ...base, width: 100, height: 100 }); 
       (shapeObj as any).customRadii = { tl: 0, tr: 0, br: 0, bl: 0 }; 
     }
     else if (type === 'circle') shapeObj = new fabric.Circle({ ...base, radius: 50 });
     else if (type === 'triangle') shapeObj = new fabric.Triangle({ ...base, width: 100, height: 100 });
-    else shapeObj = new fabric.Line([-75, 0, 75, 0], { stroke: '#94a3b8', strokeWidth: 5, originX: 'center', originY: 'center' });
+    else shapeObj = new fabric.Line([-75, 0, 75, 0], { stroke: '#94a3b8', strokeWidth: 5, originX: 'center', originY: 'center', strokeLineCap: 'round' });
     
     (shapeObj as any).variableId = null; (shapeObj as any).isFrame = false; (shapeObj as any).locked = false; (shapeObj as any).customName = '';
     
@@ -698,18 +698,33 @@ export const useFabricEditor = () => {
     const obj = selectedObject, scaleX = obj.scaleX || 1;
     const utl = tl / scaleX, utr = tr / scaleX, ubr = br / scaleX, ubl = bl / scaleX;
     (obj as any).customRadii = { tl, tr, br, bl };
+    
     if (obj.type === 'image' || obj.type === 'rect') {
-      if (obj.type === 'rect') (obj as fabric.Rect).set({ rx: 0, ry: 0 });
       let tw = (obj as any).width || 0, th = (obj as any).height || 0;
-      if (obj.type === 'image' && obj.clipPath && (obj as any).frameType === 'rect') { 
-        tw = (obj.clipPath as any).width || 0; 
-        th = (obj.clipPath as any).height || 0; 
-      }
-      if (utl <= 0 && utr <= 0 && ubr <= 0 && ubl <= 0) obj.set('clipPath', undefined);
-      else {
-         const pathStr = createRoundedRectPathString(tw, th, utl, utr, ubr, ubl);
-         const clipPath = new fabric.Path(pathStr, { originX: 'center', originY: 'center', left: 0, top: 0 });
-         obj.set('clipPath', clipPath);
+      
+      if (obj.type === 'rect') {
+        const rect = obj as fabric.Rect;
+        rect.set({ strokeLineJoin: 'round', strokeLineCap: 'round' });
+        // Se todos os cantos forem iguais, usamos o rx/ry nativo do Fabric para um arredondamento perfeito (interno e externo)
+        if (tl === tr && tr === br && br === bl) {
+          rect.set({ rx: utl, ry: utl, clipPath: undefined });
+        } else {
+          rect.set({ rx: 0, ry: 0 });
+          const pathStr = createRoundedRectPathString(tw, th, utl, utr, ubr, ubl);
+          const clipPath = new fabric.Path(pathStr, { originX: 'center', originY: 'center', left: 0, top: 0 });
+          rect.set('clipPath', clipPath);
+        }
+      } else if (obj.type === 'image') {
+        if (obj.clipPath && (obj as any).frameType === 'rect') { 
+          tw = (obj.clipPath as any).width || 0; 
+          th = (obj.clipPath as any).height || 0; 
+        }
+        if (utl <= 0 && utr <= 0 && ubr <= 0 && ubl <= 0) obj.set('clipPath', undefined);
+        else {
+           const pathStr = createRoundedRectPathString(tw, th, utl, utr, ubr, ubl);
+           const clipPath = new fabric.Path(pathStr, { originX: 'center', originY: 'center', left: 0, top: 0 });
+           obj.set('clipPath', clipPath);
+        }
       }
       obj.set('dirty', true); saveHistory();
     } 
@@ -888,7 +903,9 @@ export const useFabricEditor = () => {
       selectedObject.set({
         fill: 'transparent',
         stroke: currentColor,
-        strokeWidth: selectedObject.strokeWidth || 2
+        strokeWidth: selectedObject.strokeWidth || 2,
+        strokeLineJoin: 'round',
+        strokeLineCap: 'round'
       });
     } else {
       // Ativa preenchimento: transfere a cor do contorno para o preenchimento

@@ -38,7 +38,7 @@ import {
   Maximize, ArrowUpToLine, ArrowDownToLine, CircleDashed, SquareDashed, ImagePlus,
   LayoutTemplate, Shapes, Palette, UploadCloud, Wand2, FolderHeart, Lock, Crown,
   CornerUpLeft, CornerUpRight, CornerDownLeft, CornerDownRight, Loader2, Share, Menu, Crop,
-  ZoomIn, ZoomOut, Focus, LockOpen, Unlink, Move, Scissors, Check, X,
+  ZoomIn, ZoomOut, Focus, LockOpen, Unlink, Move, Scissors, Check, X, FolderPlus,
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ArrowRightToLine, Type, Paintbrush, Undo2, Redo2, Plus, Copy, ChevronUp, ChevronDown, ChevronRight, Files, Edit3, FileDown,
   Eye, EyeOff, Square, Circle, Triangle, Minus, Grab, MoreVertical, Home, GripVertical
@@ -520,6 +520,7 @@ function SupportContent() {
   const searchParams = useSearchParams();
   const [canvasTitle, setCanvasTitle] = useState('Nova Arte Sem Título');
   const [isSaving, setIsSaving] = useState(false);
+  const [autoSave, setAutoSave] = useState(true);
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('editor'); 
@@ -559,6 +560,7 @@ function SupportContent() {
 
   const [showLanding, setShowLanding] = useState(true);
   const [isNewDesignModalOpen, setIsNewDesignModalOpen] = useState(false);
+  const [isAddProjectsModalOpen, setIsAddProjectsModalOpen] = useState(false);
 
   const [gradColor1, setGradColor1] = useState('#3b82f6');
   const [gradColor2, setGradColor2] = useState('#1d4ed8');
@@ -1021,9 +1023,9 @@ function SupportContent() {
     setCornerRadii(newRadii.tl, newRadii.tr, newRadii.br, newRadii.bl);
   };
 
-  const handleCreateNew = () => {
+  const handleCreateNew = (width = 1080, height = 1080) => {
     const newId = uuidv4();
-    setArtboards([{ id: newId, title: 'Prancheta 1', width: 1080, height: 1080 }]);
+    setArtboards([{ id: newId, title: 'Prancheta 1', width, height }]);
     setActiveArtboardId(newId);
     setCanvasTitle('Nova Arte Sem Título');
     setCurrentModelId(null);
@@ -1064,9 +1066,9 @@ function SupportContent() {
     setZoomLevel(0.6);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (silent = false) => {
     try {
-      setIsSaving(true);
+      if (!silent) setIsSaving(true);
       
       const artboardsWithData = artboards.map(a => {
         const methods = artboardsMethods.current[a.id];
@@ -1077,21 +1079,30 @@ function SupportContent() {
       });
 
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) throw new Error("Precisa fazer login para guardar modelos.");
+      if (authError || !user) {
+        if (!silent) throw new Error("Precisa fazer login para guardar modelos.");
+        return;
+      }
 
       const firstMethods = artboardsMethods.current[artboards[0].id];
       const thumbnailUrl = firstMethods?.exportToImage(); 
       let savedThumbnailUrl = null;
 
-      if (thumbnailUrl) {
-         const response = await fetch(thumbnailUrl);
-         const blob = await response.blob();
-         const fileName = `${user.id}/thumb_${Date.now()}.png`;
-         
-         const { error: uploadError } = await supabase.storage.from('user-uploads').upload(fileName, blob, { upsert: true });
-         if (!uploadError) {
-           const { data: { publicUrl } } = supabase.storage.from('user-uploads').getPublicUrl(fileName);
-           savedThumbnailUrl = publicUrl;
+      // Só faz upload da thumbnail se NÃO for silent (performance e economia)
+      // No silent, confiamos na thumb anterior ou salvamos sem thumb
+      if (thumbnailUrl && !silent) {
+         try {
+           const response = await fetch(thumbnailUrl);
+           const blob = await response.blob();
+           const fileName = `${user.id}/thumb_${Date.now()}.png`;
+           
+           const { error: uploadError } = await supabase.storage.from('user-uploads').upload(fileName, blob, { upsert: true });
+           if (!uploadError) {
+             const { data: { publicUrl } } = supabase.storage.from('user-uploads').getPublicUrl(fileName);
+             savedThumbnailUrl = publicUrl;
+           }
+         } catch (e) {
+           console.error("Erro ao salvar thumb:", e);
          }
       }
 
@@ -1105,21 +1116,34 @@ function SupportContent() {
       if (currentModelId) {
         const { error: updateError } = await supabase.from('design_models').update(payload).eq('id', currentModelId);
         if (updateError) throw updateError;
-        toast.success('Projeto atualizado com sucesso!');
+        if (!silent) toast.success('Projeto atualizado com sucesso!');
       } else {
+        // Agora permite criar novo projeto no auto-save (silent)
         const { data, error: insertError } = await supabase.from('design_models').insert(payload).select().single();
         if (insertError) throw insertError;
         setCurrentModelId(data.id);
-        toast.success('Novo projeto salvo com sucesso!');
+        if (!silent) toast.success('Novo projeto salvo com sucesso!');
       }
 
       fetchModels(); 
     } catch (error: any) {
-      toast.error(error.message || "Falha ao salvar o modelo.");
+      if (!silent) toast.error(error.message || "Falha ao salvar o modelo.");
     } finally {
-      setIsSaving(false);
+      if (!silent) setIsSaving(false);
     }
   };
+
+  // Auto-save effect: Triggers on any meaningful change (fabric, title, artboard selection)
+  // Intervalo de 2 minutos (120000ms) conforme solicitado pelo usuário
+  useEffect(() => {
+    if (!autoSave) return;
+
+    const timer = setTimeout(() => {
+      handleSave(true);
+    }, 120000); 
+
+    return () => clearTimeout(timer);
+  }, [artboards, canvasTitle, activeArtboardId, autoSave, currentModelId, activeEditor?.changeCount]);
 
   const handleSaveAsTemplate = async () => {
     if (!templateSaveName.trim()) {
@@ -1540,64 +1564,242 @@ function SupportContent() {
     }
   }) : null;
 
+  const ManageFolderProjectsDialog = () => {
+    const [localLoading, setLocalLoading] = useState<string | null>(null);
+
+    const toggleProjectInFolder = async (project: any) => {
+      if (!activeTemplateFolderId) return;
+      
+      const existingTemplate = activeTemplateFolderTemplates.find(t => t.title === project.title);
+      
+      try {
+        setLocalLoading(project.id);
+        if (existingTemplate) {
+          // Remover
+          const { error } = await supabase.from('design_templates').delete().eq('id', existingTemplate.id);
+          if (error) throw error;
+          toast.success(`"${project.title}" removido da pasta.`);
+        } else {
+          // Adicionar
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          const { error } = await supabase.from('design_templates').insert({
+            user_id: user.id,
+            folder_id: activeTemplateFolderId,
+            title: project.title,
+            data: project.data,
+            thumbnail_url: project.thumbnail_url
+          });
+          if (error) throw error;
+          toast.success(`"${project.title}" adicionado à pasta.`);
+        }
+        await fetchModels();
+      } catch (error: any) {
+        toast.error(error.message || "Erro ao atualizar pasta.");
+      } finally {
+        setLocalLoading(null);
+      }
+    };
+
+    return (
+      <Dialog open={isAddProjectsModalOpen} onOpenChange={setIsAddProjectsModalOpen}>
+        <DialogContent className="rounded-[2rem] max-w-xl p-0 overflow-hidden glass-panel border-none shadow-2xl">
+          <div className="p-8">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Gerenciar Projetos na Pasta</DialogTitle>
+              <DialogDescription className="text-slate-500 dark:text-slate-400 font-medium text-sm">
+                Selecione seus projetos pessoais para adicionar a esta pasta como templates.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+              {savedModels.length === 0 ? (
+                <div className="py-12 text-center opacity-40">
+                  <Layers className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                  <p className="text-sm font-medium">Você ainda não tem projetos salvos.</p>
+                </div>
+              ) : (
+                savedModels.map((project) => {
+                  const isInFolder = activeTemplateFolderTemplates.some(t => t.title === project.title);
+                  const isLoading = localLoading === project.id;
+
+                  return (
+                    <div 
+                      key={project.id}
+                      className={cn(
+                        "flex items-center justify-between p-4 rounded-2xl border transition-all",
+                        isInFolder 
+                          ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50" 
+                          : "bg-white dark:bg-zinc-900/50 border-slate-100 dark:border-zinc-800 hover:border-slate-200 dark:hover:border-zinc-700"
+                      )}
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-12 h-9 rounded-lg bg-slate-100 dark:bg-zinc-800 overflow-hidden shrink-0 border border-slate-200/50 dark:border-zinc-700/50">
+                          {project.thumbnail_url ? (
+                            <img src={project.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Layers className="w-4 h-4 text-slate-300 dark:text-zinc-600" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200 truncate">{project.title}</h4>
+                          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                            {new Date(project.updated_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant={isInFolder ? "default" : "outline"}
+                        onClick={() => toggleProjectInFolder(project)}
+                        disabled={!!localLoading}
+                        className={cn(
+                          "h-8 px-4 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all",
+                          isInFolder 
+                            ? "bg-blue-600 hover:bg-red-600 hover:text-white" 
+                            : "border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400"
+                        )}
+                      >
+                        {isLoading ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : isInFolder ? (
+                          <Check className="w-3 h-3 mr-1.5" />
+                        ) : (
+                          <Plus className="w-3 h-3 mr-1.5" />
+                        )}
+                        {isInFolder ? "Na Pasta" : "Adicionar"}
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="mt-8">
+              <Button 
+                className="w-full h-12 bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold rounded-2xl"
+                onClick={() => setIsAddProjectsModalOpen(false)}
+              >
+                Concluído
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   const NewDesignDialog = () => (
     <Dialog open={isNewDesignModalOpen} onOpenChange={setIsNewDesignModalOpen}>
-      <DialogContent className="rounded-[2rem] max-w-md p-8 glass-panel border-none shadow-2xl overflow-hidden glass-font">
-        <DialogHeader className="mb-2">
-          <DialogTitle className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Novo Design</DialogTitle>
-          <DialogDescription className="text-slate-500 dark:text-slate-400 font-medium">Escolha um formato para começar sua arte.</DialogDescription>
-        </DialogHeader>
-        
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <Button variant="outline" className="h-24 flex-col gap-2 rounded-2xl border-slate-100 dark:border-white/10 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 group transition-all" onClick={() => { handleCreateNew(); handleResizeCanvas(1080, 1080); setIsNewDesignModalOpen(false); }}>
-            <Square className="w-6 h-6 text-slate-400 group-hover:text-blue-500" />
-            <div className="text-center">
-              <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Feed Quadrado</div>
-              <div className="text-[10px] text-slate-400">1080 x 1080 px</div>
+      <DialogContent className="rounded-[2rem] max-w-2xl p-0 glass-panel border-none shadow-2xl overflow-hidden glass-font">
+        <div className="flex h-[600px]">
+          {/* Lado Esquerdo: Formatos em Branco */}
+          <div className="w-[320px] p-8 border-r border-slate-100 dark:border-white/10 overflow-y-auto custom-scrollbar bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Novo Design</DialogTitle>
+              <DialogDescription className="text-slate-500 dark:text-slate-400 font-medium text-xs">Comece com um quadro em branco.</DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 gap-3">
+              <Button variant="outline" className="h-20 flex-row gap-4 justify-start px-4 rounded-2xl border-slate-100 dark:border-white/10 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 group transition-all" onClick={() => { handleCreateNew(1080, 1080); setIsNewDesignModalOpen(false); }}>
+                <Square className="w-6 h-6 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                <div className="text-left">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Feed Quadrado</div>
+                  <div className="text-[10px] text-slate-400 font-medium">1080 x 1080 px</div>
+                </div>
+              </Button>
+              <Button variant="outline" className="h-20 flex-row gap-4 justify-start px-4 rounded-2xl border-slate-100 dark:border-white/10 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 group transition-all" onClick={() => { handleCreateNew(1080, 1350); setIsNewDesignModalOpen(false); }}>
+                <FileDown className="w-6 h-6 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                <div className="text-left">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Feed Vertical</div>
+                  <div className="text-[10px] text-slate-400 font-medium">1080 x 1350 px</div>
+                </div>
+              </Button>
+              <Button variant="outline" className="h-20 flex-row gap-4 justify-start px-4 rounded-2xl border-slate-100 dark:border-white/10 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 group transition-all" onClick={() => { handleCreateNew(1080, 1920); setIsNewDesignModalOpen(false); }}>
+                <Maximize className="w-6 h-6 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                <div className="text-left">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Story / Reels</div>
+                  <div className="text-[10px] text-slate-400 font-medium">1080 x 1920 px</div>
+                </div>
+              </Button>
+              <Button variant="outline" className="h-20 flex-row gap-4 justify-start px-4 rounded-2xl border-slate-100 dark:border-white/10 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 group transition-all" onClick={() => { handleCreateNew(1080, 1440); setIsNewDesignModalOpen(false); }}>
+                <ImageIcon className="w-6 h-6 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                <div className="text-left">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Capa Reels</div>
+                  <div className="text-[10px] text-slate-400 font-medium">1080 x 1440 px</div>
+                </div>
+              </Button>
             </div>
-          </Button>
-          <Button variant="outline" className="h-24 flex-col gap-2 rounded-2xl border-slate-100 dark:border-white/10 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 group transition-all" onClick={() => { handleCreateNew(); handleResizeCanvas(1080, 1350); setIsNewDesignModalOpen(false); }}>
-            <FileDown className="w-6 h-6 text-slate-400 group-hover:text-blue-500" />
-            <div className="text-center">
-              <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Feed Vertical</div>
-              <div className="text-[10px] text-slate-400">1080 x 1350 px</div>
+            
+            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/10">
+               <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 block">Tamanho Personalizado</Label>
+               <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-slate-500 font-bold uppercase">L</Label>
+                    <Input type="number" id="landing-w" defaultValue={1080} className="h-10 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-xs font-bold" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-slate-500 font-bold uppercase">A</Label>
+                    <Input type="number" id="landing-h" defaultValue={1080} className="h-10 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-xs font-bold" />
+                  </div>
+               </div>
+               <Button className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200/50 transition-all active:scale-95" onClick={() => {
+                  const w = Number((document.getElementById('landing-w') as HTMLInputElement).value);
+                  const h = Number((document.getElementById('landing-h') as HTMLInputElement).value);
+                  handleCreateNew(w, h);
+                  setIsNewDesignModalOpen(false);
+               }}>Criar em Branco</Button>
             </div>
-          </Button>
-          <Button variant="outline" className="h-24 flex-col gap-2 rounded-2xl border-slate-100 dark:border-white/10 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 group transition-all" onClick={() => { handleCreateNew(); handleResizeCanvas(1080, 1920); setIsNewDesignModalOpen(false); }}>
-            <Maximize className="w-6 h-6 text-slate-400 group-hover:text-blue-500" />
-            <div className="text-center">
-              <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Story / Reels</div>
-              <div className="text-[10px] text-slate-400">1080 x 1920 px</div>
+          </div>
+
+          {/* Lado Direito: Escolher Template */}
+          <div className="flex-1 p-8 overflow-y-auto custom-scrollbar bg-slate-50/30 dark:bg-slate-900/20">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <LayoutTemplate className="w-5 h-5 text-blue-500" /> Usar Template
+              </h3>
             </div>
-          </Button>
-          <Button variant="outline" className="h-24 flex-col gap-2 rounded-2xl border-slate-100 dark:border-white/10 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 group transition-all" onClick={() => { handleCreateNew(); handleResizeCanvas(1080, 1440); setIsNewDesignModalOpen(false); }}>
-            <ImageIcon className="w-6 h-6 text-slate-400 group-hover:text-blue-500" />
-            <div className="text-center">
-              <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Capa Reels</div>
-              <div className="text-[10px] text-slate-400">1080 x 1440 px</div>
-            </div>
-          </Button>
-        </div>
-        
-        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/10">
-           <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Tamanho Personalizado</Label>
-           <div className="flex gap-3 items-end">
-              <div className="flex-1 space-y-1.5">
-                <Label className="text-[10px] text-slate-500 font-bold uppercase">Largura</Label>
-                <Input type="number" id="landing-w" defaultValue={1080} className="h-10 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10" />
+
+            {templates.length === 0 ? (
+              <div className="h-[400px] flex flex-col items-center justify-center text-center opacity-40">
+                <LayoutTemplate className="w-12 h-12 text-slate-300 dark:text-zinc-700 mb-4" />
+                <p className="text-sm font-medium text-slate-600 dark:text-zinc-500">Nenhum template disponível.</p>
               </div>
-              <div className="flex-1 space-y-1.5">
-                <Label className="text-[10px] text-slate-500 font-bold uppercase">Altura</Label>
-                <Input type="number" id="landing-h" defaultValue={1080} className="h-10 rounded-xl bg-slate-50/50 dark:bg-white/5 border-slate-200 dark:border-white/10" />
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {templates.map((template: any) => (
+                  <div 
+                    key={template.id} 
+                    onClick={() => {
+                      handleLoadModel(template, true);
+                      setIsNewDesignModalOpen(false);
+                    }}
+                    className="group cursor-pointer space-y-2"
+                  >
+                    <div className="aspect-[4/3] rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 overflow-hidden relative shadow-sm transition-all hover:shadow-md hover:border-blue-400 group-hover:-translate-y-1">
+                      {template.thumbnail_url ? (
+                        <img src={template.thumbnail_url} alt={template.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <LayoutTemplate className="w-10 h-10 text-slate-200 dark:text-zinc-800" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-[10px] font-black uppercase tracking-widest bg-blue-600 px-3 py-1.5 rounded-full shadow-lg">Usar</span>
+                      </div>
+                    </div>
+                    <div className="px-1">
+                      <h4 className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-blue-500 transition-colors">{template.title}</h4>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <Button className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200/50" onClick={() => {
-                const w = Number((document.getElementById('landing-w') as HTMLInputElement).value);
-                const h = Number((document.getElementById('landing-h') as HTMLInputElement).value);
-                handleCreateNew();
-                handleResizeCanvas(w, h);
-                setIsNewDesignModalOpen(false);
-              }}>Criar</Button>
-           </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -2034,7 +2236,9 @@ function SupportContent() {
           </main>
         </div>
         <NewDesignDialog />
-        <SaveTemplateDialogComponent 
+        <ManageFolderProjectsDialog />
+        <SaveTemplateDialogComponent
+ 
           isOpen={isSaveTemplateDialogOpen}
           onOpenChange={setIsSaveTemplateDialogOpen}
           templateName={templateSaveName}
@@ -2084,6 +2288,15 @@ function SupportContent() {
                         {activeTemplateFolderTemplates.length === 1 ? '1 design nesta pasta' : `${activeTemplateFolderTemplates.length} designs nesta pasta`}
                       </p>
                       <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setIsAddProjectsModalOpen(true)}
+                          className="h-7 px-2.5 rounded-full border-blue-200 dark:border-blue-800/50 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-bold text-[10px] uppercase tracking-wider gap-1.5 transition-all active:scale-95"
+                        >
+                          <FolderPlus className="w-3 h-3" />
+                          Adicionar Projetos
+                        </Button>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-200/70 dark:border-blue-700/40">
                           {folderTagDraft || 'Sem etiqueta'}
                         </span>
@@ -2495,6 +2708,27 @@ function SupportContent() {
                 Novo Design
               </Button>
               
+              <div className="flex items-center gap-2 mr-2 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-800">
+                <Switch 
+                  id="auto-save" 
+                  checked={autoSave} 
+                  onCheckedChange={setAutoSave}
+                  className="scale-75 data-[state=checked]:bg-blue-600"
+                />
+                <Label htmlFor="auto-save" className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider cursor-pointer">Auto-save</Label>
+              </div>
+
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => handleSave()}
+                disabled={isSaving}
+                className="h-9 px-3 border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-semibold rounded-lg"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                Salvar
+              </Button>
+
               <DropdownMenu onOpenChange={(open) => { if(!open) setShowDownloadSettings(false); }}>
                 <DropdownMenuTrigger asChild>
                   <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-sm font-semibold rounded-lg px-6 border-0">
@@ -3738,30 +3972,25 @@ function SupportContent() {
                               />
                             </div>
                           )}
-
-                          {selectedObject.type !== 'circle' && selectedObject.type !== 'line' && (
-                            <div className="space-y-3">
-                              <Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Arredondar Cantos (px)</Label>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-zinc-800/50"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium" /></div>
-                                <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-zinc-800/50"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium" /></div>
-                                <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-zinc-800/50"><CornerDownLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().bl)} onChange={(e) => handleRadiusChange('bl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium" /></div>
-                                <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-zinc-800/50"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium" /></div>
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between"><Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Transparência</Label><span className="text-xs text-slate-500 dark:text-zinc-500 font-medium">{Math.round((selectedObject.opacity || 1) * 100)}%</span></div>
-                            <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" />
-                          </div>
                         </div>
                       )}
 
-                      {selectedObject.type === 'image' && (
-                        <div className="space-y-6">
+                      {/* ── COMMON PROPERTIES (ROUNDING, OPACITY, LAYERS) ── */}
+                      <div className="space-y-6 mt-6">
+                        {selectedObject.type !== 'circle' && selectedObject.type !== 'line' && selectedObject.type !== 'i-text' && (
                           <div className="space-y-3">
-                            <Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Arredondar Cantos (px)</Label>
+                            <div className="flex justify-between items-center">
+                              <Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Arredondar Cantos (px)</Label>
+                              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{Math.round(getCornerRadii().tl)}px</span>
+                            </div>
+                            <Slider 
+                              min={0} max={200} step={1} 
+                              value={[getCornerRadii().tl]} 
+                              onValueChange={(v) => {
+                                setCornerRadii(v[0], v[0], v[0], v[0]);
+                              }} 
+                              className="py-2"
+                            />
                             <div className="grid grid-cols-2 gap-2">
                               <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-zinc-800/50"><CornerUpLeft className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tl)} onChange={(e) => handleRadiusChange('tl', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium" /></div>
                               <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-zinc-800/50"><CornerUpRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().tr)} onChange={(e) => handleRadiusChange('tr', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium" /></div>
@@ -3769,19 +3998,23 @@ function SupportContent() {
                               <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-zinc-800/50"><CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" /><input type="number" min={0} value={Math.round(getCornerRadii().br)} onChange={(e) => handleRadiusChange('br', parseInt(e.target.value))} className="w-full text-xs bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium" /></div>
                             </div>
                           </div>
-                          <div className="space-y-3">
-                            <Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Transparência</Label>
-                            <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Inverter</Label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Button variant="outline" size="sm" className={`bg-transparent dark:border-zinc-800 ${selectedObject.flipX ? 'border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'dark:text-zinc-400'}`} onClick={toggleFlipX}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
-                              <Button variant="outline" size="sm" className={`bg-transparent dark:border-zinc-800 ${selectedObject.flipY ? 'border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'dark:text-zinc-400'}`} onClick={toggleFlipY}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
-                            </div>
-                          </div>
+                        )}
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between"><Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Transparência</Label><span className="text-xs text-slate-500 dark:text-zinc-500 font-medium">{Math.round((selectedObject.opacity || 1) * 100)}%</span></div>
+                          <Slider defaultValue={[1]} max={1} step={0.01} value={[selectedObject.opacity || 1]} onValueChange={(vals) => setImageOpacity(vals[0])} className="py-2" />
                         </div>
-                      )}
+
+                          {selectedObject.type === 'image' && (
+                            <div className="space-y-3">
+                              <Label className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Inverter</Label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button variant="outline" size="sm" className={`bg-transparent dark:border-zinc-800 ${selectedObject.flipX ? 'border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'dark:text-zinc-400'}`} onClick={toggleFlipX}><FlipHorizontal className="w-4 h-4 mr-2" /> X</Button>
+                                <Button variant="outline" size="sm" className={`bg-transparent dark:border-zinc-800 ${selectedObject.flipY ? 'border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'dark:text-zinc-400'}`} onClick={toggleFlipY}><FlipVertical className="w-4 h-4 mr-2" /> Y</Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
 
                       <Separator className="bg-slate-100 dark:bg-zinc-800" />
 

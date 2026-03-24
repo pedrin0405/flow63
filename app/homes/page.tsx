@@ -92,7 +92,7 @@ export default function ImoveisPage() {
         .select('property_code')
         .eq('city', filters.city || 'Palmas')
       
-      const currentFeaturedCodes = featuredData?.map(f => f.property_code) || []
+      const currentFeaturedCodes = featuredData?.map(f => String(f.property_code)) || []
       setFeaturedCodes(currentFeaturedCodes)
 
       const from = (currentPage - 1) * itemsPerPage;
@@ -131,7 +131,7 @@ export default function ImoveisPage() {
       if (error) throw error;
       
       const mapItem = (item: any) => ({
-        code: item.codigo || "S/C",
+        code: String(item.codigo) || "S/C",
         image: item.urlfotoprincipal || "https://app.imoview.com.br//Front/img/house1.png",
         value: normalizeCurrency(item.valor),
         address: item.endereco || "Endereço não informado",

@@ -16,7 +16,7 @@ export function PropertyCard({ property, formatCurrency, onClick, isFeatured = f
     <div 
       className={cn(
         "bg-card rounded-xl border border-border overflow-hidden cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group relative",
-        isFeatured && "border-amber-500/30 shadow-md shadow-amber-500/5"
+        isFeatured && "border-amber-400 dark:border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.15)] ring-1 ring-amber-400/30"
       )}
       onClick={onClick}
     >
@@ -30,14 +30,14 @@ export function PropertyCard({ property, formatCurrency, onClick, isFeatured = f
         
         {isFeatured && (
           <div className="absolute top-3 left-3 z-30 animate-in fade-in zoom-in duration-500">
-            <div className="bg-amber-500/90 text-white p-1 rounded-lg backdrop-blur-sm border border-amber-400/50 shadow-lg shadow-amber-500/20">
-              <Star className="h-3 w-3 fill-white" />
+            <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-xl border border-amber-400 shadow-lg">
+              <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
             </div>
           </div>
         )}
 
         <div>
-             <Badge variant={property.status.includes("Desativado") ? "destructive" : "default"} className={cn("shadow-sm absolute top-3 z-20 animate-in fade-in zoom-in duration-300", isFeatured ? "left-10" : "left-3")}>
+             <Badge variant={property.status.includes("Desativado") ? "destructive" : "default"} className={cn("shadow-sm absolute top-3 z-20 animate-in fade-in zoom-in duration-300", isFeatured ? "left-14" : "left-3")}>
                 {property.status}
              </Badge>
              <Badge variant="outline" className="text-[12px] bg-muted/100 absolute top-3 right-3">

@@ -64,12 +64,14 @@ export default function LeafletMapInner({
     else if (t.includes("rural") || t.includes("fazenda")) color = "#8b4513" // marrom
 
     const size = isSelected ? 22 : 14
-    const border = isSelected ? '3px solid white' : '2px solid white'
-    const shadow = isSelected ? '0 0 15px rgba(0,0,0,0.6)' : '0 2px 4px rgba(0,0,0,0.3)'
+    let border = isSelected ? '3px solid white' : '2px solid white'
+    if (isFeatured) border = isSelected ? '3.5px solid #f59e0b' : '2.5px solid #f59e0b'
+    
+    const shadow = isSelected ? '0 0 15px rgba(245,158,11,0.4)' : '0 2px 4px rgba(0,0,0,0.3)'
 
     const starHtml = isFeatured ? `
-      <div style="position: absolute; top: -8px; right: -8px; background: #f59e0b; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10;">
-        <svg viewBox="0 0 24 24" width="8" height="8" fill="white" stroke="white" stroke-width="2">
+      <div style="position: absolute; top: -10px; right: -10px; background: #f59e0b; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10;">
+        <svg viewBox="0 0 24 24" width="10" height="10" fill="white" stroke="white" stroke-width="2">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
         </svg>
       </div>
