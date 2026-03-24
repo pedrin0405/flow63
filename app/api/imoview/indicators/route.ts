@@ -7,18 +7,124 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PU
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const cache = new Map();
+const authSessionCache = new Map<string, { cookie: string; createdAt: number }>();
+const loginInFlight = new Map<string, Promise<string>>();
+
+const COOKIE_MAX_AGE_MS = 30 * 60 * 1000;
+
+function extractCookie(setCookie: string) {
+    const sessionId = setCookie.match(/ASP.NET_SessionId=([^;]+)/)?.[1] || '';
+    const aspxAuth = setCookie.match(/\.ASPXAUTH=([^;]+)/)?.[1] || '';
+    const authToken = setCookie.match(/auth_token_apiGerencia=([^;]+)/)?.[1] || '';
+
+    return `ASP.NET_SessionId=${sessionId}; .ASPXAUTH=${aspxAuth}; auth_token_apiGerencia=${authToken};`;
+}
+
+function isSessionFresh(instanceName: string) {
+    const session = authSessionCache.get(instanceName);
+    if (!session?.cookie) return false;
+    return Date.now() - session.createdAt < COOKIE_MAX_AGE_MS;
+}
+
+async function loginAndGetCookie(baseUrl: string, credentials: any) {
+    const loginRes = await fetch(`${baseUrl}/Login/LogOn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+    });
+
+    if (!loginRes.ok) {
+        throw new Error(`Falha no login do Imoview (status ${loginRes.status})`);
+    }
+
+    const setCookie = loginRes.headers.get('set-cookie') || '';
+    const cookie = extractCookie(setCookie);
+
+    if (!cookie.includes('ASP.NET_SessionId=') || !cookie.includes('.ASPXAUTH=')) {
+        throw new Error('Login realizado, mas cookie de sessão não foi retornado corretamente');
+    }
+
+    return cookie;
+}
+
+async function getOrRefreshCookie(instanceName: string, baseUrl: string, credentials: any, forceRefresh = false) {
+    if (!forceRefresh && isSessionFresh(instanceName)) {
+        return authSessionCache.get(instanceName)!.cookie;
+    }
+
+    if (!forceRefresh && loginInFlight.has(instanceName)) {
+        return loginInFlight.get(instanceName)!;
+    }
+
+    const loginPromise = (async () => {
+        const cookie = await loginAndGetCookie(baseUrl, credentials);
+        authSessionCache.set(instanceName, { cookie, createdAt: Date.now() });
+        return cookie;
+    })();
+
+    loginInFlight.set(instanceName, loginPromise);
+
+    try {
+        return await loginPromise;
+    } finally {
+        loginInFlight.delete(instanceName);
+    }
+}
+
+async function isAuthExpired(response: Response) {
+    if (response.status === 401 || response.status === 403) return true;
+
+    if (response.redirected && response.url.includes('/Login/LogOn')) {
+        return true;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('text/html')) return false;
+
+    const body = await response.clone().text();
+    return /Login\/LogOn|name=["']senha["']|name=["']login["']/i.test(body);
+}
+
+async function fetchWithSession(
+    instanceName: string,
+    baseUrl: string,
+    credentials: any,
+    endpoint: string,
+    init: RequestInit,
+    baseHeaders: Record<string, string>
+) {
+    let cookie = await getOrRefreshCookie(instanceName, baseUrl, credentials);
+
+    const buildInit = (cookieValue: string): RequestInit => ({
+        ...init,
+        headers: {
+            ...baseHeaders,
+            ...(init.headers || {}),
+            Cookie: cookieValue,
+        },
+    });
+
+    let response = await fetch(`${baseUrl}/${endpoint.replace(/^\//, '')}`, buildInit(cookie));
+
+    if (await isAuthExpired(response)) {
+        cookie = await getOrRefreshCookie(instanceName, baseUrl, credentials, true);
+        response = await fetch(`${baseUrl}/${endpoint.replace(/^\//, '')}`, buildInit(cookie));
+    }
+
+    return response;
+}
 
 export async function POST(req: Request) { 
     try {
         const body = await req.json();
-        const { filters, action, instanceName } = body;
+        const { filters, action, instanceName, codigoImovel } = body;
 
         if (!instanceName) {
             return NextResponse.json({ error: true, message: "instanceName é obrigatório" }, { status: 400 });
         }
         
         // Cache inteligente baseado no estado do filtro e na instância selecionada
-        const cacheKey = JSON.stringify({ action, filters, instanceName });
+        const cacheKey = JSON.stringify({ action, filters, instanceName, codigoImovel });
         const cached = cache.get(cacheKey);
         if (cached && (Date.now() - cached.time < 600000)) return NextResponse.json(cached.data);
 
@@ -47,18 +153,8 @@ export async function POST(req: Request) {
 
         const baseUrl = settings.url_site.replace(/\/$/, ''); // Remove barra final da URL se existir
 
-        // 2. Autenticação e Extração de Cookies usando a URL e credenciais dinâmicas
-        const loginRes = await fetch(`${baseUrl}/Login/LogOn`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(credentials),
-        });
-
-        const setCookie = loginRes.headers.get('set-cookie') || "";
-        const cookieStr = `ASP.NET_SessionId=${setCookie.match(/ASP.NET_SessionId=([^;]+)/)?.[1] || ''}; .ASPXAUTH=${setCookie.match(/\.ASPXAUTH=([^;]+)/)?.[1] || ''}; auth_token_apiGerencia=${setCookie.match(/auth_token_apiGerencia=([^;]+)/)?.[1] || ''};`;
-
+        // 2. Headers base para requisições autenticadas (cookie é injetado dinamicamente)
         const commonHeaders = {
-            'Cookie': cookieStr,
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json, text/javascript, */*; q=0.01'
@@ -67,7 +163,14 @@ export async function POST(req: Request) {
         // 3. Roteamento de Ações Secundárias com URL dinâmica
         if (['getEquipes', 'getEtiquetas'].includes(action)) {
             const endpoint = action === 'getEtiquetas' ? 'Etiqueta/Pesquisar?tiposRels=5' : (action === 'getEquipes' ? 'Equipe/RetornarEquipes' : 'Equipe/RetornarCorretores');
-            const res = await fetch(`${baseUrl}/${endpoint}?${new URLSearchParams(filters)}`, { headers: commonHeaders });
+            const res = await fetchWithSession(
+                instanceName,
+                baseUrl,
+                credentials,
+                `${endpoint}?${new URLSearchParams(filters)}`,
+                { method: 'GET' },
+                commonHeaders
+            );
             const data = await res.json();
             return NextResponse.json(data);
         }
@@ -79,18 +182,66 @@ export async function POST(req: Request) {
                 finalidade: filters?.Finalidade || '2'
             });
 
-            const response = await fetch(`${baseUrl}/Equipe/RetornarCorretores?${params.toString()}`, {
-                headers: commonHeaders
-            });
+            const response = await fetchWithSession(
+                instanceName,
+                baseUrl,
+                credentials,
+                `Equipe/RetornarCorretores?${params.toString()}`,
+                { method: 'GET' },
+                commonHeaders
+            );
 
             if (!response.ok) return NextResponse.json([]); 
             const data = await response.json();
             return NextResponse.json(data);
         }
 
+        if (action === 'getCaptadores') {
+            const codigoImovelValue = codigoImovel ?? filters?.codigoImovel ?? filters?.CodigoImovel;
+
+            if (!codigoImovelValue) {
+                return NextResponse.json(
+                    { error: true, message: 'codigoImovel é obrigatório para getCaptadores' },
+                    { status: 400 }
+                );
+            }
+
+            const response = await fetchWithSession(
+                instanceName,
+                baseUrl,
+                credentials,
+                'Imovel/CarregarCaptadores',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ codigoImovel: codigoImovelValue }),
+                },
+                commonHeaders
+            );
+
+            if (!response.ok) {
+                return NextResponse.json(
+                    { error: true, message: 'Falha ao carregar captadores', status: response.status },
+                    { status: response.status }
+                );
+            }
+
+            const data = await response.json();
+            return NextResponse.json(data);
+        }
+
         // 4. Extração Massiva de Indicadores
         const indicatorsUrl = `${baseUrl}/Atendimento/Indicadores?${new URLSearchParams(filters)}`;
-        const htmlRes = await fetch(indicatorsUrl, { headers: { ...commonHeaders, 'Accept': 'text/html' } });
+        const htmlRes = await fetchWithSession(
+            instanceName,
+            baseUrl,
+            credentials,
+            `Atendimento/Indicadores?${new URLSearchParams(filters)}`,
+            { method: 'GET' },
+            { ...commonHeaders, 'Accept': 'text/html' }
+        );
         const html = await htmlRes.text();
 
         // --- MOTOR DE EXTRAÇÃO DE ALTA CAPACIDADE (MANTIDO ORIGINAL) ---

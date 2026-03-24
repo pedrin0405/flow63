@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, Suspense, useCallback } from "react"
+import { useState, useMemo, useEffect, Suspense, useCallback, useRef } from "react"
 import { Building2, RefreshCw, Menu, MapPin, LayoutGrid, Map as MapIcon, ChevronLeft, Search, X } from "lucide-react"
 import { Sidebar } from "@/components/central63/sidebar"
 import { StatCard } from "@/components/central63/services/stat-card"
@@ -21,6 +21,11 @@ import { cn } from "@/lib/utils"
 // --- CONSTANTES ---
 const CITIES = ["Palmas", "Araguaina"]
 const PROPERTY_TYPES = ["Casa", "Apartamento", "Lote", "Comercial", "Rural"] 
+const CITY_MAP_CENTERS: Record<string, [number, number]> = {
+  palmas: [-10.184, -48.333],
+  araguaina: [-7.192, -48.207],
+  'araguaína': [-7.192, -48.207],
+}
 
 export default function ImoveisPage() {
   const { toast } = useToast()
@@ -29,8 +34,50 @@ export default function ImoveisPage() {
   
   // Estados de Dados
   const [selectedProperty, setSelectedProperty] = useState<any | null>(null)
+  const [mapPreviewProperty, setMapPreviewProperty] = useState<any | null>(null)
   const [propertiesData, setPropertiesData] = useState<any[]>([]) 
   const [allPropertiesForMap, setAllPropertiesForMap] = useState<any[]>([])
+  const [selectedPropertyCode, setSelectedPropertyCode] = useState<string | null>(null)
+  const [highlightedPropertyCode, setHighlightedPropertyCode] = useState<string | null>(null)
+  const listScrollRef = useRef<HTMLDivElement | null>(null)
+  const lastListScrollTopRef = useRef(0)
+  const shouldRestoreScrollRef = useRef(false)
+
+  const handleSelectProperty = (prop: any) => {
+    if (listScrollRef.current) {
+      lastListScrollTopRef.current = listScrollRef.current.scrollTop
+    }
+    setMapPreviewProperty(null)
+    setSelectedPropertyCode(String(prop.code))
+    setSelectedProperty(prop)
+  }
+
+  const handleMapPropertyPreview = (prop: any) => {
+    const code = String(prop.code)
+    setMapPreviewProperty(prop)
+    setSelectedPropertyCode(code)
+    setHighlightedPropertyCode(code)
+
+    const listContainer = listScrollRef.current
+    if (listContainer) {
+      requestAnimationFrame(() => {
+        const safeCode = CSS?.escape ? CSS.escape(code) : code
+        const selectedCard = listContainer.querySelector(`[data-property-code="${safeCode}"]`) as HTMLElement | null
+        if (selectedCard) {
+          selectedCard.scrollIntoView({ behavior: "smooth", block: "nearest" })
+        }
+      })
+    }
+
+    setTimeout(() => {
+      setHighlightedPropertyCode((prev) => (prev === code ? null : prev))
+    }, 1800)
+  }
+
+  const handleCloseProperty = () => {
+    shouldRestoreScrollRef.current = true
+    setSelectedProperty(null)
+  }
   const [totalItems, setTotalItems] = useState(0) 
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
@@ -50,6 +97,18 @@ export default function ImoveisPage() {
   })
 
   const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  const selectedCityCenter = useMemo<[number, number]>(() => {
+    const cityKey = String(filters.city || "Palmas").toLowerCase()
+    return CITY_MAP_CENTERS[cityKey] || CITY_MAP_CENTERS.palmas
+  }, [filters.city])
+
+  const selectedCityZoom = useMemo(() => {
+    const cityKey = String(filters.city || "Palmas").toLowerCase()
+    return cityKey.includes("aragua") ? 12 : 13
+  }, [filters.city])
+
+  const featuredCodeSet = useMemo(() => new Set((featuredCodes || []).map((code: any) => String(code))), [featuredCodes])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -80,6 +139,15 @@ export default function ImoveisPage() {
     return Number.isFinite(parsed) ? parsed : null
   }
 
+  const selectedPropertyCenter = useMemo<[number, number]>(() => {
+    if (!selectedProperty) return selectedCityCenter
+
+    return [
+      normalizeCoordinate(selectedProperty.latitude) ?? -10.1837,
+      normalizeCoordinate(selectedProperty.longitude) ?? -48.3337,
+    ]
+  }, [selectedProperty, selectedCityCenter])
+
   const fetchProperties = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -95,6 +163,18 @@ export default function ImoveisPage() {
       const currentFeaturedCodes = featuredData?.map(f => String(f.property_code)) || []
       setFeaturedCodes(currentFeaturedCodes)
 
+      const featuredCodesAsNumber = currentFeaturedCodes
+        .map((code: any) => Number(code))
+        .filter((code: number) => Number.isFinite(code))
+
+      if (filters.onlyFeatured && featuredCodesAsNumber.length === 0) {
+        setPropertiesData([])
+        setAllPropertiesForMap([])
+        setTotalItems(0)
+        setMapPreviewProperty(null)
+        return
+      }
+
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
@@ -103,7 +183,15 @@ export default function ImoveisPage() {
         .select('codigo, urlfotoprincipal, valor, endereco, bairro, cidade, estado, situacao, areaprincipal, valor_m2, descricao, tipo, created_at, latitude, longitude', { count: 'exact' })
 
       if (debouncedSearch) {
-        query = query.or(`codigo.ilike.%${debouncedSearch}%,endereco.ilike.%${debouncedSearch}%,bairro.ilike.%${debouncedSearch}%`);
+        const search = debouncedSearch.trim()
+        const searchAsNumber = Number(search)
+        const isNumericSearch = Number.isFinite(searchAsNumber)
+
+        if (isNumericSearch) {
+          query = query.eq('codigo', searchAsNumber)
+        } else {
+          query = query.or(`endereco.ilike.%${search}%,bairro.ilike.%${search}%`)
+        }
       }
       if (filters.status !== "Todos") {
         query = query.eq('situacao', filters.status);
@@ -118,12 +206,7 @@ export default function ImoveisPage() {
       // FILTRO CORRIGIDO: Se o switch estiver ativo, filtramos pelos códigos.
       // Se não houver códigos destacados, forçamos um resultado vazio.
       if (filters.onlyFeatured) {
-        if (currentFeaturedCodes.length > 0) {
-          query = query.in('codigo', currentFeaturedCodes);
-        } else {
-          // Garante que não retorne nada se não houver destaques marcados
-          query = query.eq('codigo', '00000000-0000-0000-0000-000000000000'); 
-        }
+        query = query.in('codigo', featuredCodesAsNumber);
       }
       
       const { data, count, error } = await query.range(from, to).order('created_at', { ascending: false });
@@ -157,10 +240,21 @@ export default function ImoveisPage() {
         .select('codigo, urlfotoprincipal, valor, endereco, bairro, cidade, estado, situacao, areaprincipal, valor_m2, descricao, tipo, created_at, latitude, longitude')
         .limit(300)
 
-      if (debouncedSearch) mapQuery = mapQuery.or(`codigo.ilike.%${debouncedSearch}%,endereco.ilike.%${debouncedSearch}%,bairro.ilike.%${debouncedSearch}%`);
+      if (debouncedSearch) {
+        const search = debouncedSearch.trim()
+        const searchAsNumber = Number(search)
+        const isNumericSearch = Number.isFinite(searchAsNumber)
+
+        if (isNumericSearch) {
+          mapQuery = mapQuery.eq('codigo', searchAsNumber)
+        } else {
+          mapQuery = mapQuery.or(`endereco.ilike.%${search}%,bairro.ilike.%${search}%`)
+        }
+      }
       if (filters.status !== "Todos") mapQuery = mapQuery.eq('situacao', filters.status);
       if (filters.type !== "Todos") mapQuery = mapQuery.eq('tipo', filters.type);
       if (filters.neighborhood) mapQuery = mapQuery.ilike('bairro', `%${filters.neighborhood}%`);
+      if (filters.onlyFeatured) mapQuery = mapQuery.in('codigo', featuredCodesAsNumber);
 
       const { data: mapData } = await mapQuery.order('created_at', { ascending: false });
       setAllPropertiesForMap((mapData || []).map(mapItem))
@@ -176,6 +270,27 @@ export default function ImoveisPage() {
   useEffect(() => {
     fetchProperties()
   }, [fetchProperties])
+
+  useEffect(() => {
+    if (selectedProperty || !shouldRestoreScrollRef.current) return
+
+    requestAnimationFrame(() => {
+      const listContainer = listScrollRef.current
+      if (!listContainer) return
+
+      listContainer.scrollTop = lastListScrollTopRef.current
+
+      if (selectedPropertyCode) {
+        const safeCode = CSS?.escape ? CSS.escape(selectedPropertyCode) : selectedPropertyCode
+        const selectedCard = listContainer.querySelector(`[data-property-code="${safeCode}"]`) as HTMLElement | null
+        if (selectedCard) {
+          selectedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      }
+
+      shouldRestoreScrollRef.current = false
+    })
+  }, [selectedProperty, selectedPropertyCode, currentPage, propertiesData.length])
 
   const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
   const formatCompact = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(value)
@@ -220,7 +335,7 @@ export default function ImoveisPage() {
                     variant="outline" 
                     size="sm" 
                     className="rounded-xl h-10 px-4 gap-2 font-black uppercase text-[10px] tracking-widest bg-white/60 dark:bg-white/[0.02] border-white/30 dark:border-white/[0.08] backdrop-blur-xl hover:bg-white dark:hover:bg-white/[0.05] transition-all"
-                    onClick={() => setSelectedProperty(null)}
+                  onClick={handleCloseProperty}
                 >
                     <ChevronLeft size={16} /> Voltar para Lista
                 </Button>
@@ -237,10 +352,7 @@ export default function ImoveisPage() {
                         <PropertyMap 
                             properties={[selectedProperty]}
                             selectedProperty={selectedProperty}
-                            center={[
-                              normalizeCoordinate(selectedProperty.latitude) ?? -10.1837,
-                              normalizeCoordinate(selectedProperty.longitude) ?? -48.3337,
-                            ]}
+                            center={selectedPropertyCenter}
                             zoom={16}
                             formatCurrency={formatCurrency}
                             showPopups={false}
@@ -260,14 +372,20 @@ export default function ImoveisPage() {
                         <PropertyDetailsContent 
                             property={selectedProperty} 
                             formatCurrency={formatCurrency}
-                            onClose={() => setSelectedProperty(null)}
+                          onClose={handleCloseProperty}
                             isInline={true}
                         />
                     </div>
                 </div>
             ) : (
                 /* VIEW: LISTA + MAPA AO FUNDO */
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <div
+                ref={listScrollRef}
+                className="flex-1 overflow-y-auto custom-scrollbar"
+                onScroll={(e) => {
+                  lastListScrollTopRef.current = e.currentTarget.scrollTop
+                }}
+              >
                 <div className="p-6 lg:p-8 space-y-8 max-w-[1650px] mx-auto">
                         {/* Estatísticas */}
                   <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl p-4 lg:p-5">
@@ -283,7 +401,7 @@ export default function ImoveisPage() {
                   <div className="relative rounded-[2rem] overflow-hidden border border-white/20 dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.03] backdrop-blur-3xl shadow-2xl p-4">
                     <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/20 to-transparent" />
                     <FeaturedPropertiesTicker 
-                      onPropertyClick={setSelectedProperty}
+                        onPropertyClick={handleSelectProperty}
                       formatCurrency={formatCurrency}
                     />
                   </div>
@@ -308,13 +426,21 @@ export default function ImoveisPage() {
                                 <>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                         {propertiesData.map(prop => (
-                                            <PropertyCard 
-                                                key={`${prop.code}`}
+                                            <div
+                                              key={`${prop.code}`}
+                                              data-property-code={prop.code}
+                                              className={cn(
+                                                "transition-all duration-300 rounded-2xl",
+                                                highlightedPropertyCode === String(prop.code) && "ring-2 ring-primary/40"
+                                              )}
+                                            >
+                                              <PropertyCard 
                                                 property={prop}
                                                 formatCurrency={formatCurrency}
-                                                onClick={() => setSelectedProperty(prop)}
-                                                isFeatured={featuredCodes.includes(prop.code)}
-                                            />
+                                                onClick={() => handleSelectProperty(prop)}
+                                                isFeatured={featuredCodeSet.has(String(prop.code))}
+                                              />
+                                            </div>
                                         ))}
                                     </div>
                                     {totalItems > 0 && Math.ceil(totalItems / itemsPerPage) > 1 && (
@@ -350,10 +476,103 @@ export default function ImoveisPage() {
                                 <PropertyMap 
                                     properties={allPropertiesForMap}
                                     formatCurrency={formatCurrency}
-                                    onPropertyClick={setSelectedProperty}
+                                  onPropertyClick={handleMapPropertyPreview}
+                                    center={selectedCityCenter}
+                                    zoom={selectedCityZoom}
                                     className="w-full h-full"
+                                  showPopups={false}
                                     featuredCodes={featuredCodes}
                                 />
+
+                                {mapPreviewProperty && (
+                                  <>
+                                    <div className="hidden lg:block absolute top-4 right-4 z-[1001] w-full max-w-[350px]">
+                                      <div className="rounded-2xl shadow-2xl overflow-hidden relative h-[335px] group cursor-pointer border border-white/25 dark:border-white/10">
+                                        <img
+                                          src={mapPreviewProperty.image || "https://app.imoview.com.br//Front/img/house1.png"}
+                                          alt={`Preview ${mapPreviewProperty.code}`}
+                                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/55 to-transparent" />
+
+                                        <Badge className="absolute top-4 left-4 text-white text-xs font-bold px-3 py-1.5 rounded-md shadow-lg bg-blue-500 border-0">
+                                          {mapPreviewProperty.status || "Disponível"}
+                                        </Badge>
+
+                                        <button
+                                          onClick={() => setMapPreviewProperty(null)}
+                                          className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 backdrop-blur-md text-white p-2 rounded-full transition-colors border border-white/30"
+                                        >
+                                          <X size={16} strokeWidth={2.5} />
+                                        </button>
+
+                                        <div className="absolute bottom-0 left-0 w-full p-6">
+                                          <div className="translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                                            <p className="text-gray-300 text-xs font-semibold tracking-widest mb-1">IMÓVEL #{mapPreviewProperty.code}</p>
+                                            <h3 className="text-white font-bold text-xl leading-tight mb-1 line-clamp-1">
+                                              {mapPreviewProperty.neighborhood}, {mapPreviewProperty.city}
+                                            </h3>
+                                            <p className="text-gray-300 text-sm mb-5 opacity-90 line-clamp-2">{mapPreviewProperty.address}</p>
+
+                                            <div className="flex justify-between items-center border-t border-white/20 pt-4 gap-3">
+                                              <span className="text-blue-400 font-bold text-2xl tracking-tight leading-none">
+                                                {formatCurrency(Number(mapPreviewProperty.value || 0))}
+                                              </span>
+                                              <Button
+                                                className="bg-white text-gray-900 hover:bg-gray-100 text-sm font-bold py-2 px-4 rounded-full transition-colors shadow-lg h-9"
+                                                onClick={() => handleSelectProperty(mapPreviewProperty)}
+                                              >
+                                                Detalhes
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="lg:hidden absolute inset-x-2 bottom-2 z-[1001] rounded-2xl overflow-hidden shadow-2xl border border-white/25 dark:border-white/10">
+                                      <div className="relative min-h-[220px] group">
+                                        <img
+                                          src={mapPreviewProperty.image || "https://app.imoview.com.br//Front/img/house1.png"}
+                                          alt={`Preview ${mapPreviewProperty.code}`}
+                                          className="absolute inset-0 w-full h-full object-cover"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/55 to-transparent" />
+
+                                        <Badge className="absolute top-3 left-3 text-white text-[10px] font-bold px-2.5 py-1 rounded-md shadow-lg bg-blue-500 border-0">
+                                          {mapPreviewProperty.status || "Disponível"}
+                                        </Badge>
+
+                                        <button
+                                          onClick={() => setMapPreviewProperty(null)}
+                                          className="absolute top-3 right-3 bg-white/20 hover:bg-white/40 backdrop-blur-md text-white p-1.5 rounded-full transition-colors border border-white/30"
+                                        >
+                                          <X size={14} strokeWidth={2.5} />
+                                        </button>
+
+                                        <div className="absolute bottom-0 left-0 w-full p-4">
+                                          <p className="text-gray-300 text-[10px] font-semibold tracking-widest mb-1">IMÓVEL #{mapPreviewProperty.code}</p>
+                                          <h3 className="text-white font-bold text-base leading-tight mb-1 line-clamp-1">
+                                            {mapPreviewProperty.neighborhood}, {mapPreviewProperty.city}
+                                          </h3>
+                                          <p className="text-gray-300 text-xs mb-4 opacity-90 line-clamp-2">{mapPreviewProperty.address}</p>
+
+                                          <div className="flex justify-between items-center border-t border-white/20 pt-3 gap-2">
+                                            <span className="text-blue-400 font-bold text-lg tracking-tight leading-none">
+                                              {formatCurrency(Number(mapPreviewProperty.value || 0))}
+                                            </span>
+                                            <Button
+                                              className="bg-white text-gray-900 hover:bg-gray-100 text-xs font-bold py-1.5 px-3 rounded-full transition-colors shadow-lg h-8"
+                                              onClick={() => handleSelectProperty(mapPreviewProperty)}
+                                            >
+                                              Detalhes
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
                                 
                                 {/* Legenda Flutuante (dentro do mapa) */}
                                 <div className="absolute bottom-6 left-6 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl p-5 rounded-3xl shadow-2xl border border-white/30 dark:border-white/[0.08] z-[1000] hidden md:block">
