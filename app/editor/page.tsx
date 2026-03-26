@@ -521,6 +521,9 @@ function SupportContent() {
   const [canvasTitle, setCanvasTitle] = useState('Nova Arte Sem Título');
   const [isSaving, setIsSaving] = useState(false);
   const [autoSave, setAutoSave] = useState(true);
+  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+  const lastSavedChangeCount = useRef<number>(0);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('editor'); 
@@ -1061,7 +1064,6 @@ function SupportContent() {
   const handleZoomOut = () => {
     setZoomLevel(prev => Math.max(prev - 0.1, 0.1)); 
   };
-
   const handleResetZoom = () => {
     setZoomLevel(0.6);
   };
@@ -1072,14 +1074,42 @@ function SupportContent() {
       
       const artboardsWithData = artboards.map(a => {
         const methods = artboardsMethods.current[a.id];
+        let artboardData = a.data;
+        
+        if (methods) {
+          try {
+            const json = methods.saveToJson();
+            artboardData = JSON.parse(json);
+          } catch (e) {
+            console.error(`[handleSave] Erro ao serializar prancheta ${a.id}:`, e);
+            // Mantém a.data como fallback
+          }
+        }
+        
+        console.log(`[handleSave] Processando prancheta ${a.id}:`, {
+          source: methods ? 'canvas' : 'state_backup',
+          objectsCount: artboardData?.objects?.length || 0,
+          title: a.title
+        });
+        
         return {
           ...a,
-          data: methods ? JSON.parse(methods.saveToJson()) : a.data
+          data: artboardData
         };
       });
 
+      // Validação crítica: Se o design resultante for totalmente vazio mas o usuário estiver editando
+      const totalObjects = artboardsWithData.reduce((sum, a) => sum + (a.data?.objects?.length || 0), 0);
+      if (totalObjects === 0 && !silent) {
+        // Se houver objetos no editor ativo mas o total calculado for 0, algo está muito errado
+        if (activeEditor && activeEditor.fabricCanvas.current && activeEditor.fabricCanvas.current.getObjects().length > 0) {
+          throw new Error("Erro de integridade: O sistema detectou objetos na tela mas falhou ao convertê-los para o formato de salvamento. O salvamento foi cancelado para evitar perda de dados. Por favor, tente novamente ou atualize a página.");
+        }
+      }
+
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
+        console.error("[handleSave] Erro de autenticação:", authError);
         if (!silent) throw new Error("Precisa fazer login para guardar modelos.");
         return;
       }
@@ -1113,9 +1143,19 @@ function SupportContent() {
         ...(savedThumbnailUrl && { thumbnail_url: savedThumbnailUrl })
       };
 
+      console.log("[handleSave] Final payload to save:", {
+        id: currentModelId,
+        title: payload.title,
+        artboardsCount: artboardsWithData.length,
+        totalObjects: artboardsWithData.reduce((acc, a) => acc + (a.data?.objects?.length || 0), 0)
+      });
+
       if (currentModelId) {
         const { error: updateError } = await supabase.from('design_models').update(payload).eq('id', currentModelId);
-        if (updateError) throw updateError;
+        if (updateError) {
+           console.error("[handleSave] Erro ao atualizar:", updateError);
+           throw updateError;
+        }
         if (!silent) toast.success('Projeto atualizado com sucesso!');
       } else {
         // Agora permite criar novo projeto no auto-save (silent)
@@ -1130,20 +1170,33 @@ function SupportContent() {
       if (!silent) toast.error(error.message || "Falha ao salvar o modelo.");
     } finally {
       if (!silent) setIsSaving(false);
+      // Se salvou com sucesso (pelo menos chegou aqui sem erro), atualiza o estado de controle do auto-save
+      setLastSavedTime(new Date());
+      if (activeEditor) {
+        lastSavedChangeCount.current = activeEditor.changeCount;
+      }
     }
   };
 
-  // Auto-save effect: Triggers on any meaningful change (fabric, title, artboard selection)
-  // Intervalo de 2 minutos (120000ms) conforme solicitado pelo usuário
+  // Auto-save effect: Melhora a lógica para salvar apenas quando há mudanças reais
+  // Intervalo de 30 segundos após a última mudança (debounce)
   useEffect(() => {
-    if (!autoSave) return;
+    if (!autoSave || !currentModelId) return;
 
-    const timer = setTimeout(() => {
-      handleSave(true);
-    }, 120000); 
+    // Se o contador de mudanças atual for maior que o registrado no último salvamento
+    if (activeEditor && activeEditor.changeCount > lastSavedChangeCount.current) {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      
+      autoSaveTimerRef.current = setTimeout(() => {
+        console.log(`[Auto-save] Detectadas mudanças (${activeEditor.changeCount} > ${lastSavedChangeCount.current}). Salvando...`);
+        handleSave(true);
+      }, 30000); // 30 segundos de inatividade após mudança
+    }
 
-    return () => clearTimeout(timer);
-  }, [artboards, canvasTitle, activeArtboardId, autoSave, currentModelId, activeEditor?.changeCount]);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [activeEditor?.changeCount, autoSave, currentModelId]);
 
   const handleSaveAsTemplate = async () => {
     if (!templateSaveName.trim()) {
@@ -1156,9 +1209,25 @@ function SupportContent() {
       
       const artboardsWithData = artboards.map(a => {
         const methods = artboardsMethods.current[a.id];
+        let artboardData = a.data;
+        
+        if (methods) {
+          try {
+            const json = methods.saveToJson();
+            artboardData = JSON.parse(json);
+          } catch (e) {
+            console.error(`[handleSaveAsTemplate] Erro ao serializar:`, e);
+          }
+        }
+        
+        console.log(`[handleSaveAsTemplate] Processando prancheta ${a.id}:`, {
+          source: methods ? 'canvas' : 'state_backup',
+          objectsCount: artboardData?.objects?.length || 0
+        });
+        
         return {
           ...a,
-          data: methods ? JSON.parse(methods.saveToJson()) : a.data
+          data: artboardData
         };
       });
 
@@ -2717,6 +2786,15 @@ function SupportContent() {
                 />
                 <Label htmlFor="auto-save" className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider cursor-pointer">Auto-save</Label>
               </div>
+
+              {lastSavedTime && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-900/20 animate-in fade-in slide-in-from-right-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="text-[9px] font-bold text-blue-600/70 dark:text-blue-400/70 uppercase tracking-wider">
+                    Salvo às {lastSavedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              )}
 
               <Button 
                 variant="outline" 
