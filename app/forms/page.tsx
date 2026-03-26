@@ -135,14 +135,29 @@ const generatePDF = async (form: any) => {
   doc.setFontSize(11);
   currentY += 15;
 
-  // Função auxiliar para campos simples (Label em Negrito, Valor Normal)
+  // Função auxiliar para campos simples (Label em Negrito, Valor Normal) com suporte a quebra de linha
   const drawField = (label: string, value: string) => {
     doc.setFont("helvetica", "bold");
-    doc.text(label, margin, currentY);
     const labelWidth = doc.getTextWidth(label);
+    
     doc.setFont("helvetica", "normal");
-    doc.text(value || "", margin + labelWidth + 2, currentY);
-    currentY += 8; // Reduzido de 10 para 8
+    const maxWidth = 170 - labelWidth;
+    const splitValue = doc.splitTextToSize(value || "", maxWidth);
+    
+    // Verifica se precisa de nova página
+    const neededHeight = splitValue.length * 7;
+    if (currentY + neededHeight > 275) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.text(label, margin, currentY);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(splitValue, margin + labelWidth + 2, currentY);
+    
+    currentY += Math.max(8, splitValue.length * 7); 
   };
 
   // --- PREENCHIMENTO DOS CAMPOS ---
@@ -151,9 +166,19 @@ const generatePDF = async (form: any) => {
   doc.setFont("helvetica", "bold");
   doc.text("ENDEREÇO DO IMÓVEL (COM N° DE MATRÍCULA):", margin, currentY);
   currentY += 7;
+  
   doc.setFont("helvetica", "normal");
-  doc.text(detailData?.endereco || "_________________________________________________", margin, currentY);
-  currentY += 9; // Reduzido de 10 para 9
+  const endereco = detailData?.endereco || "_________________________________________________";
+  const splitEndereco = doc.splitTextToSize(endereco, 170);
+  
+  // Verifica se o endereço cabe na página
+  if (currentY + (splitEndereco.length * 7) > 275) {
+    doc.addPage();
+    currentY = 20;
+  }
+  
+  doc.text(splitEndereco, margin, currentY);
+  currentY += (splitEndereco.length * 7) + 5; 
 
   drawField("QUAL TIPO DE INTERMEDIAÇÃO?: ", detailData?.tipo || "SEM EXCLUSIVIDADE");
   drawField("AUTORIZAÇÃO COM PRAZO DE VIGÊNCIA DE: ", detailData?.prazo || "NÃO INFORMADO");
@@ -161,6 +186,12 @@ const generatePDF = async (form: any) => {
 
   // Função para desenhar parágrafos (Texto Fixo Normal + Variável em Negrito no final)
   const drawMixedParagraph = (title: string, fixedText: string, variableText: string) => {
+    // Verifica se o título cabe na página atual
+    if (currentY + 15 > 275) {
+      doc.addPage();
+      currentY = 20;
+    }
+
     doc.setFont("helvetica", "bold");
     doc.text(title, margin, currentY);
     currentY += 5;
@@ -178,6 +209,12 @@ const generatePDF = async (form: any) => {
         if (cursorX + width > margin + maxWidth) {
           cursorX = margin;
           cursorY += 5.5; // Reduzido de 6 para 5.5
+          
+          if (cursorY > 275) {
+            doc.addPage();
+            cursorY = 20;
+            currentY = 20;
+          }
         }
         doc.text(w, cursorX, cursorY);
         cursorX += width;
@@ -205,6 +242,10 @@ const generatePDF = async (form: any) => {
     if (cursorX + width > margin + 170) {
       cursorX = margin;
       cursorY += 6;
+      if (cursorY > 275) {
+        doc.addPage();
+        cursorY = 20;
+      }
     }
     doc.text(w, cursorX, cursorY);
     cursorX += width;
