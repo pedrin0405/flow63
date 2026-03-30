@@ -130,16 +130,16 @@ const glassStyles = `
 
   /* ── Benefit card (Sombra reforçada) ── */
   .benefit-card {
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--card-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 1);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 1);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.05);
     transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.5s ease, border-color 0.3s;
   }
   .benefit-card:hover {
     transform: translateY(-6px) scale(1.01);
-    box-shadow: 0 24px 48px rgba(233, 28, 116, 0.15), 0 12px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 #fff;
+    box-shadow: 0 24px 48px rgba(233, 28, 116, 0.15), 0 12px 24px rgba(0, 0, 0, 0.08);
     border-color: rgba(233, 28, 116, 0.3);
   }
 
@@ -206,7 +206,7 @@ const glassStyles = `
   /* ── Scrollbar ── */
   .glass-scroll::-webkit-scrollbar { width: 4px; }
   .glass-scroll::-webkit-scrollbar-track { background: transparent; }
-  .glass-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 99px; }
+  .glass-scroll::-webkit-scrollbar-thumb { background: rgba(120,120,120,0.2); border-radius: 99px; }
 
   /* ── Shimmer no badge status ── */
   @keyframes status-pulse {
@@ -807,8 +807,8 @@ return (
                       <div
                         style={{
                           padding: '5px 14px', borderRadius: 99,
-                          background: '#ffffff', color: '#111827',
-                          border: '1px solid rgba(0,0,0,0.05)',
+                          background: 'var(--card-bg)', color: 'var(--text-main)',
+                          border: '1px solid var(--border-subtle)',
                           fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
                           boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                         }}
@@ -841,20 +841,20 @@ return (
                                     onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
                                   />
                                 ) : (
-                                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6' }}>
-                                    <Star size={28} color="#d1d5db" />
+                                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--btn-ghost-bg)' }}>
+                                    <Star size={28} color="var(--text-muted)" />
                                   </div>
                                 )}
                                 {/* Level badge */}
                                 <div
                                   style={{
                                     position: 'absolute', top: 10, right: 10,
-                                    background: 'rgba(255,255,255,0.9)',
+                                    background: 'var(--glass-white)',
                                     backdropFilter: 'blur(8px)',
                                     borderRadius: 99, padding: '4px 10px',
-                                    color: '#111827', fontSize: 8, fontWeight: 800, letterSpacing: '0.1em',
+                                    color: 'var(--text-main)', fontSize: 8, fontWeight: 800, letterSpacing: '0.1em',
                                     textTransform: 'uppercase',
-                                    border: '1px solid rgba(0,0,0,0.05)',
+                                    border: '1px solid var(--border-subtle)',
                                     boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                                   }}
                                 >
@@ -864,10 +864,10 @@ return (
 
                               {/* Content */}
                               <div style={{ padding: '14px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '-0.01em', textTransform: 'uppercase', lineHeight: 1.2, color: '#111827' }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '-0.01em', textTransform: 'uppercase', lineHeight: 1.2, color: 'var(--text-main)' }}>
                                   {cb.benefits.nome}
                                 </div>
-                                <div style={{ fontSize: 11, fontWeight: 500, color: '#6b7280', lineHeight: 1.5, flex: 1 }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', lineHeight: 1.5, flex: 1 }}>
                                   <HighlightValue text={cb.benefits.descricao} />
                                 </div>
                               </div>
@@ -876,8 +876,8 @@ return (
                               <div
                                 style={{
                                   padding: '10px 16px',
-                                  borderTop: '1px solid rgba(0,0,0,0.04)',
-                                  background: 'rgba(249,250,251,0.5)',
+                                  borderTop: '1px solid var(--border-subtle)',
+                                  background: 'var(--btn-ghost-bg)',
                                   display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                                 }}
                               >
@@ -888,7 +888,7 @@ return (
                                   />
                                   <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#e91c74' }}>Ativado</span>
                                 </div>
-                                <ChevronRight size={13} style={{ opacity: 0.4, transition: 'all 0.3s', color: '#4b5563' }} />
+                                <ChevronRight size={13} style={{ opacity: 0.4, transition: 'all 0.3s', color: 'var(--text-muted)' }} />
                               </div>
                             </div>
                           ))}
@@ -908,11 +908,11 @@ return (
                     className="glass-panel"
                     style={{ width: 100, height: 100, borderRadius: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <CreditCard size={36} color="#9ca3af" />
+                    <CreditCard size={36} color="var(--text-muted)" />
                   </div>
                   <div>
-                    <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.03em', fontStyle: 'italic', textTransform: 'uppercase', marginBottom: 10, color: '#111827' }}>Cartão não identificado</div>
-                    <p style={{ fontSize: 13, color: '#6b7280', maxWidth: 340, margin: '0 auto' }}>Entre em contato com o suporte para vincular seu benefício.</p>
+                    <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.03em', fontStyle: 'italic', textTransform: 'uppercase', marginBottom: 10, color: 'var(--text-main)' }}>Cartão não identificado</div>
+                    <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 340, margin: '0 auto' }}>Entre em contato com o suporte para vincular seu benefício.</p>
                   </div>
                 </div>
               )}
@@ -928,11 +928,11 @@ return (
             width: '92vw', maxWidth: 380,
             borderRadius: '2.5rem',
             padding: 0, overflow: 'hidden',
-            background: 'rgba(255, 255, 255, 0.95)',
+            background: 'var(--glass-white)',
             backdropFilter: 'blur(40px) saturate(200%)',
             WebkitBackdropFilter: 'blur(40px) saturate(200%)',
-            border: '1px solid rgba(255, 255, 255, 1)',
-            boxShadow: '0 40px 80px rgba(0,0,0,0.1), 0 10px 30px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,1)'
+            border: '1px solid var(--glass-border)',
+            boxShadow: 'var(--glass-shadow)'
           }}
         >
           {/* Luzes ambiente de fundo do modal */}
@@ -954,8 +954,8 @@ return (
                 <QrCode size={24} color="white" />
               </div>
               <div className="space-y-1 mt-1">
-                <DialogTitle style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: '#111827', lineHeight: 1 }}>Passe de Acesso</DialogTitle>
-                <DialogDescription style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>Apresente para liberação</DialogDescription>
+                <DialogTitle style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-main)', lineHeight: 1 }}>Passe de Acesso</DialogTitle>
+                <DialogDescription style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-muted)' }}>Apresente para liberação</DialogDescription>
               </div>
             </div>
 
@@ -991,15 +991,15 @@ return (
                 width: '100%',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '16px 20px', borderRadius: '1.2rem',
-                background: 'rgba(255,255,255,0.7)',
-                border: '1px solid rgba(255,255,255,1)',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.8)',
+                background: 'var(--btn-ghost-bg)',
+                border: '1px solid var(--border-subtle)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.1)',
                 textAlign: 'left'
               }}
             >
               <div>
-                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 2 }}>Membro VIP</div>
-                <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', color: '#111827', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cardName}</div>
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 2 }}>Membro VIP</div>
+                <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-main)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cardName}</div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>

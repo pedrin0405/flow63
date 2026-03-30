@@ -166,7 +166,7 @@ export default function BenefitCardsAdminPage() {
               <Button 
                 variant="outline"
                 onClick={handleExport}
-                className="rounded-full gap-2 border-slate-200 hover:bg-slate-50 text-slate-600 hidden md:flex"
+                className="rounded-full gap-2 border-border hover:bg-accent text-muted-foreground hidden md:flex"
               >
                 <Download size={16} /> Exportar
               </Button>
@@ -188,7 +188,7 @@ export default function BenefitCardsAdminPage() {
               
               {/* Stats Rápidas */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="bg-white border-none shadow-md rounded-3xl overflow-hidden relative border-l-4 border-l-primary/30">
+                <Card className="bg-card dark:bg-zinc-900/50 border-none shadow-md rounded-3xl overflow-hidden relative border-l-4 border-l-primary/30">
                   <CardContent className="p-6 flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
                       <CreditCard size={24} />
@@ -199,7 +199,7 @@ export default function BenefitCardsAdminPage() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border-none shadow-md rounded-3xl overflow-hidden">
+                <Card className="bg-card dark:bg-zinc-900/50 border-none shadow-md rounded-3xl overflow-hidden">
                   <CardContent className="p-6 flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                       <CheckCircle size={24} />
@@ -210,7 +210,7 @@ export default function BenefitCardsAdminPage() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border-none shadow-md rounded-3xl overflow-hidden">
+                <Card className="bg-card dark:bg-zinc-900/50 border-none shadow-md rounded-3xl overflow-hidden">
                   <CardContent className="p-6 flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500">
                       <Star size={24} />
@@ -224,16 +224,16 @@ export default function BenefitCardsAdminPage() {
               </div>
 
               <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="bg-white/50 backdrop-blur-xl p-1.5 rounded-2xl shadow-md border border-white/40 inline-flex">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-xl p-1.5 rounded-2xl shadow-md border border-white/40 dark:border-white/10 inline-flex">
                   <button 
                     onClick={() => setActiveTab("cards")}
-                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'cards' ? 'bg-[#e91c74] text-white shadow-lg shadow-[#e91c74]/20' : 'text-muted-foreground hover:bg-slate-100'}`}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'cards' ? 'bg-[#e91c74] text-white shadow-lg shadow-[#e91c74]/20' : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-zinc-800'}`}
                   >
                     Cartões Emitidos
                   </button>
                   <button 
                     onClick={() => setActiveTab("catalog")}
-                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'catalog' ? 'bg-[#e91c74] text-white shadow-lg shadow-[#e91c74]/20' : 'text-muted-foreground hover:bg-slate-100'}`}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'catalog' ? 'bg-[#e91c74] text-white shadow-lg shadow-[#e91c74]/20' : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-zinc-800'}`}
                   >
                     Catálogo de Benefícios
                   </button>
@@ -245,13 +245,13 @@ export default function BenefitCardsAdminPage() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                       <Input 
                         placeholder="Buscar por nome ou email..." 
-                        className="pl-10 rounded-2xl bg-white border-none shadow-sm h-11"
+                        className="pl-10 rounded-2xl bg-card dark:bg-zinc-900/50 border-none shadow-sm h-11"
                         value={filters.search}
                         onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                       />
                     </div>
                     <Select value={filters.status} onValueChange={(val) => setFilters(prev => ({ ...prev, status: val }))}>
-                      <SelectTrigger className="w-[140px] rounded-2xl bg-white border-none shadow-sm h-11">
+                      <SelectTrigger className="w-[140px] rounded-2xl bg-card dark:bg-zinc-900/50 border-none shadow-sm h-11">
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -357,7 +357,7 @@ export default function BenefitCardsAdminPage() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="flex-1 rounded-xl h-9 font-bold text-[10px] gap-1.5 border-slate-200 hover:bg-slate-50 transition-all bg-white shadow-sm"
+                            className="flex-1 rounded-xl h-9 font-bold text-[10px] gap-1.5 border-border hover:bg-accent transition-all bg-card shadow-sm"
                             onClick={() => { setEditingCard(card); setIsCardModalOpen(true); }}
                           >
                             <Settings2 size={12} /> GERENCIAR
@@ -365,7 +365,7 @@ export default function BenefitCardsAdminPage() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="w-9 h-9 rounded-xl p-0 border-rose-100 text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-all bg-white shadow-sm"
+                            className="w-9 h-9 rounded-xl p-0 border-rose-100 dark:border-rose-900/30 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:border-rose-200 transition-all bg-card shadow-sm"
                             onClick={() => handleDeleteCard(card.id)}
                           >
                             <Trash2 size={14} />
@@ -380,7 +380,7 @@ export default function BenefitCardsAdminPage() {
               <div className={activeTab === 'catalog' ? 'block' : 'hidden'}>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {benefits.map((benefit) => (
-                    <Card key={benefit.id} className="bg-white border-none rounded-[2rem] shadow-md hover:shadow-xl transition-all overflow-hidden border-l-4 border-l-primary/30">
+                    <Card key={benefit.id} className="bg-card dark:bg-zinc-900/50 border-none rounded-[2rem] shadow-md hover:shadow-xl transition-all overflow-hidden border-l-4 border-l-primary/30">
                       <CardContent className="p-6">
                         <div className="flex justify-between items-start mb-4">
                           {benefit.image_url ? (
@@ -403,11 +403,11 @@ export default function BenefitCardsAdminPage() {
                           <HighlightValue text={benefit.descricao} />
                         </p>
                         
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                        <div className="flex items-center justify-between pt-4 border-t border-border/50">
                           <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nível Mín: {benefit.nivel_minimo}</span>
                           <div className="flex gap-2">
                             <Button size="sm" variant="ghost" className="rounded-full w-8 h-8 p-0" onClick={() => { setEditingBenefit(benefit); setIsBenefitModalOpen(true); }}>
-                              <Settings2 size={16} className="text-slate-400" />
+                              <Settings2 size={16} className="text-muted-foreground" />
                             </Button>
                             <Button size="sm" variant="ghost" className="rounded-full w-8 h-8 p-0 text-rose-400 hover:text-rose-600" onClick={() => handleDeleteBenefit(benefit.id)}>
                               <Trash2 size={16} />
@@ -419,12 +419,12 @@ export default function BenefitCardsAdminPage() {
                   ))}
                   <button 
                     onClick={() => { setEditingBenefit(null); setIsBenefitModalOpen(true); }}
-                    className="group border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center py-12 gap-4 hover:border-primary/50 hover:bg-primary/5 transition-all shadow-sm hover:shadow-md"
+                    className="group border-2 border-dashed border-border rounded-[2rem] flex flex-col items-center justify-center py-12 gap-4 hover:border-primary/50 hover:bg-primary/5 transition-all shadow-sm hover:shadow-md"
                   >
-                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all shadow-inner">
+                    <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-white transition-all shadow-inner">
                       <Plus size={24} />
                     </div>
-                    <span className="font-bold text-slate-400 group-hover:text-primary uppercase tracking-widest text-xs">Novo Benefício</span>
+                    <span className="font-bold text-muted-foreground group-hover:text-primary uppercase tracking-widest text-xs">Novo Benefício</span>
                   </button>
                 </div>
               </div>
@@ -735,9 +735,9 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border border-white/20 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] bg-white/80 backdrop-blur-3xl">
+      <DialogContent className="sm:max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border border-border/20 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] bg-card/80 backdrop-blur-3xl">
         <div className="flex flex-col h-[85vh]">
-          <div className="bg-white/40 px-8 py-5 border-b border-white/20 flex items-center justify-between shadow-sm z-10">
+          <div className="bg-card/40 px-8 py-5 border-b border-border/20 flex items-center justify-between shadow-sm z-10">
             <DialogHeader>
               <DialogTitle className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-[#e91c74] flex items-center justify-center text-white shadow-lg shadow-[#e91c74]/30">
@@ -746,14 +746,14 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                 {card ? 'Ajustar Privilégios' : 'Emitir Cartão'}
               </DialogTitle>
             </DialogHeader>
-            <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/40 hover:shadow-md transition-all">
-              <X size={20} className="text-slate-600" />
+            <button onClick={onClose} className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center hover:bg-accent/40 hover:shadow-md transition-all">
+              <X size={20} className="text-muted-foreground" />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             <div className="grid grid-cols-1 lg:grid-cols-12 h-full">
-              <div className="lg:col-span-5 p-8 space-y-8 border-r border-white/20 bg-white/20 shadow-inner">
+              <div className="lg:col-span-5 p-8 space-y-8 border-r border-border/20 bg-card/20 shadow-inner">
                 <div className="space-y-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e91c74] px-1 flex items-center gap-2">
                     <Eye size={12} /> Live Preview
@@ -803,9 +803,9 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                 </div>
 
                 <div className="space-y-5">
-                  <div className="bg-white/40 p-5 rounded-[2rem] border border-white/40 shadow-lg space-y-4">
+                  <div className="bg-card/40 p-5 rounded-[2rem] border border-border/40 shadow-lg space-y-4">
                     <div className="space-y-1.5 relative">
-                      <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+                      <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <User size={10} className="text-[#e91c74]" /> {isEditMode ? 'Colaborador' : 'Colaboradores'}
                         </div>
@@ -819,15 +819,15 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                       {!isEditMode ? (
                         <div className="space-y-2">
                           <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60" size={14} />
                             <Input 
                               placeholder="Pesquisar por nome..." 
                               value={userSearch}
                               onChange={(e) => setUserSearch(e.target.value)}
-                              className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner font-bold text-xs pl-9 focus:ring-2 focus:ring-[#e91c74]/20 transition-all"
+                              className="h-11 rounded-xl bg-background/60 border-border shadow-inner font-bold text-xs pl-9 focus:ring-2 focus:ring-[#e91c74]/20 transition-all"
                             />
                           </div>
-                          <div className="max-h-[200px] overflow-y-auto rounded-xl border border-white/40 bg-white/40 shadow-inner custom-scrollbar">
+                          <div className="max-h-[200px] overflow-y-auto rounded-xl border border-border bg-background/40 shadow-inner custom-scrollbar">
                             {filteredUsers.length > 0 ? (
                               filteredUsers.map(u => {
                                 const isSelected = formData.selected_user_ids.includes(u.id)
@@ -839,20 +839,20 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                                 <div 
                                   key={u.id}
                                   onClick={() => toggleUserSelection(u.id)}
-                                  className={`flex items-center gap-3 p-3 cursor-pointer transition-all border-b border-white/10 last:border-0 group ${isSelected ? 'bg-[#e91c74]/10' : 'hover:bg-[#e91c74]/10'}`}
+                                  className={`flex items-center gap-3 p-3 cursor-pointer transition-all border-b border-border/10 last:border-0 group ${isSelected ? 'bg-[#e91c74]/10' : 'hover:bg-[#e91c74]/10'}`}
                                 >
-                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-[#e91c74] border-[#e91c74]' : 'border-slate-300 bg-white'}`}>
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-[#e91c74] border-[#e91c74]' : 'border-border bg-background'}`}>
                                     {isSelected && <CheckCircle className="text-white w-3 h-3" />}
                                   </div>
-                                  <Avatar className="h-8 w-8 rounded-full shadow-sm border border-white/40">
+                                  <Avatar className="h-8 w-8 rounded-full shadow-sm border border-border/40">
                                     <AvatarImage src={u.avatar_url} className="object-cover rounded-full" />
-                                    <AvatarFallback className="text-[10px] font-black bg-white text-slate-700 flex items-center justify-center w-8 h-8 rounded-full">{displayName.charAt(0)}</AvatarFallback>
+                                    <AvatarFallback className="text-[10px] font-black bg-background text-muted-foreground flex items-center justify-center w-8 h-8 rounded-full">{displayName.charAt(0)}</AvatarFallback>
                                   </Avatar>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-slate-700 truncate group-hover:text-[#e91c74] transition-colors">{displayName}</p>
-                                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">{u.role}</p>
+                                    <p className="text-xs font-bold text-foreground truncate group-hover:text-[#e91c74] transition-colors">{displayName}</p>
+                                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">{u.role}</p>
                                   </div>
-                                  <ChevronRight size={14} className={`transition-all ${isSelected ? 'text-[#e91c74] translate-x-1' : 'text-slate-300 group-hover:text-[#e91c74] group-hover:translate-x-1'}`} />
+                                  <ChevronRight size={14} className={`transition-all ${isSelected ? 'text-[#e91c74] translate-x-1' : 'text-muted-foreground/40 group-hover:text-[#e91c74] group-hover:translate-x-1'}`} />
                                 </div>
                                 )
                               })
@@ -864,12 +864,12 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                             )}
                           </div>
 
-                          <p className="text-[9px] text-slate-400 font-bold px-1">Somente colaboradores sem cartão aparecem na lista.</p>
+                          <p className="text-[9px] text-muted-foreground font-bold px-1">Somente colaboradores sem cartão aparecem na lista.</p>
 
                           {selectedUsers.length > 0 && (
-                            <div className="rounded-xl bg-white/50 border border-white/40 p-3 space-y-1">
-                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Selecionados</p>
-                              <p className="text-[10px] font-bold text-slate-700 truncate">
+                            <div className="rounded-xl bg-background/50 border border-border p-3 space-y-1">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Selecionados</p>
+                              <p className="text-[10px] font-bold text-foreground truncate">
                                 {selectedUsers.slice(0, 3).map(u => u.full_name || u.email?.split('@')[0] || "Usuário").join(', ')}
                                 {selectedUsers.length > 3 ? ` +${selectedUsers.length - 3}` : ''}
                               </p>
@@ -877,13 +877,13 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/60 border border-white/40 shadow-inner">
-                          <Avatar className="h-10 w-10 rounded-full shadow-md border-2 border-white">
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-background/60 border border-border shadow-inner">
+                          <Avatar className="h-10 w-10 rounded-full shadow-md border-2 border-background">
                             <AvatarImage src={selectedUser?.avatar_url} className="object-cover" />
-                            <AvatarFallback className="text-sm font-black bg-slate-100 text-slate-400">{selectedUserName.charAt(0)}</AvatarFallback>
+                            <AvatarFallback className="text-sm font-black bg-accent text-muted-foreground">{selectedUserName.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-black text-slate-800 truncate">{selectedUserName}</p>
+                            <p className="text-xs font-black text-foreground truncate">{selectedUserName}</p>
                             <p className="text-[9px] text-[#e91c74] uppercase font-black tracking-widest">{selectedUser?.role || "Membro"}</p>
                           </div>
                           {card && <ShieldCheck size={18} className="text-blue-500" />}
@@ -892,19 +892,19 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                      <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                         <Type size={10} className="text-[#e91c74]" /> Nome Impresso
                       </label>
-                      <Input placeholder="Personalizado" className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner text-xs font-bold" value={formData.card_display_name} onChange={(e) => setFormData(p => ({ ...p, card_display_name: e.target.value }))} />
+                      <Input placeholder="Personalizado" className="h-11 rounded-xl bg-background/60 border-border shadow-inner text-xs font-bold" value={formData.card_display_name} onChange={(e) => setFormData(p => ({ ...p, card_display_name: e.target.value }))} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Nível</label>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Nível</label>
                         <Input
                           type="number"
                           min={1}
-                          className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner text-center font-black text-[#e91c74]"
+                          className="h-11 rounded-xl bg-background/60 border-border shadow-inner text-center font-black text-[#e91c74]"
                           value={formData.nivel_beneficio}
                           onChange={(e) => {
                             const parsedLevel = Number.parseInt(e.target.value, 10)
@@ -916,9 +916,9 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Status</label>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Status</label>
                         <Select value={formData.status} onValueChange={(val: any) => setFormData(p => ({ ...p, status: val }))}>
-                          <SelectTrigger className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner font-bold text-[10px] uppercase">
+                          <SelectTrigger className="h-11 rounded-xl bg-background/60 border-border shadow-inner font-bold text-[10px] uppercase">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="z-[150] rounded-xl shadow-2xl">
@@ -930,14 +930,14 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                      <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                         <Calendar size={10} className="text-[#e91c74]" /> Data de Validade
                       </label>
-                      <Input type="date" className="h-11 rounded-xl bg-white/60 border-white/40 shadow-inner font-bold text-xs focus:ring-2 focus:ring-[#e91c74]/20 transition-all" value={formData.data_validade} onChange={(e) => setFormData(p => ({ ...p, data_validade: e.target.value }))} />
+                      <Input type="date" className="h-11 rounded-xl bg-background/60 border-border shadow-inner font-bold text-xs focus:ring-2 focus:ring-[#e91c74]/20 transition-all" value={formData.data_validade} onChange={(e) => setFormData(p => ({ ...p, data_validade: e.target.value }))} />
                       <div className="flex gap-2 mt-3">
                         {[{ label: '3 Meses', months: 3 }, { label: '6 Meses', months: 6 }, { label: '1 Ano', months: 12 }].map((opt) => (
                           <button key={opt.label} type="button" onClick={() => { const d = new Date(); d.setMonth(d.getMonth() + opt.months); setFormData(p => ({ ...p, data_validade: d.toISOString().split('T')[0] })) }}
-                            className="flex-1 py-2 rounded-xl bg-white/30 backdrop-blur-md border border-white/40 text-[9px] font-bold uppercase tracking-tight hover:bg-[#e91c74] hover:text-white hover:border-[#e91c74]/20 hover:shadow-lg hover:shadow-[#e91c74]/20 transition-all active:scale-95 text-slate-600">
+                            className="flex-1 py-2 rounded-xl bg-card dark:bg-zinc-800 backdrop-blur-md border border-border text-[9px] font-bold uppercase tracking-tight hover:bg-[#e91c74] hover:text-white hover:border-[#e91c74]/20 hover:shadow-lg hover:shadow-[#e91c74]/20 transition-all active:scale-95 text-muted-foreground">
                             {opt.label}
                           </button>
                         ))}
@@ -945,20 +945,20 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                     </div>
                   </div>
 
-                  <label className="flex items-center gap-4 p-4 rounded-[1.5rem] bg-white/40 border border-white/40 cursor-pointer hover:bg-white/60 hover:border-[#e91c74]/30 hover:shadow-md transition-all shadow-sm group">
-                    <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-[#e91c74] shadow-md group-hover:scale-110 transition-transform">
+                  <label className="flex items-center gap-4 p-4 rounded-[1.5rem] bg-card/40 border border-border cursor-pointer hover:bg-card/60 hover:border-[#e91c74]/30 hover:shadow-md transition-all shadow-sm group">
+                    <div className="w-12 h-12 rounded-2xl bg-card border border-border flex items-center justify-center text-[#e91c74] shadow-md group-hover:scale-110 transition-transform">
                       {uploading ? <Loader2 className="animate-spin" size={20} /> : <Camera size={20} />}
                     </div>
                     <div className="flex-1">
-                      <p className="text-[11px] font-black uppercase tracking-tight text-slate-700">Foto de Fundo</p>
-                      <p className="text-[9px] text-slate-400 font-medium">Trocar arte do cartão</p>
+                      <p className="text-[11px] font-black uppercase tracking-tight text-foreground">Foto de Fundo</p>
+                      <p className="text-[9px] text-muted-foreground font-medium">Trocar arte do cartão</p>
                     </div>
                     <input type="file" className="hidden" accept="image/*" onChange={handleUploadImage} disabled={uploading} />
                   </label>
                 </div>
               </div>
 
-              <div className="lg:col-span-7 p-8 flex flex-col h-full bg-white/40 shadow-inner">
+              <div className="lg:col-span-7 p-8 flex flex-col h-full bg-card/40 shadow-inner">
                 <div className="flex items-center justify-between mb-6 px-2">
                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e91c74] flex items-center gap-2">
                     <ListChecks size={14} /> Atribuição de Benefícios
@@ -973,20 +973,20 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                           setAutoApplyLevelBenefits(true)
                           syncBenefitsByLevel(formData.nivel_beneficio)
                         }}
-                        className="h-8 rounded-full text-[9px] font-black uppercase tracking-wider border-[#e91c74]/30 text-[#e91c74] bg-white/70 hover:bg-[#e91c74]/10"
+                        className="h-8 rounded-full text-[9px] font-black uppercase tracking-wider border-[#e91c74]/30 text-[#e91c74] bg-card/70 hover:bg-[#e91c74]/10"
                       >
                         Reaplicar nível
                       </Button>
                     )}
 
-                    <Badge variant="secondary" className="bg-white/60 backdrop-blur-md text-slate-500 border border-white/40 font-bold rounded-full text-[10px] shadow-sm">
+                    <Badge variant="secondary" className="bg-card/60 backdrop-blur-md text-muted-foreground border border-border font-bold rounded-full text-[10px] shadow-sm">
                       {formData.benefitIds.length} selecionado(s)
                     </Badge>
                   </div>
                 </div>
 
                 {!isEditMode && (
-                  <p className="px-2 mb-4 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                  <p className="px-2 mb-4 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                     {autoApplyLevelBenefits
                       ? 'Padrão automático ativo: benefícios elegíveis do nível já estão marcados.'
                       : 'Seleção manual ativa: você personalizou os benefícios deste lote.'}
@@ -999,17 +999,17 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                       const isSelected = formData.benefitIds.includes(b.id);
                       return (
                         <div key={b.id} onClick={() => toggleBenefit(b.id)}
-                          className={`flex items-center gap-4 p-4 rounded-[1.5rem] transition-all duration-300 cursor-pointer border ${isSelected ? 'bg-[#e91c74]/10 border-[#e91c74]/30 shadow-[0_15px_35px_-5px_rgba(233,28,116,0.25)] scale-[1.03] z-10 relative' : 'bg-white/40 border-white/40 hover:bg-white/60 hover:border-slate-300 hover:shadow-lg'}`}>
-                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-md ${isSelected ? 'bg-[#e91c74] text-white shadow-[#e91c74]/40' : 'bg-white text-slate-400'}`}>
+                          className={`flex items-center gap-4 p-4 rounded-[1.5rem] transition-all duration-300 cursor-pointer border ${isSelected ? 'bg-[#e91c74]/10 border-[#e91c74]/30 shadow-[0_15px_35px_-5px_rgba(233,28,116,0.25)] scale-[1.03] z-10 relative' : 'bg-card/40 border-border/40 hover:bg-card/60 hover:border-border hover:shadow-lg'}`}>
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-md ${isSelected ? 'bg-[#e91c74] text-white shadow-[#e91c74]/40' : 'bg-background text-muted-foreground border border-border'}`}>
                             {b.image_url ? <img src={b.image_url} alt="" className="w-full h-full object-cover rounded-2xl" /> : <Star size={18} />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-[11px] font-black leading-tight truncate uppercase ${isSelected ? 'text-[#e91c74]' : 'text-slate-700'}`}>
+                            <p className={`text-[11px] font-black leading-tight truncate uppercase ${isSelected ? 'text-[#e91c74]' : 'text-foreground'}`}>
                               <HighlightValue text={b.nome} />
                             </p>
                             <p className="text-[9px] font-bold opacity-40 mt-0.5">Nível {b.nivel_minimo}+</p>
                           </div>
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shadow-inner ${isSelected ? 'bg-[#e91c74] border-[#e91c74]' : 'border-slate-300 bg-white'}`}>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shadow-inner ${isSelected ? 'bg-[#e91c74] border-[#e91c74]' : 'border-border bg-background'}`}>
                             {isSelected && <CheckCircle className="text-white w-3 h-3" />}
                           </div>
                         </div>
@@ -1019,7 +1019,7 @@ function BenefitCardModal({ isOpen, card, benefits, onClose, onSave }: any) {
                 </div>
 
                 <div className="pt-8 flex gap-4 mt-auto">
-                  <Button variant="ghost" className="flex-1 rounded-2xl h-14 font-black uppercase tracking-widest text-[10px] text-slate-400 hover:text-slate-900 hover:bg-white/40 hover:shadow-sm transition-all" onClick={onClose}>Descartar</Button>
+                  <Button variant="ghost" className="flex-1 rounded-2xl h-14 font-black uppercase tracking-widest text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/40 hover:shadow-sm transition-all" onClick={onClose}>Descartar</Button>
                   <Button className="flex-[2.5] rounded-2xl h-14 font-black uppercase tracking-widest text-[10px] bg-[#e91c74] hover:bg-[#d11a68] shadow-[0_10px_25px_rgba(233,28,116,0.4)] hover:shadow-[0_15px_30px_rgba(233,28,116,0.5)] gap-3 transition-all transform active:scale-95 text-white" onClick={handleSave} disabled={loading || uploading}>
                     {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <ShieldCheck size={20} />}
                     {isEditMode
@@ -1085,30 +1085,30 @@ function BenefitCatalogModal({ isOpen, benefit, onClose, onSave }: any) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md rounded-[2.5rem] p-0 overflow-hidden border border-white/20 shadow-2xl bg-white/80 backdrop-blur-3xl">
+      <DialogContent className="sm:max-w-md rounded-[2.5rem] p-0 overflow-hidden border border-border/20 shadow-2xl bg-card/80 backdrop-blur-3xl">
         <div className="p-8 space-y-6">
           <DialogHeader><DialogTitle className="text-2xl font-black uppercase italic tracking-tight">{benefit ? 'Editar Benefício' : 'Novo Benefício'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="flex flex-col items-center justify-center py-4">
               <label className="relative group cursor-pointer">
                 <input type="file" className="hidden" accept="image/*" onChange={handleUploadImage} disabled={uploading} />
-                <div className="w-24 h-24 rounded-3xl bg-white/40 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden group-hover:border-primary/50 group-hover:bg-primary/5 transition-all shadow-inner">
-                  {formData.image_url ? <img src={formData.image_url} alt="Ícone" className="w-full h-full object-cover shadow-sm" /> : uploading ? <Loader2 className="animate-spin text-primary w-8 h-8" /> : <div className="text-center"><ImageIcon className="text-slate-400 w-8 h-8 mx-auto" /><span className="text-[8px] font-black uppercase text-slate-400 mt-1 block">Upload</span></div>}
+                <div className="w-24 h-24 rounded-3xl bg-background/40 border-2 border-dashed border-border flex items-center justify-center overflow-hidden group-hover:border-primary/50 group-hover:bg-primary/5 transition-all shadow-inner">
+                  {formData.image_url ? <img src={formData.image_url} alt="Ícone" className="w-full h-full object-cover shadow-sm" /> : uploading ? <Loader2 className="animate-spin text-primary w-8 h-8" /> : <div className="text-center"><ImageIcon className="text-muted-foreground/40 w-8 h-8 mx-auto" /><span className="text-[8px] font-black uppercase text-muted-foreground/40 mt-1 block">Upload</span></div>}
                 </div>
                 {formData.image_url && !uploading && <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-3xl transition-opacity"><Edit2 className="text-white w-6 h-6" /></div>}
               </label>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Nome</label>
-              <Input placeholder="Ex: 10% OFF" className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold shadow-inner" value={formData.nome} onChange={(e) => setFormData(p => ({ ...p, nome: e.target.value }))} />
+              <Input placeholder="Ex: 10% OFF" className="rounded-2xl h-12 bg-background/60 border-border font-bold shadow-inner" value={formData.nome} onChange={(e) => setFormData(p => ({ ...p, nome: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Descrição</label>
-              <Input placeholder="Ex: Ganhe 10% de desconto..." className="rounded-2xl h-12 bg-white/60 border-white/40 text-xs shadow-inner" value={formData.descricao} onChange={(e) => setFormData(p => ({ ...p, descricao: e.target.value }))} />
+              <Input placeholder="Ex: Ganhe 10% de desconto..." className="rounded-2xl h-12 bg-background/60 border-border text-xs shadow-inner" value={formData.descricao} onChange={(e) => setFormData(p => ({ ...p, descricao: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Nível Mínimo</label><Input type="number" className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold shadow-inner" value={formData.nivel_minimo} onChange={(e) => setFormData(p => ({ ...p, nivel_minimo: parseInt(e.target.value) }))} /></div>
-              <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Status</label><Select value={formData.ativo ? "true" : "false"} onValueChange={(val) => setFormData(p => ({ ...p, ativo: val === "true" }))}><SelectTrigger className="rounded-2xl h-12 bg-white/60 border-white/40 font-bold text-[10px] uppercase shadow-inner"><SelectValue /></SelectTrigger><SelectContent className="z-[150] shadow-2xl"><SelectItem value="true" className="text-emerald-600 font-bold uppercase text-[10px]">ATIVO</SelectItem><SelectItem value="false" className="text-rose-600 font-bold uppercase text-[10px]">SUSPENSO</SelectItem></SelectContent></Select></div>
+              <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Nível Mínimo</label><Input type="number" className="rounded-2xl h-12 bg-background/60 border-border font-bold shadow-inner" value={formData.nivel_minimo} onChange={(e) => setFormData(p => ({ ...p, nivel_minimo: parseInt(e.target.value) }))} /></div>
+              <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Status</label><Select value={formData.ativo ? "true" : "false"} onValueChange={(val) => setFormData(p => ({ ...p, ativo: val === "true" }))}><SelectTrigger className="rounded-2xl h-12 bg-background/60 border-border font-bold text-[10px] uppercase shadow-inner"><SelectValue /></SelectTrigger><SelectContent className="z-[150] shadow-2xl"><SelectItem value="true" className="text-emerald-600 font-bold uppercase text-[10px]">ATIVO</SelectItem><SelectItem value="false" className="text-rose-600 font-bold uppercase text-[10px]">SUSPENSO</SelectItem></SelectContent></Select></div>
             </div>
           </div>
           <DialogFooter className="pt-4 flex gap-3">
