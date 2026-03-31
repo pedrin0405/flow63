@@ -118,7 +118,7 @@ export async function middleware(request: NextRequest) {
       const restrictedPrefixes = [
         '/services', '/homes', '/units', '/brokers', '/admin', 
         '/indicators', '/forms', '/spreadsheets', '/custom-dashboard', 
-        '/chat-support', '/support', '/campaigns', '/editor'
+        '/chat-support', '/support', '/campaigns', '/editor', '/kanban'
       ]
 
       const isRestrictedPath = restrictedPrefixes.some(p => path.startsWith(p)) || path === '/'

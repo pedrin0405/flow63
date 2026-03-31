@@ -22,12 +22,14 @@ import {
   Library,
   Target,
   CreditCard,
+  LayoutList,
   type LucideIcon, 
   House,
   Palette,
   Wallet,
   Megaphone,
-  LinkIcon
+  LinkIcon,
+  LayoutPanelLeft
 } from "lucide-react"
 import {
   Tooltip,
@@ -136,7 +138,7 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
   const isHighLevelUser = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Secretária' || userData?.role === 'Admin';
   const isManagerOrAbove = userData?.role === 'Diretor' || userData?.role === 'Gestor' || userData?.role === 'Marketing' || userData?.role === 'Admin';
 
-  const hasAccessToMainMenu = canAccessRoute('/') || canAccessRoute('/services') || canAccessRoute('/homes') || canAccessRoute('/brokers') || canAccessRoute('/units')
+  const hasAccessToMainMenu = canAccessRoute('/') || canAccessRoute('/services') || canAccessRoute('/kanban') || canAccessRoute('/homes') || canAccessRoute('/brokers') || canAccessRoute('/units')
   const hasAccessToMetrics = canAccessRoute('/campaigns') || canAccessRoute('/indicators') || canAccessRoute('/forms') || canAccessRoute('/spreadsheets') || canAccessRoute('/custom-dashboard')
 
   // Atualiza o título da aba com a contagem de mensagens não lidas
@@ -373,6 +375,16 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
                     label="Atendimentos" 
                     active={isActive("atendimentos", "/services")} 
                     onClick={() => handleNavigation("atendimentos", "/services")} 
+                    collapsed={isCollapsed}
+                  />
+                )}
+                
+                {canAccessRoute('/kanban') && (
+                  <SidebarItem 
+                    icon={LayoutList} 
+                    label="Kanban" 
+                    active={isActive("kanban", "/kanban")} 
+                    onClick={() => handleNavigation("kanban", "/kanban")} 
                     collapsed={isCollapsed}
                   />
                 )}
