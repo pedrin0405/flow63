@@ -379,15 +379,6 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
                   />
                 )}
                 
-                {canAccessRoute('/kanban') && (
-                  <SidebarItem 
-                    icon={LayoutList} 
-                    label="Kanban" 
-                    active={isActive("kanban", "/kanban")} 
-                    onClick={() => handleNavigation("kanban", "/kanban")} 
-                    collapsed={isCollapsed}
-                  />
-                )}
                 
                 {canAccessRoute('/homes') && (
                   <SidebarItem 
@@ -528,6 +519,16 @@ export function Sidebar({ isOpen, onClose, activeTab, onTabChange, atendimentosC
                 collapsed={isCollapsed}
               />
             )}
+
+             {canAccessRoute('/kanban') && (
+                  <SidebarItem 
+                    icon={LayoutList} 
+                    label="Kanban" 
+                    active={isActive("kanban", "/kanban")} 
+                    onClick={() => handleNavigation("kanban", "/kanban")} 
+                    collapsed={isCollapsed}
+                  />
+                )}  
 
             {/* Bloco: Sistema */}
             {!isCollapsed && (
